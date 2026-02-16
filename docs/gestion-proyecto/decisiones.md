@@ -6,10 +6,10 @@
 ### Acuerdos
 * Temática: [normabot specs](normabot-specs.html)
 * División de tareas:
-    * Data + RAG Engineer --> Dani
-    * ML + NLP Engineer --> Rubén
-    * Agents + UI Lead --> Maru
-    * MLOps + Observabilidad --> Nati
+    * Data + RAG Engineer --> Dani (@danyocando-git)
+    * ML + NLP Engineer --> Rubén (@Rcerezo-dev)
+    * Agents + UI Lead --> Maru (@mariaeugenia-alvarez)
+    * MLOps + Observabilidad --> Nati (@natgarea)
 * Mantener reuniones aunque sean breves en el horario del bootcamp: 7PM Lunes, Martes y Jueves.
 * Mantener comunicación regular asíncrona por grupo de Discord.
 
