@@ -80,7 +80,7 @@ git commit -m "Actualizar VectorDB version X"
 git push origin <tu-rama>
 ```
 
-### Gestionar binarios de modelos
+#### Gestionar binarios de modelos
 El modelo de clasificación generará archivos cada vez que se termine de entrenar que pueden ser versionados.
 1. Añadir la ruta con el binario: 
 ```bash
