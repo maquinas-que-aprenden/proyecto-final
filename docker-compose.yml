@@ -15,19 +15,30 @@ services:
     image: ghcr.io/mlflow/mlflow
     ports:
       - "5000:5000"
-    environment:
-      - AWS_ACCESS_KEY_ID=${AWS_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_KEY}
+    volumes:
+      - mlflow_dev_data:/mlflow
+    restart: unless-stopped
     command: >
-      mlflow server --host 0.0.0.0 --port 5000 
-      --backend-store-uri sqlite:///mlflow_dev.db 
+      mlflow server 
+      --host 0.0.0.0 
+      --port 5000 
+      --backend-store-uri sqlite:///mlflow/mlflow_dev.db 
       --default-artifact-root s3://normabot/artifacts/dev
 
   mlflow-prod:
     image: ghcr.io/mlflow/mlflow
     ports:
-      - "5001:5000" # Mapeamos el 5001 externo al 5000 interno del contenedor
+      - "5001:5001" # Cambiamos ambos a 5001 para evitar líos
+    volumes:
+      - mlflow_prod_data:/mlflow
+    restart: unless-stopped
     command: >
-      mlflow server --host 0.0.0.0 --port 5000 
-      --backend-store-uri sqlite:///mlflow_prod.db 
+      mlflow server 
+      --host 0.0.0.0 
+      --port 5001 
+      --backend-store-uri sqlite:///mlflow/mlflow_prod.db 
       --default-artifact-root s3://normabot/artifacts/prod
+
+volumes:
+  mlflow_dev_data:
+  mlflow_prod_data:
