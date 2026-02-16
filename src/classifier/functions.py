@@ -29,6 +29,31 @@ def limpiar_texto(texto):
     
     return " ".join(tokens_limpios)
 
+import spacy
+
+nlp = spacy.load("es_core_news_sm", disable=["parser", "ner"])
+
+def limpiar_texto_preprocess(texto):
+    """
+    Esta función limpia el texto utilizando spaCy:
+    - Convierte a minúsculas
+    - Elimina puntuación, espacios y stop words. La diferencia con la función anterior es que esta función también lematiza las palabras, es decir, las reduce a su forma base o raíz. Por ejemplo, "corriendo", "corrí" y "correrá" se lematizan a "correr". Esto puede ayudar a reducir la dimensionalidad del texto y mejorar el rendimiento de los modelos de clasificación.
+    Parameters:
+    texto : str
+        El texto a limpiar.
+    Returns:
+    str
+        El texto limpio.
+    """
+    doc = nlp(texto.lower())
+    tokens = [
+        token.lemma_
+        for token in doc
+        if not token.is_punct
+        and not token.is_space
+        and not token.is_stop
+    ]
+    return " ".join(tokens)
 
 def analyze_text_length_distribution(df, text_column, label_column):
     """
@@ -94,3 +119,27 @@ def top_ngrams(df, n=20, ngram=2):
     plt.show()
     
     return ngram_most_common
+
+
+def preparar_dataset(df, text_column, label_column):
+    df = df.copy()
+    df["text_final"] = df[text_column].apply(limpiar_texto)
+    return df[["text_final", label_column]]
+
+from sklearn.model_selection import train_test_split
+
+def split_dataset(df, label_column, test_size=0.2, random_state=42):
+    X = df["text_final"]
+    y = df[label_column]
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y,
+        test_size=test_size,
+        stratify=y,
+        random_state=random_state
+    )
+
+    train_df = X_train.to_frame().join(y_train)
+    test_df = X_test.to_frame().join(y_test)
+
+    return train_df, test_df
