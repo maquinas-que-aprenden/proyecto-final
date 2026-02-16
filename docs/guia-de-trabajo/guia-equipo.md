@@ -8,6 +8,8 @@ Esta guía define cómo colaboramos para asegurar que el proyecto avance de form
     * bugfix/: Corrección de errores en desarrollo.
     * hotfix/: Errores críticos detectados en producción (salen de main).
     * release/: Preparación para paso a producción.
+    * docs/: Para documentación.
+    * chores/: Para tareas que no entran dentro de lo anterior.
 
 ## 2. Gestión de Issues
 * Antes de empezar cualquier tarea, debe existir una Issue en GitHub.
