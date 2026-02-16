@@ -1,0 +1,9 @@
+# Terraform
+infra/.terraform/*
+infra/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+.terraformrc
+terraform.rc
+aws.pem
