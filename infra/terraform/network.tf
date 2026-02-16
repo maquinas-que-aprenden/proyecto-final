@@ -1,6 +1,6 @@
 resource "aws_security_group" "normabot_sg" {
   name        = "normabot-sg"
-  description = "Permitir trafico para Streamlit, MLflow y SSH"
+  vpc_id = aws_vpc.normabot_vpc.id
 
   # SSH
   ingress {

@@ -1,4 +1,5 @@
-# Terraform
+# IaC
+infra/ansible/inventory.ini
 infra/terraform/.terraform/*
 infra/terraform/.terraform.lock.hcl
 *.tfstate
