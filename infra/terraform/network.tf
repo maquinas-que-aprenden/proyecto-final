@@ -18,10 +18,18 @@ resource "aws_security_group" "normabot_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # MLflow Tracking Server
+  # MLflow Dev
   ingress {
     from_port   = 5000
     to_port     = 5000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # MLflow Prod
+  ingress {
+    from_port   = 5001
+    to_port     = 5001
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
