@@ -1,3 +1,14 @@
+# IaC
+infra/ansible/inventory.ini
+infra/terraform/.terraform/*
+infra/terraform/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+.terraformrc
+terraform.rc
+aws.pem
+
 # Entorno virtual
 venv/
 
