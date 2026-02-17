@@ -165,3 +165,53 @@ def transform_query(state: RAGState) -> RAGState:
     rewritten = f"normativa regulación IA {original}"
 
     return {"query": rewritten}
+
+
+# ---------------------------------------------------------------------------
+# Nodo 4: generate
+# ---------------------------------------------------------------------------
+
+_DISCLAIMER = "\n\n_Informe preliminar generado por IA. Consulte profesional jurídico._"
+
+
+def generate(state: RAGState) -> RAGState:
+    """Genera una respuesta con citas legales exactas a partir de los docs relevantes.
+
+    Recibe los chunks que pasaron grade_documents y construye una respuesta
+    fundamentada con referencias a artículos concretos.
+
+    TODO: reemplazar mock por LLM call real. Prompt tipo:
+        "Eres un asistente legal especializado en normativa española y EU AI Act.
+         Responde SOLO con información de los siguientes documentos.
+         Cita siempre el artículo y la ley.
+         Documentos: {context}
+         Pregunta: {query}"
+    """
+    query = state["original_query"]
+    relevant_docs = state["relevant_docs"]
+
+    if not relevant_docs:
+        return {
+            "response": f"No se encontraron documentos relevantes para: '{query}'.{_DISCLAIMER}",
+        }
+
+    # Mock: construye respuesta concatenando los chunks con sus citas
+    # En producción: llm.invoke(generate_prompt.format(context=context, query=query))
+    citations = []
+    context_parts = []
+    for doc in relevant_docs:
+        meta = doc["metadata"]
+        ref = f"Art. {meta['articulo']} {meta['ley']}"
+        citations.append(ref)
+        context_parts.append(f"- {ref}: {doc['content']}")
+
+    context_str = "\n".join(context_parts)
+    citations_str = ", ".join(citations)
+
+    response = (
+        f"Según {citations_str}:\n\n"
+        f"{context_str}"
+        f"{_DISCLAIMER}"
+    )
+
+    return {"response": response}
