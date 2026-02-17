@@ -139,3 +139,29 @@ def grade_documents(state: RAGState) -> RAGState:
             relevant.append(doc)
 
     return {"relevant_docs": relevant}
+
+
+# ---------------------------------------------------------------------------
+# Nodo 3: transform_query
+# ---------------------------------------------------------------------------
+
+def transform_query(state: RAGState) -> RAGState:
+    """Reformula la query cuando los documentos recuperados no son relevantes.
+
+    Se activa solo si grade_documents no encontró docs válidos.
+    El objetivo es reescribir la consulta para mejorar el retrieval
+    en el siguiente intento.
+
+    TODO: reemplazar mock por LLM call real. Prompt tipo:
+        "La siguiente consulta no obtuvo resultados relevantes en una base
+         de legislación española (BOE, EU AI Act, LOPD).
+         Consulta original: {query}
+         Reescríbela para mejorar la búsqueda en el corpus legal."
+    """
+    original = state["original_query"]
+
+    # Mock: añade contexto legal a la query para mejorar el retrieval
+    # En producción: llm.invoke(rewrite_prompt.format(query=original))
+    rewritten = f"normativa regulación IA {original}"
+
+    return {"query": rewritten}
