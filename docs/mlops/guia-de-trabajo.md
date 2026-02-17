@@ -141,13 +141,13 @@ Para desplegar o destruir hay que tener permisos para crear los recursos en AWS,
 ### Ansible
 * Estamos usando [Ansible](https://docs.ansible.com/) para configurar el único servidor que tenemos. Tenemos un playbook que descarga e instala paquetes (`playbook.yaml`) y otro que levanta MLflow con una plantilla de [docker compose](http://docs.docker.com/compose/) (`deploy_mlflow.yaml`).
 * El inventario que usa ansible (`inventory.ini`) se genera autómaticamente con terraform o se puede usar esta plantilla:
-```
+```bash
 [normabot]
 <sustituir_IP> ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/aws.pem
 ```
 
 #### Cómo ejecutar
-```
+```bash
 ansible-playbook -i inventory.ini <nombre-del-playbook>.yaml
 ```
 Aviso: puede que falle en la primera ejecución.
