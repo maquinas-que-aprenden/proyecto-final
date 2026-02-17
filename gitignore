@@ -5,18 +5,18 @@ venv/
 # Credenciales
 .aws/
 credentials
-*.csv
+data/**/*.csv
 
 # Data de DVC
 /data/raw/
 /data/processed/
 !*.dvc
 
-#Carpeta claude
+`#Carpeta` claude
 .claude
 
-#Carpeta caché python para el clasificador
-src\classifier\__pycache__
+`#Carpeta` caché python para el clasificador
+src/classifier/__pycache__/
 
-#Diario (Rubén)
-src\classifier\tareas 
+`#Diario` (Rubén)
+src/classifier/tareas/
