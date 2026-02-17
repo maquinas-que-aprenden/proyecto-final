@@ -110,3 +110,32 @@ def retrieve(state: RAGState) -> RAGState:
         "documents": top_k,
         "attempt": state.get("attempt", 0) + 1,
     }
+
+
+# ---------------------------------------------------------------------------
+# Nodo 2: grade_documents
+# ---------------------------------------------------------------------------
+
+_RELEVANCE_THRESHOLD = 0.3
+
+
+def grade_documents(state: RAGState) -> RAGState:
+    """Evalúa la relevancia de cada documento recuperado respecto a la query.
+
+    Un LLM actúa como juez: para cada chunk decide "yes" o "no".
+
+    TODO: reemplazar mock por LLM call real. Prompt tipo:
+        "Dado este documento: {doc} ¿Es relevante para responder: {query}?
+         Responde solo 'yes' o 'no'."
+    """
+    documents = state["documents"]
+
+    relevant = []
+    for doc in documents:
+        # Mock: usa el score del retrieve como proxy de relevancia
+        # En producción: llm.invoke(grade_prompt.format(doc=doc, query=query))
+        score = doc.get("score", 0)
+        if score >= _RELEVANCE_THRESHOLD:
+            relevant.append(doc)
+
+    return {"relevant_docs": relevant}
