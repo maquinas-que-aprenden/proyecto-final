@@ -13,3 +13,6 @@ credentials
 
 #Carpeta claude
 .claude
+
+#Carpeta caché python para el clasificador
+src\classifier\__pycache__
