@@ -27,8 +27,8 @@
 
 ### IaC
 * Se persiste la infraestructura en Terraform para poder desplegarla y destruirla con rápidez.
-* La configuración del servidor en la instancia EC2 se hace a través un playbook de ansible.
-* Ambos se ejecutan en local, no hay planes de automatizar el despliegue de momento.
+* La configuración del servidor en la instancia EC2 se hace a través de playbooks de Ansible.
+* Tanto Terraform como Ansible se ejecutan en local, no hay planes de automatizar el despliegue de momento.
 
 ### Máquinas virtuales
 Inicialmente se plantea:

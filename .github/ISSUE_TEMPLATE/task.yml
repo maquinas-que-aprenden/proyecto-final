@@ -1,0 +1,64 @@
+name: Nueva Tarea (NormaBot)
+description: Crear una tarea específica para el equipo
+title: "[TASK]: "
+labels: ["task"]
+
+body:
+  - type: dropdown
+    id: module
+    attributes:
+      label: 🧩 Módulo
+      description: ¿A qué área del proyecto pertenece?
+      options:
+        - "Módulo A: Datos + RAG"
+        - "Módulo B: ML + NLP (Fine-tuning)"
+        - "Módulo C: Agentes + UI"
+        - "Módulo D: MLOps + Observabilidad"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: ⚡ Prioridad
+      options:
+        - 🔴 CRÍTICA (Bloqueante)
+        - 🟠 Alta (MVP)
+        - 🟡 Media (Nice to have)
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 📝 ¿Qué hay que hacer?
+      placeholder: "Ej: Implementar el scraper para el BOE..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: ✅ Criterios de aceptación
+      description: "Define qué debe cumplir la tarea para ser válida (puedes añadir más puntos)."
+      placeholder: |
+        - [ ] Tarea funcionando (obligatorio)
+        - [ ] Documentado en decisiones.md (obligatorio)
+        - [ ] PR aprobado por 2 personas (obligatorio)
+        - [ ] [Añade aquí tu criterio específico...]
+    validations:
+      required: true
+
+  - type: input
+    id: estimated_hours
+    attributes:
+      label: Estimación (horas)
+      placeholder: "2-4h"
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencias (opcional)
+      placeholder: "Depende de la tarea #X"
