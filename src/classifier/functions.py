@@ -105,18 +105,19 @@ def analyze_text_length_distribution(df, text_column, label_column):
     return stats
 
 
-def top_ngrams(df, n=20, ngram=2):
+def top_ngrams(df, n=20, ngram=2, text_column="descripcion_limpia"):
     """
-    Devuelve los n-grams más comunes en la columna 'descripcion_limpia' del
+    Devuelve los n-grams más comunes en la columna indicada del
     DataFrame y muestra una gráfica de barras con su frecuencia.
 
-    df: DataFrame con la columna 'descripcion_limpia'.
+    df: DataFrame con la columna de texto.
     n: Número de n-grams más comunes a devolver (por defecto 20).
     ngram: Tamaño del n-grama (por defecto 2 = bigramas).
+    text_column: Nombre de la columna de texto (por defecto 'descripcion_limpia').
     return: Lista de tuplas (n-gram, frecuencia).
     """
     all_ngrams = []
-    for review in df['descripcion_limpia']:
+    for review in df[text_column]:
         words = review.split()
         ngrams = zip(*[words[i:] for i in range(ngram)])
         ngrams = [' '.join(ng) for ng in ngrams]

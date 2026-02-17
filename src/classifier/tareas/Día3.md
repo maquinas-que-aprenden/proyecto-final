@@ -1,0 +1,1 @@
+XGBoost + Grid Search + k-fold. MLflow log Exp 2. Comparar modelos
