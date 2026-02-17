@@ -5,6 +5,7 @@ services:
       - "5000:5000"
     environment:
       - MLFLOW_HTTP_SITES_TRUSTED=*
+      - MLFLOW_HTTP_SITES_ALLOW_EVERYTHING=true
     volumes:
       - mlflow_data:/mlflow
     restart: unless-stopped
@@ -14,6 +15,7 @@ services:
       --port 5000 
       --backend-store-uri sqlite:///mlflow/mlflow.db 
       --default-artifact-root s3://normabot/artifacts/
+      --allowed-hosts "*"
 
 volumes:
   mlflow_data:
