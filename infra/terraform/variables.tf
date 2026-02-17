@@ -11,3 +11,8 @@ variable "key_name" {
   description = "Nombre del Key Pair en AWS"
   type        = string
 }
+
+variable "ruta_pem" {
+  type        = string
+  description = "Ruta local al archivo .pem"
+}
