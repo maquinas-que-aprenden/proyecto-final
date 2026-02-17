@@ -8,3 +8,16 @@ crash.log
 .terraformrc
 terraform.rc
 aws.pem
+
+# Entorno virtual
+venv/
+
+# Credenciales
+.aws/
+credentials
+*.csv
+
+# Data de DVC
+/data/raw/
+/data/processed/
+!*.dvc
