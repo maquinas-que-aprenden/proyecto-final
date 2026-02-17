@@ -1,0 +1,26 @@
+# Python 3.12.10
+# Dependencias del proyecto clasificador de riesgo IA (AI Act)
+
+# Procesamiento de lenguaje natural
+spacy==3.8.2
+packaging==24.2
+es-core-news-sm @ https://github.com/explosion/spacy-models/releases/download/es_core_news_sm-3.8.0/es_core_news_sm-3.8.0-py3-none-any.whl
+
+# Datos y cálculo numérico
+pandas==2.2.3
+numpy==1.26.4
+
+# Machine Learning
+scikit-learn==1.5.2
+joblib==1.4.2
+
+# Visualización
+matplotlib==3.9.2
+seaborn==0.13.2
+wordcloud==1.9.4
+
+# Tracking de experimentos
+mlflow==2.17.2
+
+# AWS
+boto3

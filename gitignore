@@ -18,3 +18,5 @@ credentials
 #Carpeta caché python para el clasificador
 src\classifier\__pycache__
 
+#Diario (Rubén)
+src\classifier\tareas 
