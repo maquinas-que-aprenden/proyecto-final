@@ -1,0 +1,52 @@
+---
+- name: Desplegar MLflow Unificado en NormaBot
+  hosts: normabot
+  vars:
+    project_path: "/home/ubuntu/normabot"
+
+  tasks:
+    - name: Asegurar que el directorio del proyecto existe
+      file:
+        path: "{{ project_path }}"
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+
+    - name: Configurar permisos de Docker para el usuario
+      become: true
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+
+    - name: Refrescar sesión SSH para aplicar permisos de grupo
+      meta: reset_connection
+
+    - name: Generar y copiar docker-compose.yml desde template
+      template:
+        src: templates/docker-compose.yml.j2
+        dest: "{{ project_path }}/docker-compose.yml"
+        owner: ubuntu
+        group: ubuntu
+        mode: '0644'
+
+    - name: Levantar stack de MLflow
+      shell: docker compose up -d --pull always
+      args:
+        chdir: "{{ project_path }}"
+
+    - name: Verificar estado del contenedor
+      shell: docker compose ps
+      args:
+        chdir: "{{ project_path }}"
+      register: compose_status
+
+    - name: Resumen del despliegue
+      debug:
+        msg: 
+          - "=========================================="
+          - "MLflow SERVER: http://{{ ansible_host }}:5000"
+          - "Estado del servicio:"
+          - "{{ compose_status.stdout }}"
+          - "=========================================="

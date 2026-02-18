@@ -1,12 +1,28 @@
 # Entorno virtual
 venv/
 .conda
+# IaC
+infra/ansible/inventory.ini
+infra/terraform/.terraform/*
+infra/terraform/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+.terraformrc
+terraform.rc
+aws.pem
+
+# Entorno virtual
+venv/
+.venv/
+__pycache__
 
 # Credenciales
 .aws/
 credentials
 data/**/*.csv
 
+*.csv
 
 # Data de DVC
 /data/raw/
