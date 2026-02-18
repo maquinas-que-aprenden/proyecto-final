@@ -112,8 +112,6 @@ mlflow.set_tracking_uri(remote_server_uri)
 ```
 Para más información, consultar la documentación oficial: [Logging to a tracking server](https://mlflow.org/docs/latest/self-hosting/architecture/tracking-server/#logging_to_a_tracking_server)
 
-La IP puede 
-
 La UI también está levantada en la misma IP y puerto.
 
 ## Infraestructura como Código
