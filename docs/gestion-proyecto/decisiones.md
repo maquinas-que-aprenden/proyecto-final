@@ -15,5 +15,5 @@
 
 ### Acciones pendientes
 
-[x] Cada uno revisa sus tareas para organizarse, plantear dudas y cambios.
-[ ] Crear un requirements.txt para trabajar todos con el mismo.
+[x] Cada uno revisa sus tareas para organizarse, plantear dudas y cambios. => 2026-02-16
+[x] Crear un requirements.txt para trabajar todos con el mismo. => 2026-02-18
