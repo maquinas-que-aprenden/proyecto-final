@@ -21,12 +21,12 @@
 * Se crea un usuario por compañero y se añade al grupo.
 
 ## Datos y versiones
-* En vez de utilizar GitHub, Google Drive o HF Datasets para almacenar el corpus como se propone en los specs originales, para tener un punto que sea la fuente única de verdad y una mayor trazabilidad vamos usar el bucket de S3 `normabot` en `eu-west-1` con [DVC](https://dvc.org/).
+* En vez de utilizar GitHub, Google Drive o HF Datasets para almacenar el corpus como se propone en los specs originales, para tener un punto que sea la fuente única de verdad y una mayor trazabilidad, vamos a usar el bucket de S3 `normabot` en `eu-west-1` con [DVC](https://dvc.org/).
 
 ## Infraestructura en AWS
 
 ### IaC
-* Se persiste la infraestructura en Terraform para poder desplegarla y destruirla con rápidez.
+* Se persiste la infraestructura en Terraform para poder desplegarla y destruirla con rapidez.
 * La configuración del servidor en la instancia EC2 se hace a través de playbooks de Ansible.
 * Tanto Terraform como Ansible se ejecutan en local, no hay planes de automatizar el despliegue de momento.
 
@@ -36,7 +36,7 @@ Inicialmente se plantea:
 * Utilizar Docker Compose para mantener varios servicios aislados en la misma instancia.
 
 ### Bases de datos
-De momento solo hay una para MLflow. Es preferible usar SQLite dentro de la propia instancia de EC2 porque es coste 0€ y evita los gatos y la gestión que supone una RDS (usuarios, redes, copias de seguridad).
+De momento solo hay una para MLflow. Es preferible usar SQLite dentro de la propia instancia de EC2 porque es coste 0€ y evita los gastos y la gestión que supone una RDS (usuarios, redes, copias de seguridad).
 
 ### Almacenamiento en bloque
 * Enlazada a la instancia de EC2 está configurada para persistir los datos en caso de que se elimine.
