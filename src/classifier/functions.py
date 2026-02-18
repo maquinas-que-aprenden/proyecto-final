@@ -19,12 +19,68 @@ from scipy.sparse import hstack
 from scipy import sparse
 import joblib
 import os
+import mlflow
 
 # ──────────────────────────────────────────────
 # Configuración MLflow
 # ──────────────────────────────────────────────
-MLFLOW_TRACKING_URI = "http://34.240.189.163:5000"
+MLFLOW_TRACKING_URI = "https://34.240.189.163"
 MLFLOW_EXPERIMENT = "clasificador_riesgo_ia"
+
+
+def get_mlflow_password():
+    """
+    Obtiene la contraseña de MLflow desde:
+    - Colab Secrets (si está en Colab)
+    - Archivo .env en el directorio de trabajo (entorno local)
+    - Variable de entorno del sistema (entorno local)
+    """
+    # Intentar obtener desde Colab
+    try:
+        from google.colab import userdata
+        password = userdata.get("MLFLOW_PASSWORD")
+        if password:
+            print("Password obtenida desde Colab Secrets.")
+            return password
+    except ImportError:
+        pass
+
+    # Cargar .env si existe (necesario en Jupyter, donde las vars del sistema
+    # no se propagan al kernel automáticamente).
+    # Se usa la ruta del propio functions.py para no depender del directorio
+    # de trabajo del kernel.
+    try:
+        from dotenv import load_dotenv
+        from pathlib import Path
+        dotenv_path = Path(__file__).parent / ".env"
+        load_dotenv(dotenv_path=dotenv_path, override=True)
+    except ImportError:
+        pass  # python-dotenv no instalado, se continúa sin él
+
+    password = os.getenv("MLFLOW_PASSWORD")
+    if password:
+        print("Password obtenida desde variable de entorno local.")
+        return password
+
+    raise EnvironmentError(
+        "No se encontró MLFLOW_PASSWORD.\n"
+        "Opciones:\n"
+        "  1. Crea un archivo .env en src/classifier/ con: MLFLOW_PASSWORD=tu_password\n"
+        "  2. Define la variable de entorno y reinicia el kernel de Jupyter.\n"
+        "  3. En Colab, configúrala en Colab Secrets."
+    )
+
+
+def configure_mlflow():
+    """Configura las credenciales y la URI de seguimiento de MLflow."""
+    password = get_mlflow_password()
+
+    os.environ["MLFLOW_TRACKING_INSECURE_TLS"] = "true"
+    os.environ["MLFLOW_TRACKING_USERNAME"] = "tracker"
+    os.environ["MLFLOW_TRACKING_PASSWORD"] = password
+
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    print(f"MLflow configurado correctamente → {MLFLOW_TRACKING_URI}")
 
 # ──────────────────────────────────────────────
 # Pipelines de spaCy (carga diferida bajo demanda)
