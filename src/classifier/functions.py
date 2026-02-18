@@ -11,73 +11,72 @@ from sklearn.metrics import (
     confusion_matrix,
     ConfusionMatrixDisplay,
     f1_score,
-    roc_auc_score,
     roc_curve,
     auc,
 )
 from sklearn.preprocessing import label_binarize
-from scipy.sparse import hstack, issparse
+from scipy.sparse import hstack
 from scipy import sparse
 import joblib
 import os
 
 # ──────────────────────────────────────────────
-# Pipelines de spaCy (se cargan una sola vez)
+# Pipelines de spaCy (carga diferida bajo demanda)
 # ──────────────────────────────────────────────
-nlp = spacy.load("es_core_news_sm", disable=["parser", "ner"])
-nlp_ner = spacy.load("es_core_news_sm")
+_nlp = None
+_nlp_ner = None
+
+
+def _get_nlp():
+    global _nlp
+    if _nlp is None:
+        _nlp = spacy.load("es_core_news_sm", disable=["parser", "ner"])
+    return _nlp
+
+
+def _get_nlp_ner():
+    global _nlp_ner
+    if _nlp_ner is None:
+        _nlp_ner = spacy.load("es_core_news_sm")
+    return _nlp_ner
 
 
 # ══════════════════════════════════════════════
 # 1. FUNCIONES DE LIMPIEZA DE TEXTO
 # ══════════════════════════════════════════════
 
-def limpiar_texto(texto):
+def limpiar_texto(texto, lemmatize=False):
     """
     Limpia el texto utilizando spaCy:
     - Convierte a minúsculas
     - Elimina puntuación, espacios y stop words
+    - Opcionalmente lematiza las palabras (reduce a su forma base o raíz).
+      Por ejemplo, "corriendo", "corrí" y "correrá" se lematizan a "correr".
+
     Parameters:
     texto : str
         El texto a limpiar.
+    lemmatize : bool
+        Si True, lematiza los tokens (por defecto False).
+
     Returns:
     str
         El texto limpio.
     """
-    doc = nlp(texto.lower())
-    tokens_limpios = [
-        token.text
-        for token in doc
-        if not token.is_punct
-        and not token.is_space
-        and not token.is_stop
-    ]
-    return " ".join(tokens_limpios)
-
-
-def limpiar_texto_preprocess(texto):
-    """
-    Limpia el texto utilizando spaCy con lematización:
-    - Convierte a minúsculas
-    - Elimina puntuación, espacios y stop words
-    - Lematiza las palabras (reduce a su forma base o raíz).
-      Por ejemplo, "corriendo", "corrí" y "correrá" se lematizan a "correr".
-    Parameters:
-    texto : str
-        El texto a limpiar.
-    Returns:
-    str
-        El texto limpio y lematizado.
-    """
-    doc = nlp(texto.lower())
+    doc = _get_nlp()(texto.lower())
     tokens = [
-        token.lemma_
+        (token.lemma_ if lemmatize else token.text)
         for token in doc
         if not token.is_punct
         and not token.is_space
         and not token.is_stop
     ]
     return " ".join(tokens)
+
+
+def limpiar_texto_preprocess(texto):
+    """Alias mantenido por compatibilidad. Equivale a limpiar_texto(texto, lemmatize=True)."""
+    return limpiar_texto(texto, lemmatize=True)
 
 
 # ══════════════════════════════════════════════
@@ -230,7 +229,7 @@ def extraer_entidades(df, text_column):
     textos = df[text_column].fillna("").astype(str).tolist()
 
     resultados = []
-    for doc in nlp_ner.pipe(textos, batch_size=100):
+    for doc in _get_nlp_ner().pipe(textos, batch_size=100):
         entidades = [
             {
                 "texto": ent.text,
@@ -319,6 +318,16 @@ def split_dataset(df, label_column, test_size=0.15, val_size=0.15, random_state=
     Returns:
     tuple (train_df, val_df, test_df)
     """
+    if test_size <= 0 or val_size <= 0:
+        raise ValueError(
+            f"test_size ({test_size}) y val_size ({val_size}) deben ser > 0."
+        )
+    if test_size + val_size >= 1.0:
+        raise ValueError(
+            f"test_size ({test_size}) + val_size ({val_size}) debe ser < 1.0 "
+            f"para que queden muestras de entrenamiento."
+        )
+
     X = df["text_final"]
     y = df[label_column]
 
@@ -414,7 +423,9 @@ def entrenar_xgboost(X_train, y_train, X_val, y_val, params=None):
     params : dict, hiperparámetros para XGBClassifier (opcional).
 
     Returns:
-    modelo : XGBClassifier entrenado.
+    tuple (modelo, label_encoder)
+        - modelo: XGBClassifier entrenado.
+        - label_encoder: LabelEncoder ajustado sobre y_train.
     """
     from xgboost import XGBClassifier
     from sklearn.preprocessing import LabelEncoder
@@ -446,10 +457,10 @@ def entrenar_xgboost(X_train, y_train, X_val, y_val, params=None):
     f1_macro = f1_score(y_val, y_val_pred, average="macro")
     print(f"F1-score macro (validación): {f1_macro:.4f}")
 
-    # Guardamos el LabelEncoder como atributo para usarlo después
-    modelo._label_encoder = le
+    # Exponemos el LabelEncoder como atributo público para predicciones posteriores
+    modelo.label_encoder = le
 
-    return modelo
+    return modelo, le
 
 
 def grid_search_cv(X_train, y_train, param_grid, cv=5):
@@ -463,10 +474,11 @@ def grid_search_cv(X_train, y_train, param_grid, cv=5):
     cv : int, número de folds para cross-validation (por defecto 5).
 
     Returns:
-    tuple (best_model, best_params, cv_results)
+    tuple (best_model, best_params, cv_results, label_encoder)
         - best_model: XGBClassifier con los mejores hiperparámetros.
         - best_params: dict con los mejores parámetros.
         - cv_results: pd.DataFrame con los resultados del Grid Search.
+        - label_encoder: LabelEncoder ajustado sobre y_train.
     """
     from xgboost import XGBClassifier
     from sklearn.model_selection import GridSearchCV, StratifiedKFold
@@ -499,11 +511,11 @@ def grid_search_cv(X_train, y_train, param_grid, cv=5):
     print(f"Mejores parámetros: {grid.best_params_}")
 
     best_model = grid.best_estimator_
-    best_model._label_encoder = le
+    best_model.label_encoder = le
 
     cv_results = pd.DataFrame(grid.cv_results_).sort_values("rank_test_score")
 
-    return best_model, grid.best_params_, cv_results
+    return best_model, grid.best_params_, cv_results, le
 
 
 def guardar_artefactos(modelo, tfidf, output_dir):
@@ -558,13 +570,12 @@ def evaluar_modelo(modelo, tfidf, X_test, y_test):
     y_pred = modelo.predict(X_test_tfidf)
 
     print("=== Resultados en TEST ===\n")
-    report = classification_report(y_test, y_pred)
-    print(report)
+    report_dict = classification_report(y_test, y_pred, output_dict=True)
+    print(classification_report(y_test, y_pred))
 
-    f1_macro = f1_score(y_test, y_pred, average="macro")
+    f1_macro = report_dict["macro avg"]["f1-score"]
     print(f"F1-score macro (test): {f1_macro:.4f}\n")
 
-    report_dict = classification_report(y_test, y_pred, output_dict=True)
     return y_pred, report_dict
 
 
