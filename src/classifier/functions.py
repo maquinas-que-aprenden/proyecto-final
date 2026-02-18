@@ -16,6 +16,8 @@ from sklearn.metrics import (
     auc,
 )
 from sklearn.preprocessing import label_binarize
+from scipy.sparse import hstack, issparse
+from scipy import sparse
 import joblib
 import os
 
@@ -79,7 +81,72 @@ def limpiar_texto_preprocess(texto):
 
 
 # ══════════════════════════════════════════════
-# 2. FUNCIONES DE ANÁLISIS EXPLORATORIO (EDA)
+# 2. FUNCIONES DE FEATURES MANUALES
+# ══════════════════════════════════════════════
+
+# Palabras clave discriminativas por clase, extraídas del análisis exploratorio
+KEYWORDS_DOMINIO = {
+    "inaceptable": ["inferir", "vender", "emocional", "conocimiento", "biométrico",
+                     "cámara", "facial", "vigilancia", "sindical", "parental"],
+    "alto_riesgo": ["determinar", "autónomamente", "control", "supervisión",
+                     "penitenciario", "juez", "autónomo", "reincidencia",
+                     "medicación", "crediticio"],
+    "riesgo_limitado": ["advertir", "indicar", "chatbot", "informar",
+                         "automatizado", "limitación", "asesoramiento",
+                         "artificial", "revelar", "asistente"],
+    "riesgo_minimo": ["industrial", "sensor", "optimizar", "mejora",
+                       "clasificación", "optimización", "investigador",
+                       "gestión", "avería", "maquinaria"],
+}
+
+
+def crear_features_manuales(X_texts):
+    """
+    Genera features numéricas a partir de los textos lematizados.
+
+    Features creadas:
+    - num_palabras: número de palabras
+    - num_caracteres: número de caracteres
+    - kw_inaceptable: conteo de keywords de la clase inaceptable
+    - kw_alto_riesgo: conteo de keywords de la clase alto_riesgo
+    - kw_riesgo_limitado: conteo de keywords de la clase riesgo_limitado
+    - kw_riesgo_minimo: conteo de keywords de la clase riesgo_minimo
+
+    Parameters:
+    X_texts : pd.Series con los textos lematizados.
+
+    Returns:
+    pd.DataFrame con las features numéricas.
+    """
+    features = pd.DataFrame()
+    features["num_palabras"] = X_texts.apply(lambda t: len(t.split()))
+    features["num_caracteres"] = X_texts.apply(len)
+
+    for clase, keywords in KEYWORDS_DOMINIO.items():
+        features[f"kw_{clase}"] = X_texts.apply(
+            lambda t, kws=keywords: sum(1 for kw in kws if kw in t.split())
+        )
+
+    return features
+
+
+def combinar_features(X_tfidf, X_manual):
+    """
+    Concatena la matriz TF-IDF (sparse) con las features manuales (dense).
+
+    Parameters:
+    X_tfidf : sparse matrix de TF-IDF.
+    X_manual : pd.DataFrame con features numéricas.
+
+    Returns:
+    sparse matrix combinada.
+    """
+    X_manual_sparse = sparse.csr_matrix(X_manual.values)
+    return hstack([X_tfidf, X_manual_sparse])
+
+
+# ══════════════════════════════════════════════
+# 3. FUNCIONES DE ANÁLISIS EXPLORATORIO (EDA)
 # ══════════════════════════════════════════════
 
 def analyze_text_length_distribution(df, text_column, label_column):
@@ -333,6 +400,110 @@ def entrenar_modelo_baseline(X_train_tfidf, y_train, X_val_tfidf, y_val):
     print(f"F1-score macro (validación): {f1_macro:.4f}")
 
     return modelo
+
+
+def entrenar_xgboost(X_train, y_train, X_val, y_val, params=None):
+    """
+    Entrena un XGBClassifier con los parámetros dados y evalúa en validación.
+
+    Parameters:
+    X_train : sparse matrix o array con features de entrenamiento.
+    y_train : pd.Series con etiquetas de entrenamiento.
+    X_val : sparse matrix o array con features de validación.
+    y_val : pd.Series con etiquetas de validación.
+    params : dict, hiperparámetros para XGBClassifier (opcional).
+
+    Returns:
+    modelo : XGBClassifier entrenado.
+    """
+    from xgboost import XGBClassifier
+    from sklearn.preprocessing import LabelEncoder
+
+    le = LabelEncoder()
+    y_train_enc = le.fit_transform(y_train)
+    y_val_enc = le.transform(y_val)
+
+    default_params = {
+        "n_estimators": 200,
+        "max_depth": 5,
+        "learning_rate": 0.1,
+        "subsample": 0.8,
+        "random_state": 42,
+        "eval_metric": "mlogloss",
+    }
+    if params:
+        default_params.update(params)
+
+    modelo = XGBClassifier(**default_params)
+    modelo.fit(X_train, y_train_enc)
+
+    y_val_pred_enc = modelo.predict(X_val)
+    y_val_pred = le.inverse_transform(y_val_pred_enc)
+
+    print("=== Resultados en VALIDACIÓN (XGBoost) ===\n")
+    print(classification_report(y_val, y_val_pred))
+
+    f1_macro = f1_score(y_val, y_val_pred, average="macro")
+    print(f"F1-score macro (validación): {f1_macro:.4f}")
+
+    # Guardamos el LabelEncoder como atributo para usarlo después
+    modelo._label_encoder = le
+
+    return modelo
+
+
+def grid_search_cv(X_train, y_train, param_grid, cv=5):
+    """
+    Ejecuta Grid Search con StratifiedKFold sobre XGBClassifier.
+
+    Parameters:
+    X_train : sparse matrix o array con features de entrenamiento.
+    y_train : pd.Series con etiquetas de entrenamiento.
+    param_grid : dict, grid de hiperparámetros a explorar.
+    cv : int, número de folds para cross-validation (por defecto 5).
+
+    Returns:
+    tuple (best_model, best_params, cv_results)
+        - best_model: XGBClassifier con los mejores hiperparámetros.
+        - best_params: dict con los mejores parámetros.
+        - cv_results: pd.DataFrame con los resultados del Grid Search.
+    """
+    from xgboost import XGBClassifier
+    from sklearn.model_selection import GridSearchCV, StratifiedKFold
+    from sklearn.preprocessing import LabelEncoder
+
+    le = LabelEncoder()
+    y_train_enc = le.fit_transform(y_train)
+
+    base_model = XGBClassifier(
+        random_state=42,
+        eval_metric="mlogloss",
+    )
+
+    skf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=42)
+
+    grid = GridSearchCV(
+        estimator=base_model,
+        param_grid=param_grid,
+        cv=skf,
+        scoring="f1_macro",
+        n_jobs=-1,
+        verbose=1,
+        refit=True,
+    )
+
+    grid.fit(X_train, y_train_enc)
+
+    print(f"\n=== Resultados Grid Search ({cv}-fold CV) ===")
+    print(f"Mejor F1-macro CV: {grid.best_score_:.4f}")
+    print(f"Mejores parámetros: {grid.best_params_}")
+
+    best_model = grid.best_estimator_
+    best_model._label_encoder = le
+
+    cv_results = pd.DataFrame(grid.cv_results_).sort_values("rank_test_score")
+
+    return best_model, grid.best_params_, cv_results
 
 
 def guardar_artefactos(modelo, tfidf, output_dir):
