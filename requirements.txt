@@ -1,12 +1,3 @@
-awscli
-dvc
-dvc-s3
-mlflow
-boto3
-langfuse
-ragas
 langgraph
 langchain
-langchain-groq
-langchain-google-genai
-langchain-community
+streamlit
