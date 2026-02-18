@@ -11,6 +11,8 @@ aws.pem
 
 # Entorno virtual
 venv/
+.venv/
+__pycache__
 
 # Credenciales
 .aws/
