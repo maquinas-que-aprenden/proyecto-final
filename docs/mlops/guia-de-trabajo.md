@@ -96,3 +96,56 @@ git add models/classifier/classifier_v1.joblib.dvc .gitignore
 git commit -m "Actualizar modelo de clasificación version X"
 git push origin <tu-rama>
 ```
+
+## Observabilidad y trazabilidad
+
+### Langfuse Cloud
+Tenemos una cuenta común para [Langfuse Cloud](https://cloud.langfuse.com/) y una API key para mandar trazas que se puede consultar en la web.
+
+Para más información, consultar la documentación oficial: [Langfuse: get started](https://langfuse.com/docs/observability/get-started)
+
+### MLflow
+Tenemos levantado un servidor para MLflow. Para usarlo, después de importar la librería hay que indicar el servidor de la siguiente manera:
+```python
+remote_server_uri = "http://<IP-de-instancia-EC2>:5000" 
+mlflow.set_tracking_uri(remote_server_uri)
+```
+Para más información, consultar la documentación oficial: [Logging to a tracking server](https://mlflow.org/docs/latest/self-hosting/architecture/tracking-server/#logging_to_a_tracking_server)
+
+La UI también está levantada en la misma IP y puerto.
+
+## Infraestructura como Código
+Usamos IaC para garantizar entornos reproducibles, escalables y que se desplieguen rápido con control de versiones.
+
+### Terraform
+* Estamos usando [Terraform](https://developer.hashicorp.com/terraform) para desplegar los servicios básicos de AWS que usamos: VPC, EC2, S3, IAM (usuarios, grupos, roles, políticas).
+* El estado de terraform (tfstate) guarda el estado existente de todos los recursos que se han desplegado con él. Sin él habría que importarlos todos manualmente para que los reconozca. Por eso, para que no se pierda, está guardado en nuestro bucket de S3 en el path `state`.
+
+#### Cómo ejecutar
+Para desplegar con terraform o hacer modificaciones:
+```bash
+terraform init # IMPORTANTE: decir 'yes' cuando pregunte si se desea incorporar el tfstate al backend
+terraform plan # nos muestra antes de ejecutar qué recursos van a cambiar o eliminarse
+terraform apply # aplica los cambios.
+```
+
+Para eliminar toda la infraestructura:
+```bash
+terraform destroy
+```
+
+Para desplegar o destruir hay que tener permisos para crear los recursos en AWS, requiere un key pair de EC2.
+
+### Ansible
+* Estamos usando [Ansible](https://docs.ansible.com/) para configurar el único servidor que tenemos. Tenemos un playbook que descarga e instala paquetes (`playbook.yaml`) y otro que levanta MLflow con una plantilla de [docker compose](http://docs.docker.com/compose/) (`deploy_mlflow.yaml`).
+* El inventario que usa ansible (`inventory.ini`) se genera automáticamente con terraform o se puede usar esta plantilla:
+```
+[normabot]
+<sustituir_IP> ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/aws.pem
+```
+
+#### Cómo ejecutar
+```bash
+ansible-playbook -i inventory.ini <nombre-del-playbook>.yaml
+```
+Aviso: puede que falle en la primera ejecución.
