@@ -21,6 +21,12 @@ import joblib
 import os
 
 # ──────────────────────────────────────────────
+# Configuración MLflow
+# ──────────────────────────────────────────────
+MLFLOW_TRACKING_URI = "http://34.240.189.163:5000"
+MLFLOW_EXPERIMENT = "clasificador_riesgo_ia"
+
+# ──────────────────────────────────────────────
 # Pipelines de spaCy (carga diferida bajo demanda)
 # ──────────────────────────────────────────────
 _nlp = None
