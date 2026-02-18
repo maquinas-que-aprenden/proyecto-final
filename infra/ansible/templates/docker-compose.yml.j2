@@ -1,8 +1,8 @@
 services:
   mlflow:
     image: ghcr.io/mlflow/mlflow
-    ports:
-      - "5000:5000"
+    expose:
+      - "5000"
     environment:
       - MLFLOW_HTTP_SITES_TRUSTED=*
       - MLFLOW_HTTP_SITES_ALLOW_EVERYTHING=true
@@ -16,6 +16,19 @@ services:
       --backend-store-uri sqlite:///mlflow/mlflow.db 
       --default-artifact-root s3://normabot/artifacts/
       --allowed-hosts "*"
+      --static-prefix /mlflow
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - mlflow
+    restart: unless-stopped
 
 volumes:
   mlflow_data:
