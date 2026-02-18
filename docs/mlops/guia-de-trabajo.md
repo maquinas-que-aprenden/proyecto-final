@@ -106,7 +106,7 @@ Para más información, consultar la documentación oficial: [Langfuse: get star
 
 ### MLflow
 Tenemos levantado un servidor para MLflow. Para usarlo, después de importar la librería hay que indicar el servidor de la siguiente manera:
-```
+```python
 remote_server_uri = "http://<IP-de-instancia-EC2>:5000" 
 mlflow.set_tracking_uri(remote_server_uri)
 ```
@@ -119,7 +119,7 @@ Usamos IaC para garantizar entornos reproducibles, escalables y que se despliegu
 
 ### Terraform
 * Estamos usando [Terraform](https://developer.hashicorp.com/terraform) para desplegar los servicios básicos de AWS que usamos: VPC, EC2, S3, IAM (usuarios, grupos, roles, políticas).
-* El estado de terraform (tfstate) guarda el estado existente de todos los recursos que se han desplegado con él. Sin el habría que importarlos todos manualmente para que los reconozca. Por eso, para que no se pierda, está guardado en nuestro bucket de S3 en el path `state`.
+* El estado de terraform (tfstate) guarda el estado existente de todos los recursos que se han desplegado con él. Sin él habría que importarlos todos manualmente para que los reconozca. Por eso, para que no se pierda, está guardado en nuestro bucket de S3 en el path `state`.
 
 #### Cómo ejecutar
 Para desplegar con terraform o hacer modificaciones:
@@ -138,7 +138,7 @@ Para desplegar o destruir hay que tener permisos para crear los recursos en AWS,
 
 ### Ansible
 * Estamos usando [Ansible](https://docs.ansible.com/) para configurar el único servidor que tenemos. Tenemos un playbook que descarga e instala paquetes (`playbook.yaml`) y otro que levanta MLflow con una plantilla de [docker compose](http://docs.docker.com/compose/) (`deploy_mlflow.yaml`).
-* El inventario que usa ansible (`inventory.ini`) se genera autómaticamente con terraform o se puede usar esta plantilla:
+* El inventario que usa ansible (`inventory.ini`) se genera automáticamente con terraform o se puede usar esta plantilla:
 ```bash
 [normabot]
 <sustituir_IP> ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/aws.pem
