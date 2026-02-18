@@ -20,6 +20,7 @@ __pycache__
 # Credenciales
 .aws/
 credentials
+.env
 data/**/*.csv
 
 *.csv
