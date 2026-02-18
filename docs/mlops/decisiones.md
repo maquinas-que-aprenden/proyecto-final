@@ -34,6 +34,7 @@
 Inicialmente se plantea:
 * Utilizar una sola instancia de EC2 para desplegar, con un Security Group e IP pública.
 * Utilizar Docker Compose para mantener varios servicios aislados en la misma instancia.
+* Para proteger MLflow y no exponer directamente su puerto, usamos un reverse proxy de NGINX y autenticación básica (usuario y contraseña).
 
 ### Bases de datos
 De momento solo hay una para MLflow. Es preferible usar SQLite dentro de la propia instancia de EC2 porque es coste 0€ y evita los gastos y la gestión que supone una RDS (usuarios, redes, copias de seguridad).
