@@ -48,7 +48,8 @@
   - Métricas: accuracy y f1_macro en validación
   - Artefactos: modelo, vectorizador
 
-### 3. Evaluar y comparar → `6_metricas_v2.ipynb`
+### 3. Evaluar y compa
+rar → `6_metricas_v2.ipynb`
 - Cargar modelo mejorado y vectorizador desde `model/`
 - Evaluar sobre test: classification report, F1-macro, matriz de confusión
 - Curva ROC multiclase (con `predict_proba`)
