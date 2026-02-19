@@ -738,3 +738,279 @@ def analisis_errores(modelo, tfidf, X_test, y_test):
             print()
 
     return df_errores
+
+
+# ══════════════════════════════════════════════
+# 7. MLFLOW — HELPER SEGURO
+# ══════════════════════════════════════════════
+
+def log_mlflow_safe(run_name, params=None, metrics=None, artifacts=None, tags=None):
+    """
+    Registra un experimento en MLflow de forma centralizada.
+
+    Diseñado para ser la única llamada dentro del bloque try/except de la
+    última celda de cada notebook, de modo que solo esa celda falle si el
+    servidor no está disponible.
+
+    Parameters:
+    run_name  : str  — nombre del run en MLflow.
+    params    : dict — hiperparámetros / configuración a loguear.
+    metrics   : dict — métricas numéricas a loguear.
+    artifacts : list — rutas de ficheros locales a subir como artefactos.
+    tags      : dict — etiquetas adicionales del run.
+    """
+    configure_mlflow()
+    mlflow.set_experiment(MLFLOW_EXPERIMENT)
+
+    with mlflow.start_run(run_name=run_name):
+        if params:
+            mlflow.log_params(params)
+        if metrics:
+            mlflow.log_metrics(metrics)
+        if artifacts:
+            for path in artifacts:
+                mlflow.log_artifact(path)
+        if tags:
+            mlflow.set_tags(tags)
+
+    print(f"✓ Run '{run_name}' registrado en MLflow ({MLFLOW_TRACKING_URI})")
+
+
+# ══════════════════════════════════════════════
+# 8. SHAP — EXPLICABILIDAD
+# ══════════════════════════════════════════════
+
+def explicar_con_shap(modelo, X_background, X_explain):
+    """
+    Calcula valores SHAP para el modelo dado.
+
+    - LogisticRegression → shap.LinearExplainer (admite matrices sparse)
+    - XGBClassifier      → shap.TreeExplainer   (convierte a denso internamente)
+
+    Parameters:
+    modelo       : modelo sklearn/xgboost entrenado.
+    X_background : sparse matrix o array — datos de referencia para el explainer.
+    X_explain    : sparse matrix o array — muestras a explicar.
+
+    Returns:
+    tuple (explainer, shap_values)
+        shap_values es una lista de arrays (n_samples, n_features), uno por clase.
+    """
+    import shap
+    from sklearn.linear_model import LogisticRegression
+
+    if isinstance(modelo, LogisticRegression):
+        explainer = shap.LinearExplainer(modelo, X_background)
+        shap_values = explainer.shap_values(X_explain)
+    else:
+        # XGBoost u otro modelo de árbol — necesita arrays densos
+        X_bg = X_background.toarray() if hasattr(X_background, "toarray") else X_background
+        X_ex = X_explain.toarray() if hasattr(X_explain, "toarray") else X_explain
+        explainer = shap.TreeExplainer(modelo, X_bg)
+        shap_values = explainer.shap_values(X_ex)
+
+    n_clases = len(shap_values) if isinstance(shap_values, list) else 1
+    print(f"SHAP calculado: {n_clases} clases, {X_explain.shape[0]} muestras")
+    return explainer, shap_values
+
+
+def plot_shap_summary(shap_values, X_explain, feature_names, class_names, output_dir, max_display=20):
+    """
+    Genera y guarda los plots SHAP de resumen:
+    - Un beeswarm por clase (top features más influyentes).
+    - Un bar plot global con la importancia media por clase.
+
+    Parameters:
+    shap_values   : lista de arrays SHAP (uno por clase).
+    X_explain     : sparse matrix o array con las muestras explicadas.
+    feature_names : list de str con los nombres de las features.
+    class_names   : list de str con los nombres de las clases.
+    output_dir    : str — carpeta donde guardar los plots.
+    max_display   : int — número máximo de features a mostrar (default 20).
+
+    Returns:
+    saved_paths : list de rutas de los archivos guardados.
+    """
+    import shap
+
+    os.makedirs(output_dir, exist_ok=True)
+    X_dense = X_explain.toarray() if hasattr(X_explain, "toarray") else X_explain
+    saved_paths = []
+
+    # Beeswarm por clase
+    for i, clase in enumerate(class_names):
+        shap.summary_plot(
+            shap_values[i], X_dense,
+            feature_names=feature_names,
+            max_display=max_display,
+            show=False,
+            plot_type="dot",
+        )
+        plt.title(f"SHAP beeswarm — {clase}")
+        plt.tight_layout()
+        path = os.path.join(output_dir, f"shap_beeswarm_{clase}.png")
+        plt.savefig(path, dpi=150, bbox_inches="tight")
+        plt.show()
+        plt.close()
+        saved_paths.append(path)
+        print(f"Guardado: {path}")
+
+    # Bar plot global con importancia media por clase
+    shap.summary_plot(
+        shap_values, X_dense,
+        feature_names=feature_names,
+        class_names=class_names,
+        max_display=max_display,
+        show=False,
+        plot_type="bar",
+    )
+    plt.title("Importancia media SHAP por clase")
+    plt.tight_layout()
+    path_bar = os.path.join(output_dir, "shap_importancia_clases.png")
+    plt.savefig(path_bar, dpi=150, bbox_inches="tight")
+    plt.show()
+    plt.close()
+    saved_paths.append(path_bar)
+    print(f"Guardado: {path_bar}")
+
+    return saved_paths
+
+
+def plot_shap_waterfall(explainer, shap_values, X_explain, idx, feature_names, class_names, output_dir, max_display=15):
+    """
+    Genera un waterfall plot para la muestra `idx`, uno por clase.
+
+    Parameters:
+    explainer     : SHAP explainer ajustado.
+    shap_values   : lista de arrays SHAP (uno por clase).
+    X_explain     : sparse matrix o array con las muestras explicadas.
+    idx           : int — índice de la muestra a visualizar.
+    feature_names : list de str con los nombres de las features.
+    class_names   : list de str con los nombres de las clases.
+    output_dir    : str — carpeta donde guardar los plots.
+    max_display   : int — número máximo de features a mostrar (default 15).
+
+    Returns:
+    saved_paths : list de rutas de los archivos guardados.
+    """
+    import shap
+
+    os.makedirs(output_dir, exist_ok=True)
+    X_dense = X_explain.toarray() if hasattr(X_explain, "toarray") else X_explain
+    expected = explainer.expected_value
+    saved_paths = []
+
+    for i, clase in enumerate(class_names):
+        ev = expected[i] if hasattr(expected, "__len__") else expected
+        explanation = shap.Explanation(
+            values=shap_values[i][idx],
+            base_values=ev,
+            data=X_dense[idx],
+            feature_names=feature_names,
+        )
+        shap.plots.waterfall(explanation, max_display=max_display, show=False)
+        plt.title(f"SHAP waterfall — muestra {idx} — clase {clase}")
+        plt.tight_layout()
+        path = os.path.join(output_dir, f"shap_waterfall_idx{idx}_{clase}.png")
+        plt.savefig(path, dpi=150, bbox_inches="tight")
+        plt.show()
+        plt.close()
+        saved_paths.append(path)
+        print(f"Guardado: {path}")
+
+    return saved_paths
+
+
+# ══════════════════════════════════════════════
+# 9. SERIALIZACIÓN Y REGISTRO DEL MEJOR MODELO
+# ══════════════════════════════════════════════
+
+def guardar_pipeline_completo(modelo, tfidf, label_encoder=None, metadata=None, output_dir="model"):
+    """
+    Guarda el pipeline completo del mejor modelo con naming convention claro.
+
+    Artefactos generados:
+    - mejor_modelo.joblib
+    - mejor_modelo_tfidf.joblib
+    - mejor_modelo_label_encoder.joblib  (solo si se pasa label_encoder)
+    - model_metadata.json
+
+    Parameters:
+    modelo         : modelo sklearn entrenado.
+    tfidf          : TfidfVectorizer ajustado.
+    label_encoder  : LabelEncoder opcional (para modelos XGBoost).
+    metadata       : dict con información adicional (experimento, métricas, etc.).
+    output_dir     : str — carpeta donde guardar los artefactos.
+
+    Returns:
+    tuple (path_modelo, path_tfidf, path_meta)
+    """
+    import json
+    from datetime import datetime
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    path_modelo = os.path.join(output_dir, "mejor_modelo.joblib")
+    path_tfidf = os.path.join(output_dir, "mejor_modelo_tfidf.joblib")
+
+    joblib.dump(modelo, path_modelo)
+    joblib.dump(tfidf, path_tfidf)
+    print(f"Modelo guardado:      {path_modelo}")
+    print(f"Vectorizador guardado: {path_tfidf}")
+
+    if label_encoder is not None:
+        path_le = os.path.join(output_dir, "mejor_modelo_label_encoder.joblib")
+        joblib.dump(label_encoder, path_le)
+        print(f"LabelEncoder guardado: {path_le}")
+
+    meta = {
+        "fecha": datetime.now().isoformat(),
+        "model_type": type(modelo).__name__,
+        "tfidf_vocab_size": len(tfidf.vocabulary_),
+        "tfidf_ngram_range": str(tfidf.ngram_range),
+        "tfidf_max_features": tfidf.max_features,
+    }
+    if metadata:
+        meta.update(metadata)
+
+    path_meta = os.path.join(output_dir, "model_metadata.json")
+    with open(path_meta, "w", encoding="utf-8") as f:
+        json.dump(meta, f, indent=2, ensure_ascii=False)
+    print(f"Metadata guardada:    {path_meta}")
+
+    return path_modelo, path_tfidf, path_meta
+
+
+def registrar_modelo_en_registry(run_id, artifact_path, registered_name, stage="Production"):
+    """
+    Registra un modelo de un run de MLflow en el Model Registry y lo
+    transita al stage indicado.
+
+    Parameters:
+    run_id          : str — ID del run de MLflow donde está logueado el modelo.
+    artifact_path   : str — ruta relativa del artefacto dentro del run (e.g. "modelo").
+    registered_name : str — nombre con el que registrar el modelo.
+    stage           : str — stage al que transitar ("Staging" o "Production").
+
+    Returns:
+    model_version : mlflow.entities.model_registry.ModelVersion
+    """
+    from mlflow.tracking import MlflowClient
+
+    model_uri = f"runs:/{run_id}/{artifact_path}"
+    model_version = mlflow.register_model(model_uri, registered_name)
+
+    client = MlflowClient()
+    client.transition_model_version_stage(
+        name=registered_name,
+        version=model_version.version,
+        stage=stage,
+    )
+    client.update_registered_model(
+        name=registered_name,
+        description=f"Mejor modelo del experimento {MLFLOW_EXPERIMENT}.",
+    )
+    client.set_registered_model_tag(registered_name, "best_model", "true")
+
+    print(f"✓ '{registered_name}' v{model_version.version} → stage='{stage}'")
+    return model_version
