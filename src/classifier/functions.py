@@ -75,7 +75,8 @@ def configure_mlflow():
     """Configura las credenciales y la URI de seguimiento de MLflow."""
     password = get_mlflow_password()
 
-    os.environ["MLFLOW_TRACKING_INSECURE_TLS"] = "true"
+    # No sobreescribir MLFLOW_TRACKING_INSECURE_TLS: respetar el valor que
+    # el usuario haya configurado en su entorno (p. ej. para entornos con TLS válido).
     os.environ["MLFLOW_TRACKING_USERNAME"] = "tracker"
     os.environ["MLFLOW_TRACKING_PASSWORD"] = password
 
@@ -460,7 +461,7 @@ def entrenar_modelo_baseline(X_train_tfidf, y_train, X_val_tfidf, y_val):
     Returns:
     modelo : LogisticRegression entrenado
     """
-    modelo = LogisticRegression(max_iter=1000, random_state=42)
+    modelo = LogisticRegression(max_iter=2000, random_state=42)
     modelo.fit(X_train_tfidf, y_train)
 
     y_val_pred = modelo.predict(X_val_tfidf)
@@ -781,6 +782,39 @@ def log_mlflow_safe(run_name, params=None, metrics=None, artifacts=None, tags=No
 # 8. SHAP — EXPLICABILIDAD
 # ══════════════════════════════════════════════
 
+_MAX_DENSE_ELEMENTS = 50_000_000  # ~400 MB en float64; ajustable según entorno
+
+
+def _sparse_to_dense_safe(X, label="X", max_elements=_MAX_DENSE_ELEMENTS):
+    """
+    Convierte una matriz sparse a densa solo si no supera el umbral de memoria.
+    Si lo supera, hace un muestreo aleatorio de filas antes de convertir y emite
+    una advertencia.
+    """
+    import warnings
+    import numpy as np
+
+    if not hasattr(X, "toarray"):
+        return X
+
+    n_rows, n_cols = X.shape
+    n_elements = n_rows * n_cols
+
+    if n_elements > max_elements:
+        max_rows = max(1, max_elements // n_cols)
+        warnings.warn(
+            f"[SHAP] {label} tiene {n_elements:,} elementos ({n_rows}×{n_cols}), "
+            f"supera el umbral de {max_elements:,}. "
+            f"Se muestrean {max_rows} filas aleatorias para evitar OOM.",
+            UserWarning,
+            stacklevel=3,
+        )
+        idx = np.random.choice(n_rows, size=max_rows, replace=False)
+        X = X[idx]
+
+    return X.toarray()
+
+
 def explicar_con_shap(modelo, X_background, X_explain):
     """
     Calcula valores SHAP para el modelo dado.
@@ -806,8 +840,8 @@ def explicar_con_shap(modelo, X_background, X_explain):
         shap_values = explainer.shap_values(X_explain)
     else:
         # XGBoost u otro modelo de árbol — necesita arrays densos
-        X_bg = X_background.toarray() if hasattr(X_background, "toarray") else X_background
-        X_ex = X_explain.toarray() if hasattr(X_explain, "toarray") else X_explain
+        X_bg = _sparse_to_dense_safe(X_background, label="X_background")
+        X_ex = _sparse_to_dense_safe(X_explain, label="X_explain")
         explainer = shap.TreeExplainer(modelo, X_bg)
         shap_values = explainer.shap_values(X_ex)
 
