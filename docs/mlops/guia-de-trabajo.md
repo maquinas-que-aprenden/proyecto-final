@@ -105,14 +105,36 @@ Tenemos una cuenta común para [Langfuse Cloud](https://cloud.langfuse.com/) y u
 Para más información, consultar la documentación oficial: [Langfuse: get started](https://langfuse.com/docs/observability/get-started)
 
 ### MLflow
-Tenemos levantado un servidor para MLflow. Para usarlo, después de importar la librería hay que indicar el servidor de la siguiente manera:
+Tenemos levantado un servidor para MLflow. Para usarlo, después de importar la librería hay que añadir este código:
 ```python
-remote_server_uri = "http://<IP-de-instancia-EC2>:5000" 
-mlflow.set_tracking_uri(remote_server_uri)
-```
-Para más información, consultar la documentación oficial: [Logging to a tracking server](https://mlflow.org/docs/latest/self-hosting/architecture/tracking-server/#logging_to_a_tracking_server)
+import os
+import mlflow
 
-La UI también está levantada en la misma IP y puerto.
+# Autenticación básica con NGINX
+try:
+    from google.colab import userdata
+    password = userdata.get("MLFLOW_PASSWORD")
+except ImportError:
+    # Entorno local: lee la variable de entorno del sistema
+    password = os.getenv("MLFLOW_PASSWORD")
+
+os.environ["MLFLOW_TRACKING_INSECURE_TLS"] = "true"
+os.environ["MLFLOW_TRACKING_USERNAME"] = "tracker"
+os.environ["MLFLOW_TRACKING_PASSWORD"] = password
+mlflow.set_tracking_uri("https://<ip>/mlflow/")
+```
+Requiere de una contraseña de autenticación básica:
+* En Google Colab hay un panel de secretos (icono de llave en el menú lateral). Se puede añadir MLFLOW_PASSWORD con el valor de la contraseña.
+* En local:
+```bash
+echo 'export MLFLOW_PASSWORD="contraseña"' >> ~/.bashrc  # si usas bash
+echo 'export MLFLOW_PASSWORD="contraseña"' >> ~/.zshrc   # si usas zsh
+source ~/.bashrc  # o source ~/.zshrc para aplicarlo sin reiniciar
+```
+
+La UI también está levantada en: https://<ip>/mlflow/.
+
+Para más información, consultar la documentación oficial: [Logging to a tracking server](https://mlflow.org/docs/latest/self-hosting/architecture/tracking-server/#logging_to_a_tracking_server)
 
 ## Infraestructura como Código
 Usamos IaC para garantizar entornos reproducibles, escalables y que se desplieguen rápido con control de versiones.
