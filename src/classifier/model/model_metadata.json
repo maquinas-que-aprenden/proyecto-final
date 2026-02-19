@@ -1,0 +1,15 @@
+{
+  "fecha": "2026-02-19T22:13:55.325633",
+  "model_type": "LogisticRegression",
+  "tfidf_vocab_size": 3773,
+  "tfidf_ngram_range": "(1, 2)",
+  "tfidf_max_features": 5000,
+  "experimento": "0",
+  "nombre": "exp0_logreg_tfidf_baseline",
+  "test_f1_macro": 0.953,
+  "test_accuracy": 0.9556,
+  "test_roc_auc": 0.9968,
+  "features": "tfidf_bigramas",
+  "tfidf_n_terms": 3773,
+  "criterio": "Mayor F1-macro en test entre los 3 experimentos"
+}
