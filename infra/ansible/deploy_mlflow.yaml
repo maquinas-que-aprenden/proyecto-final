@@ -13,6 +13,34 @@
         group: ubuntu
         mode: '0755'
 
+    - name: Crear directorio para nginx y certificados
+      file:
+        path: "{{ project_path }}/nginx/certs"
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+
+    - name: Instalar apache2-utils (para htpasswd)
+      become: true
+      apt:
+        name: apache2-utils
+        state: present
+
+    - name: Generar fichero htpasswd para usuario tracker
+      command: >
+        htpasswd -cb {{ project_path }}/nginx/certs/.htpasswd tracker {{ mlflow_password }}
+      args:
+        creates: "{{ project_path }}/nginx/certs/.htpasswd"
+      no_log: true
+
+    - name: Ajustar permisos del htpasswd
+      file:
+        path: "{{ project_path }}/nginx/certs/.htpasswd"
+        owner: ubuntu
+        group: ubuntu
+        mode: '0600'
+
     - name: Configurar permisos de Docker para el usuario
       become: true
       user:
@@ -22,6 +50,33 @@
 
     - name: Refrescar sesión SSH para aplicar permisos de grupo
       meta: reset_connection
+
+    - name: Generar certificado autofirmado (si no existe)
+      command: >
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048
+        -keyout {{ project_path }}/nginx/certs/mlflow.key
+        -out {{ project_path }}/nginx/certs/mlflow.crt
+        -subj "/CN={{ ansible_host }}"
+      args:
+        creates: "{{ project_path }}/nginx/certs/mlflow.crt"
+
+    - name: Ajustar permisos del certificado
+      file:
+        path: "{{ project_path }}/nginx/certs/{{ item }}"
+        owner: ubuntu
+        group: ubuntu
+        mode: '0600'
+      loop:
+        - mlflow.key
+        - mlflow.crt
+
+    - name: Copiar configuración de nginx desde template
+      template:
+        src: templates/nginx.conf.j2
+        dest: "{{ project_path }}/nginx/nginx.conf"
+        owner: ubuntu
+        group: ubuntu
+        mode: '0644'
 
     - name: Generar y copiar docker-compose.yml desde template
       template:
@@ -46,7 +101,7 @@
       debug:
         msg: 
           - "=========================================="
-          - "MLflow SERVER: http://{{ ansible_host }}:5000"
+          - "MLflow SERVER: https://{{ ansible_host }}/mlflow/"
           - "Estado del servicio:"
           - "{{ compose_status.stdout }}"
           - "=========================================="
