@@ -438,6 +438,7 @@ def crear_tfidf(X_train, X_val, X_test, max_features=5000, ngram_range=(1, 2)):
         max_features=max_features,
         ngram_range=ngram_range,
         sublinear_tf=True,
+        token_pattern=r"(?u)\b[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]{3,}\b",
     )
     X_train_tfidf = tfidf.fit_transform(X_train)
     X_val_tfidf = tfidf.transform(X_val)
@@ -797,6 +798,7 @@ def explicar_con_shap(modelo, X_background, X_explain):
         shap_values es una lista de arrays (n_samples, n_features), uno por clase.
     """
     import shap
+    import numpy as np
     from sklearn.linear_model import LogisticRegression
 
     if isinstance(modelo, LogisticRegression):
@@ -809,8 +811,24 @@ def explicar_con_shap(modelo, X_background, X_explain):
         explainer = shap.TreeExplainer(modelo, X_bg)
         shap_values = explainer.shap_values(X_ex)
 
-    n_clases = len(shap_values) if isinstance(shap_values, list) else 1
-    print(f"SHAP calculado: {n_clases} clases, {X_explain.shape[0]} muestras")
+    # Normalizar a lista de arrays 2D (n_samples, n_features), uno por clase.
+    # SHAP >= 0.46 puede devolver un ndarray 3D en lugar de lista.
+    n_samples = X_explain.shape[0]
+    if isinstance(shap_values, np.ndarray):
+        if shap_values.ndim == 3:
+            if shap_values.shape[0] == n_samples:
+                # formato (n_samples, n_features, n_classes)
+                shap_values = [shap_values[:, :, i] for i in range(shap_values.shape[2])]
+            else:
+                # formato (n_classes, n_samples, n_features)
+                shap_values = [shap_values[i] for i in range(shap_values.shape[0])]
+        else:
+            shap_values = [shap_values]
+    elif not isinstance(shap_values, list):
+        shap_values = [shap_values]
+
+    n_clases = len(shap_values)
+    print(f"SHAP calculado: {n_clases} clases, {n_samples} muestras")
     return explainer, shap_values
 
 
@@ -832,15 +850,35 @@ def plot_shap_summary(shap_values, X_explain, feature_names, class_names, output
     saved_paths : list de rutas de los archivos guardados.
     """
     import shap
+    import numpy as np
 
     os.makedirs(output_dir, exist_ok=True)
     X_dense = X_explain.toarray() if hasattr(X_explain, "toarray") else X_explain
     saved_paths = []
 
+    # Normalizar shap_values a lista de arrays 2D (n_samples, n_features), uno por clase.
+    # SHAP >= 0.46 puede devolver ndarray 3D o lista; hay que manejar ambos.
+    n_classes = len(class_names)
+    if isinstance(shap_values, list):
+        sv_list = shap_values
+    elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
+        if shap_values.shape[0] == X_dense.shape[0]:
+            # (n_samples, n_features, n_classes)
+            sv_list = [shap_values[:, :, i] for i in range(shap_values.shape[2])]
+        else:
+            # (n_classes, n_samples, n_features)
+            sv_list = [shap_values[i] for i in range(shap_values.shape[0])]
+    else:
+        raise ValueError(
+            f"Formato de shap_values no reconocido: type={type(shap_values)}, "
+            f"shape={getattr(shap_values, 'shape', 'N/A')}. "
+            f"Ejecuta primero explicar_con_shap para obtener el formato correcto."
+        )
+
     # Beeswarm por clase
     for i, clase in enumerate(class_names):
         shap.summary_plot(
-            shap_values[i], X_dense,
+            sv_list[i], X_dense,
             feature_names=feature_names,
             max_display=max_display,
             show=False,
@@ -855,9 +893,10 @@ def plot_shap_summary(shap_values, X_explain, feature_names, class_names, output
         saved_paths.append(path)
         print(f"Guardado: {path}")
 
-    # Bar plot global con importancia media por clase
+    # Bar plot global: SHAP >= 0.46 espera array 3D (n_samples, n_features, n_classes)
+    sv_3d = np.stack(sv_list, axis=2)
     shap.summary_plot(
-        shap_values, X_dense,
+        sv_3d, X_dense,
         feature_names=feature_names,
         class_names=class_names,
         max_display=max_display,
