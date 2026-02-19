@@ -1,3 +1,6 @@
+# Entorno virtual
+venv/
+.conda
 # IaC
 infra/ansible/inventory.ini
 infra/terraform/.terraform/*
@@ -17,9 +20,21 @@ __pycache__
 # Credenciales
 .aws/
 credentials
+.env
+data/**/*.csv
+
 *.csv
 
 # Data de DVC
 /data/raw/
 /data/processed/
 !*.dvc
+
+`#Carpeta` claude
+.claude/
+
+`#Carpeta` caché python para el clasificador
+src/classifier/__pycache__/
+
+`#Diario` (Rubén)
+src/classifier/tareas/
