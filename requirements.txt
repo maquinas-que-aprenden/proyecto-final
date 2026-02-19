@@ -36,3 +36,11 @@ langchain
 langchain-groq
 langchain-google-genai
 langchain-community
+
+# Fine-tuning QLoRA (instalar en Colab con: pip install transformers peft bitsandbytes trl datasets accelerate)
+transformers==4.47.1
+peft==0.14.0
+bitsandbytes==0.45.0
+datasets==3.2.0
+trl==0.13.0
+accelerate==1.2.1
