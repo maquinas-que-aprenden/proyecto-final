@@ -1,0 +1,68 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.yaml
+
+language: es
+
+reviews:
+  profile: assertive
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  collapse_walkthrough: true
+  path_instructions:
+    - path: "**/*.py"
+      instructions: >
+        Este es un MVP académico (proyecto final, 17 días, 4 personas).
+        NO reportes problemas de estilo, linting, formato, docstrings faltantes,
+        type hints faltantes ni convenciones de nombrado.
+        Céntrate SOLO en:
+        1. Fallos de concepto o lógica (especialmente en el pipeline RAG y el grafo LangGraph)
+        2. Vulnerabilidades de seguridad (inyección, secrets expuestos, SSRF, etc.)
+        3. Problemas de rendimiento (queries N+1, cargas innecesarias en memoria, bloqueos)
+        4. Errores que causen fallos en runtime
+        5. Problemas de concurrencia o race conditions
+    - path: "**/*.yaml"
+      instructions: >
+        Solo revisar errores de configuración que causen fallos en runtime.
+        Ignorar formato y estilo.
+    - path: "**/*.yml"
+      instructions: >
+        Solo revisar errores de configuración que causen fallos en runtime.
+        Ignorar formato y estilo.
+    - path: "Dockerfile"
+      instructions: >
+        Revisar solo problemas de seguridad (imagen base insegura, secrets en build,
+        ejecutar como root sin necesidad) y errores que impidan el build o la ejecución.
+        Ignorar mejoras cosméticas.
+
+  tools:
+    ruff:
+      enabled: false
+    pylint:
+      enabled: false
+    flake8:
+      enabled: false
+    black:
+      enabled: false
+    isort:
+      enabled: false
+    mypy:
+      enabled: false
+    pyright:
+      enabled: false
+    bandit:
+      enabled: true
+    hadolint:
+      enabled: false
+    yamllint:
+      enabled: false
+    markdownlint:
+      enabled: false
+    shellcheck:
+      enabled: false
+    eslint:
+      enabled: false
+    biome:
+      enabled: false
+
+chat:
+  auto_reply: true
