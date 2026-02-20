@@ -197,7 +197,7 @@ os.environ["MLFLOW_TRACKING_USERNAME"] = "tracker"
 os.environ["MLFLOW_TRACKING_PASSWORD"] = password
 mlflow.set_tracking_uri("https://<ip-mlflow>/mlflow/")
 ```
-No tiene porque ser este concretamente.
+No tiene por qué ser este concretamente.
 
 La contraseña se puede añadir al entorno de la siguiente forma:
 * En Google Colab hay un panel de secretos (icono de llave en el menú lateral). Se puede añadir MLFLOW_PASSWORD con el valor de la contraseña.

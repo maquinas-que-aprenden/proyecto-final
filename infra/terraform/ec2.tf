@@ -17,6 +17,10 @@ resource "aws_instance" "normabot_server" {
   tags = {
     Name = "NormaBot-Server"
   }
+
+  metadata_options {
+    http_tokens = "required"
+  }
 }
 
 resource "aws_ebs_volume" "normabot_data" {
@@ -54,6 +58,10 @@ resource "aws_instance" "mlflow_server" {
     volume_size           = 8
     volume_type           = "gp3"
     delete_on_termination = true
+  }
+
+  metadata_options {
+    http_tokens = "required"
   }
 }
 
