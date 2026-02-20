@@ -1,9 +1,7 @@
 ---
-- name: Configurar Servidor NormaBot (Ubuntu 24.04)
-  hosts: normabot
+- name: Configurar Servidores (Ubuntu 24.04)
+  hosts: all
   become: true
-  vars:
-    project_path: "/home/ubuntu/normabot"
 
   tasks:
     - name: Actualizar repositorios y sistema
@@ -30,7 +28,7 @@
 
     - name: Añadir repositorio de Docker
       apt_repository:
-        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_facts['distribution_release'] }} stable"
         state: present
 
     - name: Instalar Docker y Docker Compose
@@ -63,14 +61,6 @@
       shell: "/tmp/aws/install --update"
       args:
         creates: /usr/local/bin/aws
-
-    - name: Crear carpeta del proyecto
-      file:
-        path: "{{ project_path }}"
-        state: directory
-        owner: ubuntu
-        group: ubuntu
-        mode: '0755'
 
     - name: Mensaje final
       debug:

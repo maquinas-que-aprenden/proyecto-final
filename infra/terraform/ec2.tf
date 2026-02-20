@@ -1,6 +1,6 @@
 resource "aws_instance" "normabot_server" {
   ami           = var.ami_id
-  instance_type = "t3.small"
+  instance_type = var.instance_type
   key_name      = var.key_name
   
   subnet_id              = aws_subnet.public_subnet.id

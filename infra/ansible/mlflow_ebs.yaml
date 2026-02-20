@@ -1,0 +1,31 @@
+- name: Configurar EBS en MLflow (solo al crear la instancia desde cero)
+  hosts: mlflow
+  become: true
+  vars:
+    project_path: "/home/ubuntu/mlflow"
+
+  tasks:
+    - name: Formatear volumen de datos (solo primera vez)
+      filesystem:
+        fstype: ext4
+        dev: /dev/nvme1n1
+        force: no
+
+    - name: Montar EBS en project_path
+      mount:
+        path: "{{ project_path }}"
+        src: UUID=279f35dd-a362-42a9-b13a-ebe1f5f0cdc8
+        fstype: ext4
+        opts: defaults,nofail
+        state: mounted
+
+    - name: Asegurar permisos tras el montaje
+      file:
+        path: "{{ project_path }}"
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+
+    - name: Mensaje final MLflow
+      debug:
+        msg: "EBS montado en {{ project_path }}."
