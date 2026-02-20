@@ -1,8 +1,8 @@
-- name: Configurar EBS en MLflow (solo al crear la instancia desde cero)
-  hosts: mlflow
+- name: Configurar EBS en NormaBot (solo al crear la instancia desde cero)
+  hosts: normabot
   become: true
   vars:
-    project_path: "/home/ubuntu/mlflow"
+    project_path: "/home/ubuntu/normabot"
     ebs_device: "/dev/nvme1n1"
     ebs_fstype: "ext4"
 
@@ -29,6 +29,6 @@
         mode: "0755"
         state: directory
 
-    - name: Mensaje final MLflow
+    - name: Mensaje final
       ansible.builtin.debug:
         msg: "EBS montado correctamente en {{ project_path }}."
