@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Revisa los cambios realizados en esta respuesta. Busca: 1) Inconsistencias entre archivos (imports que no existen, nombres de funciones/variables que no coinciden, interfaces/tipos que no cuadran). 2) Código redundante o duplicado que se podría reutilizar. 3) Inconsistencias con la arquitectura descrita en CLAUDE.md (stack, convenciones, estructura). Si encuentras problemas, descríbelos brevemente en español. Si todo está correcto, responde solo 'OK'.",
+            "model": "claude-haiku-4-5"
+          }
+        ]
+      }
+    ]
+  }
+}
