@@ -83,7 +83,7 @@ jobs:
     needs: build
     if: github.event_name == 'push'
 
-steps:
+    steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
