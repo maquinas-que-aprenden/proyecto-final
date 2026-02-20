@@ -1,0 +1,8 @@
+services:
+  normabot:
+    image: ghcr.io/maquinas-que-aprenden/proyecto-final:latest
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    restart: unless-stopped
