@@ -1,0 +1,14 @@
+# Dependencias para la app (Docker / Streamlit)
+-r base.txt
+
+# UI
+streamlit
+
+# Agentes y orquestación
+langgraph
+langchain
+langchain-aws
+langchain-core
+
+# LLM providers
+# TODO: añadir groq, google-generativeai, mistralai cuando se integren

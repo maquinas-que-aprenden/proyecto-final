@@ -1,0 +1,20 @@
+# Dependencias para entrenamiento del clasificador de riesgo
+-r base.txt
+
+# NLP
+spacy==3.8.2
+packaging==24.2
+
+# Machine Learning
+scikit-learn==1.5.2
+xgboost==3.2.0
+joblib==1.4.2
+scipy
+
+# Visualización
+matplotlib==3.9.2
+seaborn==0.13.2
+wordcloud==1.9.4
+
+# Tracking de experimentos
+mlflow==2.17.2
