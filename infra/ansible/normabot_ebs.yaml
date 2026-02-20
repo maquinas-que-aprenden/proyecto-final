@@ -13,14 +13,19 @@
         dev: "{{ ebs_device }}"
         force: false
 
+    - name: Obtener UUID del volumen
+      command: blkid -s UUID -o value /dev/nvme1n1
+      register: ebs_uuid
+      changed_when: false
+
     - name: Montar EBS en project_path
-      ansible.builtin.mount:
+      mount:
         path: "{{ project_path }}"
-        src: "{{ ebs_device }}"
-        fstype: "{{ ebs_fstype }}"
+        src: "UUID={{ ebs_uuid.stdout }}"
+        fstype: ext4
         opts: defaults,nofail
         state: mounted
-
+        
     - name: Asegurar permisos tras el montaje
       ansible.builtin.file:
         path: "{{ project_path }}"

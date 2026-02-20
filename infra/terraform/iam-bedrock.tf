@@ -17,7 +17,7 @@ resource "aws_iam_policy" "bedrock_invoke_policy" {
                 "bedrock:InvokeModel",
                 "bedrock:InvokeModelWithResponseStream"
             ],
-            "Resource": "arn:aws:bedrock:*:643260088669:inference-profile/eu.amazon.nova-lite-v1:0"
+            "Resource": "arn:aws:bedrock:*:${data.aws_caller_identity.current.account_id}:inference-profile/eu.amazon.nova-lite-v1:0"
         },
         {
             "Sid": "AllowNovaLiteOnly",
@@ -28,7 +28,7 @@ resource "aws_iam_policy" "bedrock_invoke_policy" {
             ],
             "Resource": [
                 "arn:aws:bedrock:*::foundation-model/amazon.nova-lite-v1:0",
-                "arn:aws:bedrock:*:643260088669:inference-profile/eu.amazon.nova-lite-v1:0"
+                "arn:aws:bedrock:*:${data.aws_caller_identity.current.account_id}:inference-profile/eu.amazon.nova-lite-v1:0"
             ]
         }
     ]
