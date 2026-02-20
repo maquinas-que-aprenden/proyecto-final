@@ -7,7 +7,7 @@ services:
       - MLFLOW_HTTP_SITES_TRUSTED=*
       - MLFLOW_HTTP_SITES_ALLOW_EVERYTHING=true
     volumes:
-      - mlflow_data:/mlflow
+      - ./mlflow_data:/mlflow    # fijar mount al EBS
     restart: unless-stopped
     command: >
       mlflow server 
@@ -29,6 +29,3 @@ services:
     depends_on:
       - mlflow
     restart: unless-stopped
-
-volumes:
-  mlflow_data:

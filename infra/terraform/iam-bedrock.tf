@@ -5,27 +5,32 @@
 data "aws_caller_identity" "current" {}
 
 resource "aws_iam_policy" "bedrock_invoke_policy" {
+
   name = "NormaBot-Bedrock-Invoke-Policy"
   policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowBedrockInvoke"
-        Effect = "Allow"
-        Action = [
-          "bedrock:InvokeModel",
-          "bedrock:InvokeModelWithResponseStream"
-        ]
-        Resource = [
-          "arn:aws:bedrock:eu-west-1:${data.aws_caller_identity.current.account_id}:inference-profile/eu.amazon.nova-lite-v1:0",
-        ]
-      },
-      {
-        Sid    = "AllowBedrockGetProfile"
-        Effect = "Allow"
-        Action = ["bedrock:GetInferenceProfile"]
-        Resource = "arn:aws:bedrock:eu-west-1:${data.aws_caller_identity.current.account_id}:inference-profile/eu.amazon.nova-lite-v1:0"
-      }
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "ConverseNovaLiteViaInferenceProfile",
+            "Effect": "Allow",
+            "Action": [
+                "bedrock:InvokeModel",
+                "bedrock:InvokeModelWithResponseStream"
+            ],
+            "Resource": "arn:aws:bedrock:*:${data.aws_caller_identity.current.account_id}:inference-profile/eu.amazon.nova-lite-v1:0"
+        },
+        {
+            "Sid": "AllowNovaLiteOnly",
+            "Effect": "Allow",
+            "Action": [
+                "bedrock:InvokeModel",
+                "bedrock:InvokeModelWithResponseStream"
+            ],
+            "Resource": [
+                "arn:aws:bedrock:*::foundation-model/amazon.nova-lite-v1:0",
+                "arn:aws:bedrock:*:${data.aws_caller_identity.current.account_id}:inference-profile/eu.amazon.nova-lite-v1:0"
+            ]
+        }
     ]
   })
 }

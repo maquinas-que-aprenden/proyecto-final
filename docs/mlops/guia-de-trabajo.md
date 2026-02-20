@@ -97,50 +97,11 @@ git commit -m "Actualizar modelo de clasificación version X"
 git push origin <tu-rama>
 ```
 
-## Observabilidad y trazabilidad
-
-### Langfuse Cloud
-Tenemos una cuenta común para [Langfuse Cloud](https://cloud.langfuse.com/) y una API key para mandar trazas que se puede consultar en la web.
-
-Para más información, consultar la documentación oficial: [Langfuse: get started](https://langfuse.com/docs/observability/get-started)
-
-### MLflow
-Tenemos levantado un servidor para MLflow. Para usarlo, después de importar la librería hay que añadir este código:
-```python
-import os
-import mlflow
-
-# Autenticación básica con NGINX
-try:
-    from google.colab import userdata
-    password = userdata.get("MLFLOW_PASSWORD")
-except ImportError:
-    # Entorno local: lee la variable de entorno del sistema
-    password = os.getenv("MLFLOW_PASSWORD")
-
-os.environ["MLFLOW_TRACKING_INSECURE_TLS"] = "true"
-os.environ["MLFLOW_TRACKING_USERNAME"] = "tracker"
-os.environ["MLFLOW_TRACKING_PASSWORD"] = password
-mlflow.set_tracking_uri("https://<ip>/mlflow/")
-```
-Requiere de una contraseña de autenticación básica:
-* En Google Colab hay un panel de secretos (icono de llave en el menú lateral). Se puede añadir MLFLOW_PASSWORD con el valor de la contraseña.
-* En local:
-```bash
-echo 'export MLFLOW_PASSWORD="contraseña"' >> ~/.bashrc  # si usas bash
-echo 'export MLFLOW_PASSWORD="contraseña"' >> ~/.zshrc   # si usas zsh
-source ~/.bashrc  # o source ~/.zshrc para aplicarlo sin reiniciar
-```
-
-La UI también está levantada en: https://<ip>/mlflow/.
-
-Para más información, consultar la documentación oficial: [Logging to a tracking server](https://mlflow.org/docs/latest/self-hosting/architecture/tracking-server/#logging_to_a_tracking_server)
-
 ## Infraestructura como Código
 Usamos IaC para garantizar entornos reproducibles, escalables y que se desplieguen rápido con control de versiones.
 
 ### Terraform
-* Estamos usando [Terraform](https://developer.hashicorp.com/terraform) para desplegar los servicios básicos de AWS que usamos: VPC, EC2, S3, IAM (usuarios, grupos, roles, políticas).
+* Estamos usando [Terraform](https://developer.hashicorp.com/terraform) para desplegar los servicios de AWS que usamos: VPC, EC2, S3, IAM (usuarios, grupos, roles, políticas), Bedrock.
 * El estado de terraform (tfstate) guarda el estado existente de todos los recursos que se han desplegado con él. Sin él habría que importarlos todos manualmente para que los reconozca. Por eso, para que no se pierda, está guardado en nuestro bucket de S3 en el path `state`.
 
 #### Cómo ejecutar
@@ -159,15 +120,94 @@ terraform destroy
 Para desplegar o destruir hay que tener permisos para crear los recursos en AWS, requiere un key pair de EC2.
 
 ### Ansible
-* Estamos usando [Ansible](https://docs.ansible.com/) para configurar el único servidor que tenemos. Tenemos un playbook que descarga e instala paquetes (`playbook.yaml`) y otro que levanta MLflow con una plantilla de [docker compose](http://docs.docker.com/compose/) (`deploy_mlflow.yaml`).
+* Estamos usando [Ansible](https://docs.ansible.com/) para configurar los dos servidores que tenemos: normabot y mlflow.
+* Estos son los ficheros actuales:
+```
+.
+├── inventory.ini           # inventario de servidores, generado automáticamente por terraform (no se sube a github)
+├── mlflow_deploy.yaml      # configuración de mlflow
+├── mlflow_ebs.yaml         # configuración de ebs de mlflow
+├── normabot_ebs.yaml       # configuración de ebs de normabot
+├── playbook.yaml           # configuración general de ambos servidores
+└── templates
+    ├── docker-compose.yml.j2   # necesario para despliegue de mlflow
+    └── nginx.conf.j2           # necesario para securizar acceso a mlflow
+```
 * El inventario que usa ansible (`inventory.ini`) se genera automáticamente con terraform o se puede usar esta plantilla:
 ```
+[mlflow]
+<IP> ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/aws.pem
+
 [normabot]
-<sustituir_IP> ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/aws.pem
+<IP> ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/aws.pem
+
 ```
 
 #### Cómo ejecutar
+Existe un orden para ejecutarlos.
 ```bash
-ansible-playbook -i inventory.ini <nombre-del-playbook>.yaml
+# Para configurar ambos servidores desde cero:
+ansible-playbook -i inventory.ini playbook.yaml
+
+# Para mlflow (solo la primera vez o si se recrea desde cero la instancia):
+ansible-playbook -i inventory.ini mlflow_ebs.yaml
+ansible-playbook -i inventory.ini mlflow_deploy.yaml -e "mlflow_password=<password>"
+
+# Para normabot (solo la primera vez o si se recrea desde cero la instancia):
+ansible-playbook -i inventory.ini normabot_ebs.yaml
 ```
-Aviso: puede que falle en la primera ejecución.
+En el caso de `mlflow_deploy` es necesario pasar la contraseña para que nginx impida acceder a cualquiera. La contraseña está en nuestro gestor de contraseñas compartido.
+
+## Integración y despliegue continuo (CI/CD)
+
+### Probar una imagen de develop
+Para probar manualmente una imagen publicada desde la rama `develop`:
+```bash
+ssh -i ~/.ssh/aws.pem ubuntu@<ip-normabot>
+docker pull ghcr.io/maquinas-que-aprenden/proyecto-final:develop
+docker run -p 8080:8080 --env-file /home/ubuntu/normabot/.env ghcr.io/maquinas-que-aprenden/proyecto-final:develop
+```
+La app estará disponible en `http://<ip-normabot>:8080`.
+
+## Observabilidad y trazabilidad
+
+### Langfuse Cloud
+Tenemos una cuenta común para [Langfuse Cloud](https://cloud.langfuse.com/) y una API key para mandar trazas que se puede consultar en la web.
+
+Para más información, consultar la documentación oficial: [Langfuse: get started](https://langfuse.com/docs/observability/get-started)
+
+### MLflow
+Tenemos levantado un servidor para MLflow.
+
+Para usarlo es necesario añadir código que tome del entorno la contraseña de autenticación:
+```python
+import os
+import mlflow
+
+# Autenticación básica con NGINX
+try:
+    from google.colab import userdata
+    password = userdata.get("MLFLOW_PASSWORD")
+except ImportError:
+    # Entorno local: lee la variable de entorno del sistema
+    password = os.getenv("MLFLOW_PASSWORD")
+
+os.environ["MLFLOW_TRACKING_INSECURE_TLS"] = "true"
+os.environ["MLFLOW_TRACKING_USERNAME"] = "tracker"
+os.environ["MLFLOW_TRACKING_PASSWORD"] = password
+mlflow.set_tracking_uri("https://<ip-mlflow>/mlflow/")
+```
+No tiene por qué ser este concretamente.
+
+La contraseña se puede añadir al entorno de la siguiente forma:
+* En Google Colab hay un panel de secretos (icono de llave en el menú lateral). Se puede añadir MLFLOW_PASSWORD con el valor de la contraseña.
+* En local:
+```bash
+echo 'export MLFLOW_PASSWORD="contraseña"' >> ~/.bashrc  # si usas bash
+echo 'export MLFLOW_PASSWORD="contraseña"' >> ~/.zshrc   # si usas zsh
+source ~/.bashrc  # o source ~/.zshrc para aplicarlo sin reiniciar
+```
+
+La UI también está levantada en: https://<ip-mlflow>/mlflow/.
+
+Para más información, consultar la documentación oficial: [Logging to a tracking server](https://mlflow.org/docs/latest/self-hosting/architecture/tracking-server/#logging_to_a_tracking_server)
