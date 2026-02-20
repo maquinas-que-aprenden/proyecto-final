@@ -41,19 +41,8 @@ if prompt := st.chat_input("Escribe tu consulta legal..."):
         with st.spinner("Consultando agentes..."):
             result = run(prompt)
 
-        response = result.get("response", "Sin respuesta.")
+        messages = result.get("messages", [])
+        response = messages[-1].content if messages else "Sin respuesta."
         st.markdown(response)
-
-        sources = result.get("sources", [])
-        if sources:
-            with st.expander("Fuentes"):
-                for s in sources:
-                    st.markdown(
-                        f"- Art. {s.get('articulo', '?')} {s.get('ley', '?')}"
-                    )
-
-        risk = result.get("risk_level", "")
-        if risk:
-            st.info(f"Nivel de riesgo: {risk}")
 
     st.session_state.messages.append({"role": "assistant", "content": response})
