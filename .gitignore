@@ -30,6 +30,10 @@ data/**/*.csv
 /data/processed/
 !*.dvc
 
+# Configuración personal de VS Code (rutas de intérprete, etc.)
+# Usa .vscode/settings.template.json como referencia.
+.vscode/settings.json
+
 `#Carpeta` claude
 .claude/
 
