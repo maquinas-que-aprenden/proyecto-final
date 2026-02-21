@@ -520,7 +520,6 @@ def entrenar_xgboost(X_train, y_train, X_val, y_val, params=None):
 
     le = LabelEncoder()
     y_train_enc = le.fit_transform(y_train)
-    y_val_enc = le.transform(y_val)
 
     default_params = {
         "n_estimators": 200,
@@ -948,7 +947,6 @@ def plot_shap_summary(shap_values, X_explain, feature_names, class_names, output
 
     # Normalizar shap_values a lista de arrays 2D (n_samples, n_features), uno por clase.
     # SHAP >= 0.46 puede devolver ndarray 3D o lista; hay que manejar ambos.
-    n_classes = len(class_names)
     if isinstance(shap_values, list):
         sv_list = shap_values
     elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:

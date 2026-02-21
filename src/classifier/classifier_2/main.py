@@ -48,7 +48,7 @@ if __name__ == "__main__":
         "Chatbot de atención al cliente",
         "Filtro de spam de email",
     ]
-    print(f"\nPredicciones:")
+    print("\nPredicciones:")
     for desc in test_cases:
         result = predict(desc)
         print(f"  {result['risk_name']:>13} ← {desc}")

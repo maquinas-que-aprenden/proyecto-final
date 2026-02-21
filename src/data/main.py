@@ -33,7 +33,7 @@ if __name__ == "__main__":
     print(f"Model:     {result['embedding_model']}")
 
     hits = search("sistemas de alto riesgo")
-    print(f"\nQuery:     'sistemas de alto riesgo'")
+    print("\nQuery:     'sistemas de alto riesgo'")
     for i, h in enumerate(hits):
         print(f"  [{i+1}] score={h['score']:.2f}  Art. {h['metadata']['articulo']} — {h['text'][:60]}...")
 
