@@ -6,6 +6,7 @@ venv/
 # ── Python ─────────────────────────────────────
 __pycache__/
 *.pyc
+.ruff_cache/
 
 # ── Credenciales y configuración local ─────────
 .env
