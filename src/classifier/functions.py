@@ -24,8 +24,11 @@ import mlflow
 # ──────────────────────────────────────────────
 # Configuración MLflow
 # ──────────────────────────────────────────────
-MLFLOW_TRACKING_URI = "https://34.240.189.163"
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "https://34.244.146.100")
 MLFLOW_EXPERIMENT = "clasificador_riesgo_ia"
+
+# Marca del dataset para MLflow
+_DATASET_TAGS = {"dataset_type": "real", "dataset_source": "dataset_riesgo"}
 
 
 def get_mlflow_password():
@@ -37,7 +40,7 @@ def get_mlflow_password():
     """
     # Intentar obtener desde Colab
     try:
-        from google.colab import userdata
+        from google.colab import userdata  # type: ignore[import]
         password = userdata.get("MLFLOW_PASSWORD")
         if password:
             print("Password obtenida desde Colab Secrets.")
@@ -764,6 +767,8 @@ def log_mlflow_safe(run_name, params=None, metrics=None, artifacts=None, tags=No
     configure_mlflow()
     mlflow.set_experiment(MLFLOW_EXPERIMENT)
 
+    _all_tags = {**_DATASET_TAGS, **(tags or {})}
+
     with mlflow.start_run(run_name=run_name):
         if params:
             mlflow.log_params(params)
@@ -772,8 +777,7 @@ def log_mlflow_safe(run_name, params=None, metrics=None, artifacts=None, tags=No
         if artifacts:
             for path in artifacts:
                 mlflow.log_artifact(path)
-        if tags:
-            mlflow.set_tags(tags)
+        mlflow.set_tags(_all_tags)
 
     print(f"✓ Run '{run_name}' registrado en MLflow ({MLFLOW_TRACKING_URI})")
 
@@ -887,7 +891,7 @@ def plot_shap_summary(shap_values, X_explain, feature_names, class_names, output
     import numpy as np
 
     os.makedirs(output_dir, exist_ok=True)
-    X_dense = X_explain.toarray() if hasattr(X_explain, "toarray") else X_explain
+    X_dense = _sparse_to_dense_safe(X_explain, label="X_explain")
     saved_paths = []
 
     # Normalizar shap_values a lista de arrays 2D (n_samples, n_features), uno por clase.
@@ -909,10 +913,18 @@ def plot_shap_summary(shap_values, X_explain, feature_names, class_names, output
             f"Ejecuta primero explicar_con_shap para obtener el formato correcto."
         )
 
+    # Validar que sv_list y class_names tienen la misma longitud
+    if len(sv_list) != len(class_names):
+        raise ValueError(
+            f"Número de arrays SHAP ({len(sv_list)}) no coincide con "
+            f"número de clases ({len(class_names)}). "
+            f"Clases: {class_names}"
+        )
+
     # Beeswarm por clase
-    for i, clase in enumerate(class_names):
+    for sv, clase in zip(sv_list, class_names):
         shap.summary_plot(
-            sv_list[i], X_dense,
+            sv, X_dense,
             feature_names=feature_names,
             max_display=max_display,
             show=False,
@@ -969,7 +981,7 @@ def plot_shap_waterfall(explainer, shap_values, X_explain, idx, feature_names, c
     import shap
 
     os.makedirs(output_dir, exist_ok=True)
-    X_dense = X_explain.toarray() if hasattr(X_explain, "toarray") else X_explain
+    X_dense = _sparse_to_dense_safe(X_explain, label="X_explain")
     expected = explainer.expected_value
     saved_paths = []
 
