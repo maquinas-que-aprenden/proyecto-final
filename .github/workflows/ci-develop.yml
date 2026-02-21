@@ -22,8 +22,8 @@ jobs:
           cache: pip
           cache-dependency-path: "requirements/*.txt"
 
-      - name: Install ruff
-        run: pip install ruff
+      - name: Install dev dependencies
+        run: pip install -r requirements/dev.txt
 
       - name: Run ruff check
         run: ruff check . --output-format=github
