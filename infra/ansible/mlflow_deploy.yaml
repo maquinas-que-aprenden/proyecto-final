@@ -1,18 +1,10 @@
 ---
-- name: Desplegar MLflow Unificado en NormaBot
-  hosts: normabot
+- name: Desplegar MLflow
+  hosts: mlflow
   vars:
-    project_path: "/home/ubuntu/normabot"
+    project_path: "/home/ubuntu/mlflow"
 
   tasks:
-    - name: Asegurar que el directorio del proyecto existe
-      file:
-        path: "{{ project_path }}"
-        state: directory
-        owner: ubuntu
-        group: ubuntu
-        mode: '0755'
-
     - name: Crear directorio para nginx y certificados
       file:
         path: "{{ project_path }}/nginx/certs"
@@ -39,7 +31,7 @@
         path: "{{ project_path }}/nginx/certs/.htpasswd"
         owner: ubuntu
         group: ubuntu
-        mode: '0600'
+        mode: '0644'
 
     - name: Configurar permisos de Docker para el usuario
       become: true
