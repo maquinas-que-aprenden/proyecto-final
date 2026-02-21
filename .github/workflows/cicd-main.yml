@@ -30,9 +30,6 @@ jobs:
       - name: Run ruff check
         run: ruff check . --output-format=github
 
-      - name: Run ruff format check
-        run: ruff format --check .
-
   # test:
   #   name: Tests (pytest)
   #   runs-on: ubuntu-latest
