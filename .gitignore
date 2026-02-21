@@ -29,6 +29,7 @@ data/**/*.csv
 /data/raw/
 /data/processed/
 !*.dvc
+<<<<<<< HEAD
 
 `#Carpeta` claude
 .claude/
@@ -39,3 +40,6 @@ src/classifier/__pycache__/
 `#Diario` (Rubén)
 src/classifier/tareas/
 processed/
+=======
+/processed/
+>>>>>>> e875977 (Fix gitignore: anchor processed to root)
