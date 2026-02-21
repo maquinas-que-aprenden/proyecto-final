@@ -1,44 +1,38 @@
-# Entorno virtual
+# ── Entorno virtual ────────────────────────────
 venv/
-.conda
-# IaC
+.venv/
+.conda/
+
+# ── Python ─────────────────────────────────────
+__pycache__/
+*.pyc
+
+# ── Credenciales y configuración local ─────────
+.env
+.aws/
+aws.pem
+
+# ── Data ───────────────────────────────────────
+*.csv
+!*.dvc
+
+# ── DVC ────────────────────────────────────────
+/data/raw/
+/data/processed/
+
+# ── IaC (Terraform / Ansible) ──────────────────
 infra/ansible/inventory.ini
-infra/terraform/.terraform/*
+infra/terraform/.terraform/
 infra/terraform/.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
 crash.log
 .terraformrc
 terraform.rc
-aws.pem
 
-# Entorno virtual
-venv/
-.venv/
-__pycache__
-
-# Credenciales
-.aws/
-credentials
-.env
-data/**/*.csv
-
-*.csv
-
-# Data de DVC
-/data/raw/
-/data/processed/
-!*.dvc
-
-# Configuración personal de VS Code (rutas de intérprete, etc.)
-# Usa .vscode/settings.template.json como referencia.
-.vscode/settings.json
-
-`#Carpeta` claude
+# ── IDE ────────────────────────────────────────
+.vscode/
 .claude/
 
-`#Carpeta` caché python para el clasificador
-src/classifier/__pycache__/
-
-`#Diario` (Rubén)
+# ── Archivos locales / personales ──────────────
 src/classifier/tareas/
