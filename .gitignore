@@ -35,5 +35,8 @@ terraform.rc
 .vscode/
 .claude/
 
+# ── MLflow ─────────────────────────────────────
+mlruns/
+
 # ── Archivos locales / personales ──────────────
 src/classifier/tareas/
