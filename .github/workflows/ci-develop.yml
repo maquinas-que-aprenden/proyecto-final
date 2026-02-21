@@ -20,6 +20,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
+          cache-dependency-path: "requirements/*.txt"
 
       - name: Install ruff
         run: pip install ruff
