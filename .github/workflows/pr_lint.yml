@@ -19,5 +19,14 @@ jobs:
       - name: Install dev dependencies
         run: pip install -r requirements/dev.txt
 
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v46
+        with:
+          files: |
+            **/*.py
+            **/*.ipynb
+
       - name: Run ruff check
-        run: ruff check . --output-format=github
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: ruff check ${{ steps.changed-files.outputs.all_changed_files }} --output-format=github
