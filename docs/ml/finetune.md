@@ -88,7 +88,7 @@ El split es 80% train / 20% test, estratificado por clase. Los archivos se guard
 
 | Modelo | Params entrenables | VRAM | F1-macro test |
 |--------|--------------------|------|---------------|
-| LogReg + TF-IDF (baseline) | N/A | N/A | 0.953 |
+| LogReg + TF-IDF (baseline) | N/A | N/A | 0.9053 |
 | QLoRA Mistral-7B | ~4M (0.06%) | ~8 GB | pendiente |
 
 El objetivo del fine-tuning es explorar si un LLM con comprensión semántica profunda puede superar al baseline clásico, especialmente en casos límite donde el contexto semántico es determinante para la clasificación correcta bajo el EU AI Act.
