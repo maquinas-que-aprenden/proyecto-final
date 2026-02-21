@@ -24,6 +24,6 @@ if __name__ == "__main__":
     print(f"URI:        {result['tracking_uri']}")
     print(f"Params:     {result['params']}")
     print(f"Metrics:    {result['metrics']}")
-    print(f"Dashboard:  mlflow ui")
+    print("Dashboard:  mlflow ui")
 
     print("\n✓ classifier/mlflow.py OK")

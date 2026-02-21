@@ -29,9 +29,9 @@ if __name__ == "__main__":
     print(f"Trace ID:  {trace['trace_id']}")
     print(f"Query:     {trace['query']}")
     print(f"Total:     {trace['total_ms']}ms")
-    print(f"Spans:")
+    print("Spans:")
     for s in trace["spans"]:
         print(f"  {s['name']:>20} {s['duration_ms']:>5}ms  {s['status']}")
 
-    print(f"\n  TODO: Langfuse dashboard → https://cloud.langfuse.com")
+    print("\n  TODO: Langfuse dashboard → https://cloud.langfuse.com")
     print("\n✓ observability/main.py OK")
