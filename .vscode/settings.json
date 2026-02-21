@@ -1,0 +1,11 @@
+{
+  // Configuración compartida del análisis Pylance.
+  // Para rutas de intérprete y configuración personal, copia
+  // .vscode/settings.template.json como settings.json local y edítalo.
+  // (settings.json está en .gitignore; este archivo es la base mínima compartida.)
+  "python.analysis.diagnosticSeverityOverrides": {
+    // Suprime el aviso de "módulo instalado sin stubs de tipo" (habitual en
+    // paquetes como bitsandbytes que no distribuyen py.typed ni stubs).
+    "reportMissingModuleSource": "none"
+  }
+}
