@@ -43,3 +43,4 @@ src/classifier/tareas/
 # --- DVC: allow metadata files for processed/ ---
 !processed/*.dvc
 !processed/.gitignore
+.venv_rag/
