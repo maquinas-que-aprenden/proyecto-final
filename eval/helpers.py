@@ -19,6 +19,10 @@ def load_dataset() -> list[dict]:
     """Carga eval/dataset.json."""
     with open(DATASET_PATH, encoding="utf-8") as f:
         data = json.load(f)
+    for i, item in enumerate(data):
+        for field in ("question", "contexts", "ground_truth"):
+            if not item.get(field):
+                raise ValueError(f"dataset.json: item {i} sin campo '{field}'")
     logger.info("Dataset cargado: %d ejemplos", len(data))
     return data
 
@@ -39,7 +43,7 @@ def get_agent_answers(dataset: list[dict]) -> list[dict]:
         logger.info("Agente ReAct disponible — usando respuestas reales")
     except Exception as e:
         use_agent = False
-        logger.warning("Agente no disponible (%s) — usando respuestas mock del dataset", e)
+        logger.warning("Agente no disponible (%s: %s) — usando respuestas mock del dataset", type(e).__name__, e)
 
     rows = []
     for item in dataset:
@@ -94,17 +98,24 @@ def run_ragas(ragas_dataset) -> dict:
         dict con {"faithfulness": float, "answer_relevancy": float}
     """
     from ragas import evaluate
-    from ragas.metrics import faithfulness, answer_relevancy
+    from ragas.metrics import Faithfulness, AnswerRelevancy
 
     ragas_llm = get_ragas_llm()
-    faithfulness.llm = ragas_llm
-    answer_relevancy.llm = ragas_llm
 
     logger.info("Calculando métricas RAGAS...")
-    results = evaluate(
-        dataset=ragas_dataset,
-        metrics=[faithfulness, answer_relevancy],
-    )
+    try:
+        results = evaluate(
+            dataset=ragas_dataset,
+            metrics=[
+                Faithfulness(llm=ragas_llm),
+                AnswerRelevancy(llm=ragas_llm),
+            ],
+        )
+    except Exception as e:
+        raise RuntimeError(
+            f"Error al calcular métricas RAGAS ({type(e).__name__}: {e}). "
+            "Verifica las credenciales de AWS y que BEDROCK_MODEL_ID sea correcto."
+        ) from e
 
     return {
         "faithfulness": round(float(results["faithfulness"]), 4),

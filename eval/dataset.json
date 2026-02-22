@@ -59,15 +59,14 @@
     "question": "¿Qué sistemas de IA están incluidos en el Anexo III del EU AI Act?",
     "ground_truth": "El Anexo III del EU AI Act incluye sistemas de IA de alto riesgo en ámbitos como infraestructuras críticas, educación, empleo, servicios esenciales, aplicación de la ley, gestión de fronteras y administración de justicia.",
     "contexts": [
-      "Artículo 6. Un sistema de IA se considerará de alto riesgo cuando esté comprendido en alguno de los ámbitos del Anexo III y presente un riesgo significativo de perjuicio para la salud, la seguridad o los derechos fundamentales."
+      "Anexo III. Sistemas de IA de alto riesgo contemplados en el artículo 6, apartado 2: 1) Infraestructuras críticas. 2) Educación y formación profesional. 3) Empleo, gestión de trabajadores y acceso al trabajo por cuenta propia. 4) Acceso a servicios privados esenciales y servicios públicos. 5) Aplicación de la ley. 6) Gestión de la migración, el asilo y el control de fronteras. 7) Administración de justicia y procesos democráticos."
     ]
   },
   {
     "question": "¿Qué obligaciones tienen los proveedores de sistemas de IA de alto riesgo respecto a la documentación técnica?",
     "ground_truth": "Los proveedores de sistemas de IA de alto riesgo deben elaborar y mantener documentación técnica actualizada antes de la comercialización del sistema, que permita evaluar su conformidad con los requisitos del EU AI Act.",
     "contexts": [
-      "Artículo 9. Se establecerá un sistema de gestión de riesgos en relación con los sistemas de IA de alto riesgo. Consistirá en un proceso iterativo continuo planificado y ejecutado durante todo el ciclo de vida del sistema.",
-      "Artículo 10. Los conjuntos de datos de entrenamiento, validación y prueba estarán sujetos a prácticas de gobernanza y gestión de datos adecuadas al fin previsto del sistema de IA de alto riesgo."
+      "Artículo 11. Los proveedores de sistemas de IA de alto riesgo elaborarán la documentación técnica del sistema antes de que este se introduzca en el mercado o se ponga en servicio, y la mantendrán actualizada. La documentación técnica se elaborará de modo que demuestre que el sistema de IA de alto riesgo cumple los requisitos establecidos en el presente capítulo."
     ]
   }
 ]
