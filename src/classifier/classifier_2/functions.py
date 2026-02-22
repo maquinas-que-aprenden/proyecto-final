@@ -1,4 +1,3 @@
-import spacy
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -22,9 +21,20 @@ import os
 import mlflow
 
 # ──────────────────────────────────────────────
+# Cargar .env al importar el módulo
+# (Jupyter no propaga las vars del sistema al kernel automáticamente)
+# ──────────────────────────────────────────────
+try:
+    from dotenv import load_dotenv
+    from pathlib import Path
+    load_dotenv(dotenv_path=Path(__file__).parent / ".env", override=True)
+except ImportError:
+    pass  # python-dotenv no instalado; se leen las vars del sistema tal cual
+
+# ──────────────────────────────────────────────
 # Configuración MLflow
 # ──────────────────────────────────────────────
-MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "https://34.244.146.100")
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "")
 MLFLOW_EXPERIMENT = "clasificador_riesgo_ia_artificial"
 
 # Marca del dataset para MLflow
@@ -48,18 +58,7 @@ def get_mlflow_password():
     except ImportError:
         pass
 
-    # Cargar .env si existe (necesario en Jupyter, donde las vars del sistema
-    # no se propagan al kernel automáticamente).
-    # Se usa la ruta del propio functions.py para no depender del directorio
-    # de trabajo del kernel.
-    try:
-        from dotenv import load_dotenv
-        from pathlib import Path
-        dotenv_path = Path(__file__).parent / ".env"
-        load_dotenv(dotenv_path=dotenv_path, override=True)
-    except ImportError:
-        pass  # python-dotenv no instalado, se continúa sin él
-
+    # El .env ya se cargó al importar el módulo; aquí solo leemos la variable.
     password = os.getenv("MLFLOW_PASSWORD")
     if password:
         print("Password obtenida desde variable de entorno local.")
@@ -76,10 +75,17 @@ def get_mlflow_password():
 
 def configure_mlflow():
     """Configura las credenciales y la URI de seguimiento de MLflow."""
+    if not MLFLOW_TRACKING_URI:
+        raise EnvironmentError(
+            "MLFLOW_TRACKING_URI no está configurada.\n"
+            "Añádela al archivo .env: MLFLOW_TRACKING_URI=https://..."
+        )
+
     password = get_mlflow_password()
 
-    # No sobreescribir MLFLOW_TRACKING_INSECURE_TLS: respetar el valor que
-    # el usuario haya configurado en su entorno (p. ej. para entornos con TLS válido).
+    # Activar TLS permisivo por defecto para servidores con certificado autofirmado.
+    # setdefault respeta el valor ya definido en el entorno (p. ej. entornos con TLS válido).
+    os.environ.setdefault("MLFLOW_TRACKING_INSECURE_TLS", "true")
     os.environ["MLFLOW_TRACKING_USERNAME"] = "tracker"
     os.environ["MLFLOW_TRACKING_PASSWORD"] = password
 
@@ -94,6 +100,7 @@ _nlp_ner = None
 
 
 def _get_nlp():
+    import spacy
     global _nlp
     if _nlp is None:
         _nlp = spacy.load("es_core_news_sm", disable=["parser", "ner"])
@@ -101,6 +108,7 @@ def _get_nlp():
 
 
 def _get_nlp_ner():
+    import spacy
     global _nlp_ner
     if _nlp_ner is None:
         _nlp_ner = spacy.load("es_core_news_sm")
@@ -294,6 +302,7 @@ def extraer_entidades(df, text_column):
     df = df.copy()
     textos = df[text_column].fillna("").astype(str).tolist()
 
+    import spacy
     resultados = []
     for doc in _get_nlp_ner().pipe(textos, batch_size=100):
         entidades = [
