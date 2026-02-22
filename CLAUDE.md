@@ -2,52 +2,61 @@
 
 ## Qué es este proyecto
 
-NormaBot es un sistema **Agentic RAG** que permite consultar en lenguaje natural el BOE, el EU AI Act y regulaciones sectoriales, clasificar sistemas de IA por nivel de riesgo y generar informes de cumplimiento. Deploy en AWS SageMaker.
+NormaBot es un sistema **Agentic RAG** que permite consultar en lenguaje natural el BOE, el EU AI Act y regulaciones sectoriales, clasificar sistemas de IA por nivel de riesgo y generar informes de cumplimiento. Deploy en EC2 (AWS) con Docker.
 
 ## Arquitectura
 
-3 agentes orquestados por **LangGraph** con routing condicional:
+Un **agente ReAct** (LangGraph `create_react_agent`) orquestado por **Amazon Bedrock (Nova Lite v1)** que razona sobre la consulta del usuario y decide qué herramientas usar:
 
-1. **Agente RAG Normativo** (Corrective RAG): Retrieve → Grade → Transform query → Web fallback → Generate → Self-reflection. ChromaDB como vector store. **Grading híbrido**: filtro determinista primero (metadata + umbral score) para descartar irrelevantes sin consumir cuota LLM, seguido de LLM como juez binario solo para los documentos que pasen el primer filtro. Decisión motivada por el dominio legal (requiere precisión en citas) y el rate limiting de Groq.
-2. **Agente Clasificador de Riesgo** (ML): XGBoost clasifica sistemas de IA en 4 niveles del EU AI Act (inaceptable, alto, limitado, mínimo).
-3. **Agente de Informes**: genera informes de cumplimiento con citas legales exactas.
+1. **search_legal_docs**: búsqueda normativa (Corrective RAG). Flujo previsto: Retrieve → Grade → Transform query → Web fallback → Generate → Self-reflection. ChromaDB como vector store. Grading híbrido: filtro determinista primero (metadata + umbral score), seguido de LLM como juez binario.
+2. **classify_risk**: clasificación de riesgo ML (XGBoost + TF-IDF). Clasifica sistemas de IA en 4 niveles del EU AI Act (inaceptable, alto, limitado, mínimo).
+3. **generate_report**: informes de cumplimiento con citas legales exactas.
 
-Flujo: Consulta → Orquestador LangGraph → Agente(s) correspondiente(s) → Respuesta con fuentes + riesgo + recomendaciones.
+Flujo: Consulta → Agente ReAct (Bedrock) → Tool(s) correspondiente(s) → Respuesta con fuentes + riesgo + recomendaciones.
 
 ## Estructura del proyecto
 
 ```
 proyecto-final/
-├── app.py                  # Streamlit UI (chat + clasificador + informes)
+├── app.py                      # Streamlit UI (chat con orquestador)
 ├── src/
-│   ├── agents/             # LangGraph: grafo de estados, routing, 3 agentes
-│   ├── rag/                # Corrective RAG pipeline, ChromaDB, retrieval
-│   ├── classifier/         # XGBoost clasificador riesgo, SHAP, MLflow tracking
-│   └── nlp/                # spaCy NER legal, fine-tuning QLoRA
-├── data/                   # Corpus legal (BOE, EU AI Act, AESIA, LOPD)
-├── eval/                   # RAGAS + DeepEval: evaluación automática RAG
-├── scripts/                # Scraping BOE, ETL, utilidades
-├── tests/                  # pytest (unitarios + E2E)
-├── docs/                   # Especificaciones del proyecto
-├── Dockerfile              # Docker para AWS SageMaker (python:3.12-slim, puerto 8080)
-├── docker.compose.yml
-└── requirements.txt
+│   ├── orchestrator/main.py    # Agente ReAct (Bedrock Nova Lite + tools)
+│   ├── agents/state.py         # AgentState TypedDict para LangGraph
+│   ├── rag/main.py             # Corrective RAG pipeline (stub)
+│   ├── data/main.py            # Embeddings + ChromaDB (stub)
+│   ├── classifier/             # Notebooks ML 1-12 (dataset artificial)
+│   │   └── classifier_2/       # Notebooks ML 0-12 (dataset Hugging Face)
+│   ├── report/main.py          # Informes de cumplimiento (stub)
+│   ├── ui/main.py              # UI mock consola (no se usa)
+│   └── observability/main.py   # Langfuse trazas (stub)
+├── infra/
+│   ├── terraform/              # EC2, S3, IAM, VPC, Bedrock
+│   └── ansible/                # Playbooks deploy MLflow + NormaBot
+├── data/                       # Corpus legal (datos en S3 vía DVC)
+├── eval/                       # RAGAS + DeepEval (pendiente)
+├── scripts/                    # Utilidades (pendiente)
+├── tests/                      # pytest (pendiente)
+├── docs/                       # Specs, decisiones, reuniones, MLOps, ML
+├── requirements/               # Separados: base, app, dev, ml, infra
+├── Dockerfile                  # python:3.12-slim, Streamlit en :8080
+├── docker-compose.yml
+└── .github/workflows/          # ci-develop.yml + cicd-main.yml
 ```
 
-## Stack tecnológico (todo gratuito)
+## Stack tecnológico
 
-- **LLM**: Groq API (Llama 3.3 70B, 14.400 req/día) → Gemini fallback → Mistral fallback
-- **Agentes**: LangGraph + LangChain
-- **Vector store**: ChromaDB (embebido, persistido)
-- **Embeddings**: `paraphrase-multilingual-MiniLM-L12-v2` (sentence-transformers, CPU)
+- **LLM**: Amazon Bedrock — Nova Lite v1 (`eu.amazon.nova-lite-v1:0`, región eu-west-1)
+- **Agentes**: LangGraph (`create_react_agent`) + LangChain
+- **Vector store**: ChromaDB (pendiente de implementar)
+- **Embeddings**: `paraphrase-multilingual-MiniLM-L12-v2` (pendiente de implementar)
 - **ML**: scikit-learn, XGBoost, Grid Search, Stratified k-fold (k=5)
-- **NLP**: spaCy (`es_core_news_lg`) para NER legal
-- **Fine-tuning**: QLoRA con Unsloth, Llama 3.2 3B, en Google Colab T4
-- **MLOps**: MLflow (tracking + registry), DVC (versionado corpus con Google Drive)
-- **Observabilidad**: Langfuse (trazas LLM), EvidentlyAI (drift), RAGAS + DeepEval (eval RAG)
-- **CI/CD**: GitHub Actions (test → lint → RAGAS eval → build Docker → deploy AWS SageMaker)
+- **Fine-tuning**: QLoRA con bitsandbytes + HuggingFace PEFT, Mistral-7B, en Google Colab T4
+- **MLOps**: MLflow (desplegado en EC2 con Docker + NGINX), DVC (versionado corpus con S3)
+- **Observabilidad**: Langfuse Cloud (región EU) — configurado, integración pendiente
+- **CI/CD**: GitHub Actions → GHCR → SSH deploy a EC2
+- **IaC**: Terraform + Ansible
 - **UI**: Streamlit
-- **Deploy**: AWS SageMaker
+- **Deploy**: EC2 (AWS), Docker Compose, NGINX reverse proxy
 
 ## Lenguaje y convenciones
 
@@ -67,8 +76,8 @@ Todas las fuentes son públicas y gratuitas:
 | BOE (legislación IA, datos, financiero) | boe.es | Scraping |
 | EU AI Act (Reglamento UE 2024/1689) | EUR-Lex | Público |
 | Guías AESIA + sandbox | aesia.gob.es | Público |
-| Dataset clasificación riesgo (200-300 desc.) | Elaboración propia | Etiquetado manual |
-| Artículos BOE etiquetados (~500) | BOE + manual | Etiquetado manual |
+| Dataset clasificación riesgo (artificial) | Elaboración propia | Etiquetado manual |
+| Dataset clasificación riesgo (HF) | Hugging Face | Descarga |
 | LOPD-GDD, RGPD | boe.es / aepd.es | Público |
 | Regulación sectorial (banca, seguros) | BOE / CNMV / BdE | Scraping |
 
@@ -91,9 +100,6 @@ pytest tests/ -v
 # Lint
 ruff check .
 
-# Evaluación RAG
-python eval/run_ragas.py
-
 # App local
 streamlit run app.py --server.port=8080
 
@@ -106,13 +112,12 @@ docker run -p 8080:8080 normabot
 
 - **Alucinaciones**: el dominio legal exige citas exactas. Siempre usar Corrective RAG con self-reflection. Toda respuesta debe incluir artículos fuente del BOE/EU AI Act.
 - **Disclaimer obligatorio**: "Informe preliminar, consulte profesional jurídico" en toda respuesta generada.
-- **Rate limiting**: implementar fallback multi-proveedor (Groq → Gemini → Mistral) y cache de respuestas frecuentes.
-- **Clasificador**: dataset pequeño (200-300 ejemplos). Usar `class_weight='balanced'`, augmentation con paráfrasis, y documentar como limitación conocida.
+- **Clasificador**: dos experimentos con datasets diferentes (artificial y Hugging Face). Usar `class_weight='balanced'`, augmentation con paráfrasis, y documentar como limitación conocida.
 - **Explicabilidad**: SHAP para features relevantes del clasificador ML.
 
-## Equipo (4 personas, 17 días)
+## Equipo (4 personas, 17 días hábiles)
 
-- **Persona A**: Data + RAG Engineer (scraping BOE, chunking, ChromaDB, deploy AWS)
-- **Persona B**: ML + NLP Engineer (clasificador riesgo, NER spaCy, fine-tuning QLoRA)
-- **Persona C**: Agents + UI Lead (LangGraph, 3 agentes, Streamlit)
-- **Persona D**: MLOps + Observabilidad (MLflow, DVC, CI/CD, Langfuse, RAGAS eval)
+- **Dani** (@danyocando-git): Data + RAG Engineer (scraping BOE, chunking, ChromaDB, deploy AWS)
+- **Rubén** (@Rcerezo-dev): ML + NLP Engineer (clasificador riesgo, SHAP, fine-tuning QLoRA)
+- **Maru** (@mariaeugenia-alvarez): Agents + UI Lead (LangGraph, orquestador, Streamlit)
+- **Nati** (@natgarea): MLOps + Observabilidad (Terraform, Ansible, CI/CD, Langfuse)
