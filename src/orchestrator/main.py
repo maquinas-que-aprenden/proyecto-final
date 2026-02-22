@@ -14,6 +14,7 @@ import os
 from langchain_aws import ChatBedrockConverse
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
+from src.observability.main import get_langfuse_handler
 
 logger = logging.getLogger(__name__)
 
@@ -126,12 +127,15 @@ def _get_agent():
     return _agent
 
 
-def run(query: str) -> dict:
+def run(query: str, session_id: str | None = None) -> dict:
     """Ejecuta el agente ReAct con una consulta del usuario."""
     agent = _get_agent()
-    result = agent.invoke({"messages": [("user", query)]})
+    handler = get_langfuse_handler(query, session_id=session_id)
+    result = agent.invoke(
+        {"messages": [("user", query)]},
+        config={"callbacks": [handler]},
+    )
     return result
-
 
 if __name__ == "__main__":
     queries = [
