@@ -127,28 +127,45 @@ def _get_agent():
     return _agent
 
 
-def run(query: str, session_id: str | None = None) -> dict:
+def run(query: str, session_id: str | None = None, user_id: str | None = None) -> dict:
     """Ejecuta el agente ReAct con una consulta del usuario."""
     agent = _get_agent()
-    handler = get_langfuse_handler(query, session_id=session_id)
+    
+    try:
+        callbacks = [get_langfuse_handler(
+            session_id=session_id,
+            user_id=user_id,
+            tags=["produccion", "normabot-v1"]
+        )]
+    except (ImportError, ValueError) as e:
+        logger.warning("Langfuse no disponible: %s — continuando sin trazas", e)
+        callbacks = []
+
     result = agent.invoke(
         {"messages": [("user", query)]},
-        config={"callbacks": [handler]},
+        config={"callbacks": callbacks},
     )
     return result
 
 if __name__ == "__main__":
+    import uuid
+    # Generamos un ID único para agrupar estas consultas en una misma sesión de Langfuse
+    test_session = f"session-{uuid.uuid4().short if hasattr(uuid.uuid4(), 'short') else str(uuid.uuid4())[:8]}"
+    
     queries = [
         "¿Qué dice el artículo 5 del EU AI Act?",
         "Clasifica mi sistema de reconocimiento facial",
         "Genera un informe de cumplimiento para mi chatbot",
     ]
+    
     for q in queries:
         print(f"{'=' * 60}")
-        result = run(q)
+        # Pasamos el session_id para que Langfuse v3 lo capture mediante el CallbackHandler
+        result = run(q, session_id=test_session)
+        
         final_message = result["messages"][-1]
         print(f"  Query:    {q}")
         print(f"  Response: {final_message.content[:200]}...")
         print()
 
-    print("✓ orchestrator/main.py OK — Agente ReAct funcional")
+    print(f"✓ orchestrator/main.py OK — Agente funcional (Sesión: {test_session})")
