@@ -1,7 +1,7 @@
 # Dependencias de infraestructura, CI/CD y observabilidad
 boto3==1.42.51
-awscli
-dvc
-dvc-s3
-langfuse
-ragas
+awscli>=1.36.0
+dvc>=3.50.0
+dvc-s3>=3.0.0
+langfuse>=2.50.0
+ragas>=0.2.0
