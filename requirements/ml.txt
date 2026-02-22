@@ -13,7 +13,10 @@ joblib==1.4.2
 scipy==1.14.1
 
 # Deep Learning / Fine-tuning QLoRA
-torch==2.5.1
+# Windows (CPU-only): instalar con:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+# Linux/Mac (CUDA): cambiar por torch==2.5.1 sin --index-url
+torch
 # CVE-2024-11392/11393/11394: versión mínima segura
 transformers>=4.48.0
 peft==0.14.0
