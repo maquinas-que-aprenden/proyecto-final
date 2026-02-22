@@ -24,8 +24,11 @@ import mlflow
 # ──────────────────────────────────────────────
 # Configuración MLflow
 # ──────────────────────────────────────────────
-MLFLOW_TRACKING_URI = "https://34.240.189.163"
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "https://34.244.146.100")
 MLFLOW_EXPERIMENT = "clasificador_riesgo_ia"
+
+# Marca del dataset para MLflow
+_DATASET_TAGS = {"dataset_type": "real", "dataset_source": "dataset_riesgo"}
 
 
 def get_mlflow_password():
@@ -37,7 +40,7 @@ def get_mlflow_password():
     """
     # Intentar obtener desde Colab
     try:
-        from google.colab import userdata
+        from google.colab import userdata  # type: ignore[import]
         password = userdata.get("MLFLOW_PASSWORD")
         if password:
             print("Password obtenida desde Colab Secrets.")
@@ -72,10 +75,15 @@ def get_mlflow_password():
 
 
 def configure_mlflow():
-    """Configura las credenciales y la URI de seguimiento de MLflow."""
+    """
+    Configure MLflow credentials and tracking URI for the current process.
+    
+    Sets the MLFLOW_TRACKING_USERNAME and MLFLOW_TRACKING_PASSWORD environment variables (using the configured MLflow password), applies the module-level tracking URI via mlflow.set_tracking_uri, and prints a confirmation message. Does not modify MLFLOW_TRACKING_INSECURE_TLS.
+    """
     password = get_mlflow_password()
 
-    os.environ["MLFLOW_TRACKING_INSECURE_TLS"] = "true"
+    # No sobreescribir MLFLOW_TRACKING_INSECURE_TLS: respetar el valor que
+    # el usuario haya configurado en su entorno (p. ej. para entornos con TLS válido).
     os.environ["MLFLOW_TRACKING_USERNAME"] = "tracker"
     os.environ["MLFLOW_TRACKING_PASSWORD"] = password
 
@@ -428,16 +436,27 @@ def split_dataset(df, label_column, test_size=0.15, val_size=0.15, random_state=
 
 def crear_tfidf(X_train, X_val, X_test, max_features=5000, ngram_range=(1, 2)):
     """
-    Crea y ajusta un vectorizador TF-IDF sobre el conjunto de entrenamiento
-    y transforma train, validation y test.
-
+    Create and fit a TF-IDF vectorizer on training texts and transform train, validation, and test sets.
+    
+    Parameters:
+        X_train (Sequence[str]): Iterable of raw training texts.
+        X_val (Sequence[str]): Iterable of raw validation texts.
+        X_test (Sequence[str]): Iterable of raw test texts.
+        max_features (int): Maximum number of features (vocabulary size) for the vectorizer.
+        ngram_range (tuple[int, int]): The lower and upper boundary of the range of n-values for different n-grams to be extracted.
+    
     Returns:
-    tuple (tfidf, X_train_tfidf, X_val_tfidf, X_test_tfidf)
+        tuple: (tfidf, X_train_tfidf, X_val_tfidf, X_test_tfidf)
+            - tfidf: Fitted TfidfVectorizer instance.
+            - X_train_tfidf: Sparse matrix of TF-IDF features for the training set.
+            - X_val_tfidf: Sparse matrix of TF-IDF features for the validation set.
+            - X_test_tfidf: Sparse matrix of TF-IDF features for the test set.
     """
     tfidf = TfidfVectorizer(
         max_features=max_features,
         ngram_range=ngram_range,
         sublinear_tf=True,
+        token_pattern=r"(?u)\b[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]{3,}\b",
     )
     X_train_tfidf = tfidf.fit_transform(X_train)
     X_val_tfidf = tfidf.transform(X_val)
@@ -453,13 +472,20 @@ def crear_tfidf(X_train, X_val, X_test, max_features=5000, ngram_range=(1, 2)):
 
 def entrenar_modelo_baseline(X_train_tfidf, y_train, X_val_tfidf, y_val):
     """
-    Entrena un modelo LogisticRegression como baseline y muestra resultados
-    sobre el conjunto de validación.
-
+    Train a logistic regression baseline and print validation metrics.
+    
+    Train a LogisticRegression classifier on the provided TF-IDF training matrix and print a classification report and macro F1 score computed on the validation set.
+    
+    Parameters:
+        X_train_tfidf (sparse matrix or ndarray): TF-IDF features for training.
+        y_train (array-like): Training labels.
+        X_val_tfidf (sparse matrix or ndarray): TF-IDF features for validation.
+        y_val (array-like): Validation labels.
+    
     Returns:
-    modelo : LogisticRegression entrenado
+        modelo (LogisticRegression): Fitted LogisticRegression model.
     """
-    modelo = LogisticRegression(max_iter=1000, random_state=42)
+    modelo = LogisticRegression(max_iter=2000, random_state=42)
     modelo.fit(X_train_tfidf, y_train)
 
     y_val_pred = modelo.predict(X_val_tfidf)
@@ -494,7 +520,6 @@ def entrenar_xgboost(X_train, y_train, X_val, y_val, params=None):
 
     le = LabelEncoder()
     y_train_enc = le.fit_transform(y_train)
-    y_val_enc = le.transform(y_val)
 
     default_params = {
         "n_estimators": 200,
@@ -705,10 +730,19 @@ def plot_curva_roc_multiclase(modelo, tfidf, X_test, y_test):
 
 def analisis_errores(modelo, tfidf, X_test, y_test):
     """
-    Muestra los ejemplos mal clasificados para analizar patrones de error.
-
+    Show misclassified test examples to assist error analysis.
+    
+    Parameters:
+        modelo: Trained classifier with a `predict` method.
+        tfidf: Fitted vectorizer with a `transform` method.
+        X_test (pd.Series or array-like): Raw text samples to classify.
+        y_test (pd.Series or array-like): True labels corresponding to X_test.
+    
     Returns:
-    df_errores : pd.DataFrame con las predicciones incorrectas.
+        df_errores (pd.DataFrame): Rows where predictions differ from true labels, with columns:
+            - texto: original input text,
+            - etiqueta_real: true label,
+            - etiqueta_predicha: model prediction.
     """
     X_test_tfidf = tfidf.transform(X_test)
     y_pred = modelo.predict(X_test_tfidf)
@@ -738,3 +772,375 @@ def analisis_errores(modelo, tfidf, X_test, y_test):
             print()
 
     return df_errores
+
+
+# ══════════════════════════════════════════════
+# 7. MLFLOW — HELPER SEGURO
+# ══════════════════════════════════════════════
+
+def log_mlflow_safe(run_name, params=None, metrics=None, artifacts=None, tags=None):
+    """
+    Log parameters, metrics, artifacts, and tags to a named MLflow run after configuring MLflow.
+    
+    Parameters:
+        run_name (str): Name for the MLflow run.
+        params (dict, optional): Hyperparameters or configuration key-value pairs to log.
+        metrics (dict, optional): Numeric metrics to log.
+        artifacts (list[str], optional): Local file paths to upload as run artifacts.
+        tags (dict, optional): Additional tags to attach to the run.
+    """
+    configure_mlflow()
+    mlflow.set_experiment(MLFLOW_EXPERIMENT)
+
+    _all_tags = {**_DATASET_TAGS, **(tags or {})}
+
+    with mlflow.start_run(run_name=run_name):
+        if params:
+            mlflow.log_params(params)
+        if metrics:
+            mlflow.log_metrics(metrics)
+        if artifacts:
+            for path in artifacts:
+                mlflow.log_artifact(path)
+        mlflow.set_tags(_all_tags)
+
+    print(f"✓ Run '{run_name}' registrado en MLflow ({MLFLOW_TRACKING_URI})")
+
+
+# ══════════════════════════════════════════════
+# 8. SHAP — EXPLICABILIDAD
+# ══════════════════════════════════════════════
+
+_MAX_DENSE_ELEMENTS = 50_000_000  # ~400 MB en float64; ajustable según entorno
+
+
+def _sparse_to_dense_safe(X, label="X", max_elements=_MAX_DENSE_ELEMENTS):
+    """
+    Safely convert a sparse matrix to a dense numpy array with a memory-size guard.
+    
+    If the input supports `toarray()`, the function converts it to a dense numpy array unless
+    the total number of elements (rows × columns) exceeds `max_elements`, in which case a
+    random subset of rows is sampled and converted to avoid out-of-memory errors; a warning
+    is emitted when sampling occurs.
+    
+    Parameters:
+        X: object
+            Input matrix or array. If `X` does not implement `toarray()`, it is returned unchanged.
+        label (str): optional
+            Human-readable name used in the warning message when sampling is performed.
+        max_elements (int): optional
+            Maximum allowed number of elements (rows × columns) for a full dense conversion.
+            If exceeded, the function samples rows so the resulting matrix has at most this many elements.
+    
+    Returns:
+        numpy.ndarray or original input:
+            A dense numpy array converted from `X` (or from a sampled subset of `X` if sampling occurred),
+            or the original `X` when it does not support `toarray()`.
+    """
+    import warnings
+    import numpy as np
+
+    if not hasattr(X, "toarray"):
+        return X
+
+    n_rows, n_cols = X.shape
+    n_elements = n_rows * n_cols
+
+    if n_elements > max_elements:
+        max_rows = max(1, max_elements // n_cols)
+        warnings.warn(
+            f"[SHAP] {label} tiene {n_elements:,} elementos ({n_rows}×{n_cols}), "
+            f"supera el umbral de {max_elements:,}. "
+            f"Se muestrean {max_rows} filas aleatorias para evitar OOM.",
+            UserWarning,
+            stacklevel=3,
+        )
+        idx = np.random.choice(n_rows, size=max_rows, replace=False)
+        X = X[idx]
+
+    return X.toarray()
+
+
+def explicar_con_shap(modelo, X_background, X_explain):
+    """
+    Compute SHAP explanations for a trained classifier.
+    
+    Uses a linear SHAP explainer for sklearn LogisticRegression models and a tree explainer for other model types; sparse inputs will be converted to dense when required. The returned SHAP values are normalized to a list of 2-D arrays (n_samples, n_features), one array per class.
+    
+    Parameters:
+        modelo: Trained classifier (e.g., sklearn LogisticRegression or tree-based model).
+        X_background: Reference dataset (array or sparse matrix) used to initialize the explainer.
+        X_explain: Samples (array or sparse matrix) to explain.
+    
+    Returns:
+        tuple: (explainer, shap_values)
+            explainer: The fitted SHAP explainer object.
+            shap_values: List of 2-D numpy arrays, each of shape (n_samples, n_features), one entry per class.
+    """
+    import shap
+    import numpy as np
+    from sklearn.linear_model import LogisticRegression
+
+    if isinstance(modelo, LogisticRegression):
+        explainer = shap.LinearExplainer(modelo, X_background)
+        shap_values = explainer.shap_values(X_explain)
+    else:
+        # XGBoost u otro modelo de árbol — necesita arrays densos
+        X_bg = _sparse_to_dense_safe(X_background, label="X_background")
+        X_ex = _sparse_to_dense_safe(X_explain, label="X_explain")
+        explainer = shap.TreeExplainer(modelo, X_bg)
+        shap_values = explainer.shap_values(X_ex)
+
+    # Normalizar a lista de arrays 2D (n_samples, n_features), uno por clase.
+    # SHAP >= 0.46 puede devolver un ndarray 3D en lugar de lista.
+    n_samples = X_explain.shape[0]
+    if isinstance(shap_values, np.ndarray):
+        if shap_values.ndim == 3:
+            if shap_values.shape[0] == n_samples:
+                # formato (n_samples, n_features, n_classes)
+                shap_values = [shap_values[:, :, i] for i in range(shap_values.shape[2])]
+            else:
+                # formato (n_classes, n_samples, n_features)
+                shap_values = [shap_values[i] for i in range(shap_values.shape[0])]
+        else:
+            shap_values = [shap_values]
+    elif not isinstance(shap_values, list):
+        shap_values = [shap_values]
+
+    n_clases = len(shap_values)
+    print(f"SHAP calculado: {n_clases} clases, {n_samples} muestras")
+    return explainer, shap_values
+
+
+def plot_shap_summary(shap_values, X_explain, feature_names, class_names, output_dir, max_display=20):
+    """
+    Generate and save SHAP summary visualizations: a beeswarm plot for each class and a global per-class importance bar chart.
+    
+    Parameters:
+        shap_values: list or ndarray
+            SHAP values as either a list of 2D arrays (one per class, shape (n_samples, n_features))
+            or a 3D ndarray with one of the two shapes:
+            - (n_samples, n_features, n_classes) or
+            - (n_classes, n_samples, n_features).
+            The function accepts these formats and normalizes them internally.
+        X_explain: array-like or sparse matrix
+            Samples used for plotting (rows correspond to samples). A sparse matrix will be converted to dense.
+        feature_names: list[str]
+            Names of the features (length = n_features).
+        class_names: list[str]
+            Names of the target classes (length = n_classes).
+        output_dir: str
+            Directory where plot files will be saved; created if it does not exist.
+        max_display: int, optional
+            Maximum number of features to display in each plot (default 20).
+    
+    Returns:
+        saved_paths: list[str]
+            Paths to the image files written to disk.
+    """
+    import shap
+    import numpy as np
+
+    os.makedirs(output_dir, exist_ok=True)
+    X_dense = _sparse_to_dense_safe(X_explain, label="X_explain")
+    saved_paths = []
+
+    # Normalizar shap_values a lista de arrays 2D (n_samples, n_features), uno por clase.
+    # SHAP >= 0.46 puede devolver ndarray 3D o lista; hay que manejar ambos.
+    if isinstance(shap_values, list):
+        sv_list = shap_values
+    elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
+        if shap_values.shape[0] == X_dense.shape[0]:
+            # (n_samples, n_features, n_classes)
+            sv_list = [shap_values[:, :, i] for i in range(shap_values.shape[2])]
+        else:
+            # (n_classes, n_samples, n_features)
+            sv_list = [shap_values[i] for i in range(shap_values.shape[0])]
+    else:
+        raise ValueError(
+            f"Formato de shap_values no reconocido: type={type(shap_values)}, "
+            f"shape={getattr(shap_values, 'shape', 'N/A')}. "
+            f"Ejecuta primero explicar_con_shap para obtener el formato correcto."
+        )
+
+    # Validar que sv_list y class_names tienen la misma longitud
+    if len(sv_list) != len(class_names):
+        raise ValueError(
+            f"Número de arrays SHAP ({len(sv_list)}) no coincide con "
+            f"número de clases ({len(class_names)}). "
+            f"Clases: {class_names}"
+        )
+
+    # Beeswarm por clase
+    for sv, clase in zip(sv_list, class_names):
+        shap.summary_plot(
+            sv, X_dense,
+            feature_names=feature_names,
+            max_display=max_display,
+            show=False,
+            plot_type="dot",
+        )
+        plt.title(f"SHAP beeswarm — {clase}")
+        plt.tight_layout()
+        path = os.path.join(output_dir, f"shap_beeswarm_{clase}.png")
+        plt.savefig(path, dpi=150, bbox_inches="tight")
+        plt.show()
+        plt.close()
+        saved_paths.append(path)
+        print(f"Guardado: {path}")
+
+    # Bar plot global: SHAP >= 0.46 espera array 3D (n_samples, n_features, n_classes)
+    sv_3d = np.stack(sv_list, axis=2)
+    shap.summary_plot(
+        sv_3d, X_dense,
+        feature_names=feature_names,
+        class_names=class_names,
+        max_display=max_display,
+        show=False,
+        plot_type="bar",
+    )
+    plt.title("Importancia media SHAP por clase")
+    plt.tight_layout()
+    path_bar = os.path.join(output_dir, "shap_importancia_clases.png")
+    plt.savefig(path_bar, dpi=150, bbox_inches="tight")
+    plt.show()
+    plt.close()
+    saved_paths.append(path_bar)
+    print(f"Guardado: {path_bar}")
+
+    return saved_paths
+
+
+def plot_shap_waterfall(explainer, shap_values, X_explain, idx, feature_names, class_names, output_dir, max_display=15):
+    """
+    Create and save SHAP waterfall plots for a single sample, producing one plot per class.
+    
+    Parameters:
+        explainer: A fitted SHAP Explainer whose `expected_value` provides base values.
+        shap_values: List-like of SHAP value arrays (one entry per class) where each array has shape (n_samples, n_features).
+        X_explain: 2D array or sparse matrix of samples used for explanations; the row at `idx` will be plotted.
+        idx (int): Index of the sample (row) in `X_explain` to visualize.
+        feature_names (list[str]): Names of the input features, in the same order as columns of `X_explain`.
+        class_names (list[str]): Names of classes corresponding to entries in `shap_values`.
+        output_dir (str): Directory where PNG files will be saved; the directory will be created if it does not exist.
+        max_display (int): Maximum number of features to show in each waterfall plot.
+    
+    Returns:
+        saved_paths (list[str]): Paths to the saved waterfall plot image files, one per class.
+    """
+    import shap
+
+    os.makedirs(output_dir, exist_ok=True)
+    X_dense = _sparse_to_dense_safe(X_explain, label="X_explain")
+    expected = explainer.expected_value
+    saved_paths = []
+
+    for i, clase in enumerate(class_names):
+        ev = expected[i] if hasattr(expected, "__len__") else expected
+        explanation = shap.Explanation(
+            values=shap_values[i][idx],
+            base_values=ev,
+            data=X_dense[idx],
+            feature_names=feature_names,
+        )
+        shap.plots.waterfall(explanation, max_display=max_display, show=False)
+        plt.title(f"SHAP waterfall — muestra {idx} — clase {clase}")
+        plt.tight_layout()
+        path = os.path.join(output_dir, f"shap_waterfall_idx{idx}_{clase}.png")
+        plt.savefig(path, dpi=150, bbox_inches="tight")
+        plt.show()
+        plt.close()
+        saved_paths.append(path)
+        print(f"Guardado: {path}")
+
+    return saved_paths
+
+
+# ══════════════════════════════════════════════
+# 9. SERIALIZACIÓN Y REGISTRO DEL MEJOR MODELO
+# ══════════════════════════════════════════════
+
+def guardar_pipeline_completo(modelo, tfidf, label_encoder=None, metadata=None, output_dir="model"):
+    """
+    Save the full trained pipeline (model, TF-IDF vectorizer, optional label encoder) and metadata to disk using a clear naming convention.
+    
+    Parameters:
+        modelo: Trained model object to serialize (e.g., sklearn or XGBoost estimator).
+        tfidf: Fitted TfidfVectorizer to serialize.
+        label_encoder: Optional LabelEncoder to serialize alongside the model.
+        metadata: Optional dict with additional metadata to merge into the saved JSON (e.g., experiment info or metrics).
+        output_dir: Directory path where artefacts will be written. Files created: mejor_modelo.joblib, mejor_modelo_tfidf.joblib, optionally mejor_modelo_label_encoder.joblib, and model_metadata.json.
+    
+    Returns:
+        tuple: (path_modelo, path_tfidf, path_meta) — filesystem paths to the saved model file, TF-IDF file, and metadata JSON respectively.
+    """
+    import json
+    from datetime import datetime
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    path_modelo = os.path.join(output_dir, "mejor_modelo.joblib")
+    path_tfidf = os.path.join(output_dir, "mejor_modelo_tfidf.joblib")
+
+    joblib.dump(modelo, path_modelo)
+    joblib.dump(tfidf, path_tfidf)
+    print(f"Modelo guardado:      {path_modelo}")
+    print(f"Vectorizador guardado: {path_tfidf}")
+
+    if label_encoder is not None:
+        path_le = os.path.join(output_dir, "mejor_modelo_label_encoder.joblib")
+        joblib.dump(label_encoder, path_le)
+        print(f"LabelEncoder guardado: {path_le}")
+
+    meta = {
+        "fecha": datetime.now().isoformat(),
+        "model_type": type(modelo).__name__,
+        "tfidf_vocab_size": len(tfidf.vocabulary_),
+        "tfidf_ngram_range": str(tfidf.ngram_range),
+        "tfidf_max_features": tfidf.max_features,
+    }
+    if metadata:
+        meta.update(metadata)
+
+    path_meta = os.path.join(output_dir, "model_metadata.json")
+    with open(path_meta, "w", encoding="utf-8") as f:
+        json.dump(meta, f, indent=2, ensure_ascii=False)
+    print(f"Metadata guardada:    {path_meta}")
+
+    return path_modelo, path_tfidf, path_meta
+
+
+def registrar_modelo_en_registry(run_id, artifact_path, registered_name, stage="Production"):
+    """
+    Register a model artifact produced in an MLflow run to the MLflow Model Registry and transition it to the specified stage.
+    
+    This function registers the model located at the given run artifact path under the provided registered name, transitions the created model version to `stage` (for example "Staging" or "Production"), updates the registered model description, and tags the registered model with `best_model=true`.
+    
+    Parameters:
+        run_id (str): MLflow run identifier that contains the logged model.
+        artifact_path (str): Relative artifact path inside the run (e.g., "modelo" or "model").
+        registered_name (str): Name to use for the registered model in the Model Registry.
+        stage (str): Target stage to transition the new model version to (e.g., "Staging" or "Production").
+    
+    Returns:
+        model_version: The created mlflow.entities.model_registry.ModelVersion object for the registered model.
+    """
+    from mlflow.tracking import MlflowClient
+
+    model_uri = f"runs:/{run_id}/{artifact_path}"
+    model_version = mlflow.register_model(model_uri, registered_name)
+
+    client = MlflowClient()
+    client.transition_model_version_stage(
+        name=registered_name,
+        version=model_version.version,
+        stage=stage,
+    )
+    client.update_registered_model(
+        name=registered_name,
+        description=f"Mejor modelo del experimento {MLFLOW_EXPERIMENT}.",
+    )
+    client.set_registered_model_tag(registered_name, "best_model", "true")
+
+    print(f"✓ '{registered_name}' v{model_version.version} → stage='{stage}'")
+    return model_version

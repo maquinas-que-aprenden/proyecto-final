@@ -2,13 +2,13 @@
 -r base.txt
 
 # UI
-streamlit
+streamlit>=1.40.0
 
 # Agentes y orquestación
-langgraph
-langchain
-langchain-aws
-langchain-core
+langgraph>=0.2.0
+langchain>=0.3.0
+langchain-aws>=0.2.0
+langchain-core>=0.3.0
 
 # LLM providers
 # TODO: añadir groq, google-generativeai, mistralai cuando se integren
