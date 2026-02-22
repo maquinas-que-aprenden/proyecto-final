@@ -55,7 +55,13 @@ def main(ci_mode: bool = False) -> int:
     ragas_dataset = build_ragas_dataset(rows)
 
     # 4. Calcular métricas
-    metrics = run_ragas(ragas_dataset)
+    try:
+        metrics = run_ragas(ragas_dataset)
+    except Exception as e:
+        logger.error("Error en la evaluación RAGAS: %s", e)
+        if ci_mode:
+            return 1
+        metrics = {"faithfulness": 0.0, "answer_relevancy": 0.0}
 
     # 5. Mostrar resultados
     logger.info("─" * 40)

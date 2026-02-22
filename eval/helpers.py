@@ -91,31 +91,47 @@ def get_ragas_llm():
     )
     return LangchainLLMWrapper(llm)
 
-def run_ragas(ragas_dataset) -> dict:
-    """Calcula métricas RAGAS sobre el dataset.
+def get_ragas_embeddings():
+    """Instancia los embeddings de Titan v2 para Ragas."""
+    from langchain_aws import BedrockEmbeddings
+    from ragas.embeddings import LangchainEmbeddingsWrapper
+    
+    embeddings = BedrockEmbeddings(
+        model_id="amazon.titan-embed-text-v2:0",
+        region_name=os.getenv("AWS_REGION", "eu-west-1"),
+    )
+    # Ragas necesita este wrapper para entender los embeddings de LangChain
+    return LangchainEmbeddingsWrapper(embeddings)
 
-    Returns:
-        dict con {"faithfulness": float, "answer_relevancy": float}
-    """
+def run_ragas(ragas_dataset) -> dict:
     from ragas import evaluate
     from ragas.metrics import Faithfulness, AnswerRelevancy
 
     ragas_llm = get_ragas_llm()
+    
+    # Cargar embeddings para evitar error de OpenAI
+    try:
+        ragas_embeddings = get_ragas_embeddings()
+        logger.info("Embeddings Titan v2 cargados correctamente.")
+    except Exception as e:
+        logger.warning("No se pudieron cargar embeddings, AnswerRelevancy fallará: %s", e)
+        ragas_embeddings = None
 
     logger.info("Calculando métricas RAGAS...")
+    
+    # Definimos las métricas pasando los embeddings explícitamente
+    metrics = [
+        Faithfulness(llm=ragas_llm),
+        AnswerRelevancy(llm=ragas_llm, embeddings=ragas_embeddings)
+    ]
+
     try:
         results = evaluate(
             dataset=ragas_dataset,
-            metrics=[
-                Faithfulness(llm=ragas_llm),
-                AnswerRelevancy(llm=ragas_llm),
-            ],
+            metrics=metrics,
         )
     except Exception as e:
-        raise RuntimeError(
-            f"Error al calcular métricas RAGAS ({type(e).__name__}: {e}). "
-            "Verifica las credenciales de AWS y que BEDROCK_MODEL_ID sea correcto."
-        ) from e
+        raise RuntimeError(f"Fallo crítico en Bedrock/Ragas: {e}")
 
     return {
         "faithfulness": round(float(results["faithfulness"]), 4),
