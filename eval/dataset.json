@@ -1,0 +1,73 @@
+[
+  {
+    "question": "¿Qué prácticas de IA están prohibidas según el EU AI Act?",
+    "ground_truth": "El artículo 5 del EU AI Act prohíbe las prácticas de IA que utilicen técnicas subliminales para alterar el comportamiento humano causando perjuicio físico o psicológico, así como sistemas que exploten vulnerabilidades de grupos específicos.",
+    "contexts": [
+      "Artículo 5. Quedan prohibidas las siguientes prácticas de IA: a) sistemas que utilicen técnicas subliminales para alterar el comportamiento de una persona de manera que cause o pueda causar perjuicio físico o psicológico."
+    ]
+  },
+  {
+    "question": "¿Cuándo se considera que un sistema de IA es de alto riesgo?",
+    "ground_truth": "Según el artículo 6 del EU AI Act, un sistema de IA se considera de alto riesgo cuando está comprendido en alguno de los ámbitos del Anexo III y presenta un riesgo significativo para la salud, la seguridad o los derechos fundamentales.",
+    "contexts": [
+      "Artículo 6. Un sistema de IA se considerará de alto riesgo cuando esté comprendido en alguno de los ámbitos del Anexo III y presente un riesgo significativo de perjuicio para la salud, la seguridad o los derechos fundamentales."
+    ]
+  },
+  {
+    "question": "¿Qué es el sistema de gestión de riesgos del EU AI Act?",
+    "ground_truth": "El artículo 9 establece que los sistemas de IA de alto riesgo deben contar con un sistema de gestión de riesgos que consiste en un proceso iterativo continuo planificado y ejecutado durante todo el ciclo de vida del sistema.",
+    "contexts": [
+      "Artículo 9. Se establecerá un sistema de gestión de riesgos en relación con los sistemas de IA de alto riesgo. Consistirá en un proceso iterativo continuo planificado y ejecutado durante todo el ciclo de vida del sistema."
+    ]
+  },
+  {
+    "question": "¿Qué requisitos de gobernanza de datos exige el EU AI Act?",
+    "ground_truth": "El artículo 10 del EU AI Act exige que los conjuntos de datos de entrenamiento, validación y prueba estén sujetos a prácticas adecuadas de gobernanza y gestión de datos apropiadas al fin previsto del sistema de IA de alto riesgo.",
+    "contexts": [
+      "Artículo 10. Los conjuntos de datos de entrenamiento, validación y prueba estarán sujetos a prácticas de gobernanza y gestión de datos adecuadas al fin previsto del sistema de IA de alto riesgo."
+    ]
+  },
+  {
+    "question": "¿Qué dice el EU AI Act sobre la supervisión humana?",
+    "ground_truth": "El artículo 14 establece que los sistemas de IA de alto riesgo deben diseñarse para permitir una vigilancia efectiva por personas físicas durante su uso, incluida la posibilidad de intervención humana.",
+    "contexts": [
+      "Artículo 14. Los sistemas de IA de alto riesgo se diseñarán y desarrollarán de modo que puedan ser vigilados de manera efectiva por personas físicas durante su período de utilización, incluida la posibilidad de intervención humana."
+    ]
+  },
+  {
+    "question": "¿Están obligados los sistemas de IA a informar a los usuarios de que están interactuando con una IA?",
+    "ground_truth": "Sí. El artículo 52 del EU AI Act obliga a los proveedores de sistemas de IA diseñados para interactuar con personas a garantizar que los usuarios sean informados de que están interactuando con un sistema de IA.",
+    "contexts": [
+      "Artículo 52. Los proveedores garantizarán que los sistemas de IA destinados a interactuar con personas físicas se diseñen de modo que las personas sean informadas de que están interactuando con un sistema de IA."
+    ]
+  },
+  {
+    "question": "¿Qué multas prevé el EU AI Act por incumplimiento de las prácticas prohibidas?",
+    "ground_truth": "El artículo 71 establece que las infracciones de las prácticas prohibidas del artículo 5 pueden dar lugar a multas administrativas de hasta 35.000.000 EUR o el 7% del volumen de negocios total anual mundial.",
+    "contexts": [
+      "Artículo 71. Las infracciones de las prácticas prohibidas del artículo 5 estarán sujetas a multas administrativas de hasta 35 000 000 EUR o el 7% del volumen de negocios total anual mundial."
+    ]
+  },
+  {
+    "question": "¿Qué obliga la LOPD-GDD respecto a las evaluaciones de impacto?",
+    "ground_truth": "El artículo 80 bis de la LOPD-GDD establece que el responsable del tratamiento debe realizar una evaluación de impacto cuando el tratamiento entrañe un alto riesgo para los derechos y libertades de las personas físicas.",
+    "contexts": [
+      "Artículo 80 bis de la LOPD-GDD. El responsable del tratamiento deberá realizar una evaluación de impacto cuando el tratamiento entrañe un alto riesgo para los derechos y libertades de las personas físicas."
+    ]
+  },
+  {
+    "question": "¿Qué sistemas de IA están incluidos en el Anexo III del EU AI Act?",
+    "ground_truth": "El Anexo III del EU AI Act incluye sistemas de IA de alto riesgo en ámbitos como infraestructuras críticas, educación, empleo, servicios esenciales, aplicación de la ley, gestión de fronteras y administración de justicia.",
+    "contexts": [
+      "Artículo 6. Un sistema de IA se considerará de alto riesgo cuando esté comprendido en alguno de los ámbitos del Anexo III y presente un riesgo significativo de perjuicio para la salud, la seguridad o los derechos fundamentales."
+    ]
+  },
+  {
+    "question": "¿Qué obligaciones tienen los proveedores de sistemas de IA de alto riesgo respecto a la documentación técnica?",
+    "ground_truth": "Los proveedores de sistemas de IA de alto riesgo deben elaborar y mantener documentación técnica actualizada antes de la comercialización del sistema, que permita evaluar su conformidad con los requisitos del EU AI Act.",
+    "contexts": [
+      "Artículo 9. Se establecerá un sistema de gestión de riesgos en relación con los sistemas de IA de alto riesgo. Consistirá en un proceso iterativo continuo planificado y ejecutado durante todo el ciclo de vida del sistema.",
+      "Artículo 10. Los conjuntos de datos de entrenamiento, validación y prueba estarán sujetos a prácticas de gobernanza y gestión de datos adecuadas al fin previsto del sistema de IA de alto riesgo."
+    ]
+  }
+]

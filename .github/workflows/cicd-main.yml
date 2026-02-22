@@ -36,17 +36,37 @@ jobs:
   #   needs: lint
   #   ...
 
-  # ragas-eval:
-  #   name: RAGAS Eval
-  #   runs-on: ubuntu-latest
-  #   needs: test
-  #   ...
+ragas-eval:
+  name: RAGAS Eval
+  runs-on: ubuntu-latest
+  needs: lint
+  # needs: test  # cambiar cuando haya tests
+
+  steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: pip
+        cache-dependency-path: "requirements/*.txt"
+
+    - name: Install dependencies
+      run: pip install -r requirements/base.txt
+
+    - name: Run RAGAS eval
+      run: python eval/run_ragas.py --ci
+      env:
+        MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_PASSWORD }}
+        AWS_REGION: eu-west-1
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        BEDROCK_MODEL_ID: eu.amazon.nova-lite-v1:0
 
   build:
     name: Build & Push Docker
     runs-on: ubuntu-latest
-    needs: lint
-    # needs: ragas-eval  # descomentar cuando haya tests
+    needs: ragas-eval
     if: github.event_name == 'push'
 
     permissions:
