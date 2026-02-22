@@ -1,40 +1,42 @@
-# Entorno virtual
+# ── Entorno virtual ────────────────────────────
 venv/
-.conda
-# IaC
+.venv/
+.conda/
+
+# ── Python ─────────────────────────────────────
+__pycache__/
+*.pyc
+.ruff_cache/
+
+# ── Credenciales y configuración local ─────────
+.env
+.aws/
+aws.pem
+
+# ── Data ───────────────────────────────────────
+*.csv
+!*.dvc
+
+# ── DVC ────────────────────────────────────────
+/data/raw/
+/data/processed/
+
+# ── IaC (Terraform / Ansible) ──────────────────
 infra/ansible/inventory.ini
-infra/terraform/.terraform/*
+infra/terraform/.terraform/
 infra/terraform/.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
 crash.log
 .terraformrc
 terraform.rc
-aws.pem
 
-# Entorno virtual
-venv/
-.venv/
-__pycache__
-
-# Credenciales
-.aws/
-credentials
-.env
-data/**/*.csv
-
-*.csv
-
-# Data de DVC
-/data/raw/
-/data/processed/
-!*.dvc
-
-`#Carpeta` claude
+# ── IDE ────────────────────────────────────────
+.vscode/
 .claude/
 
-`#Carpeta` caché python para el clasificador
-src/classifier/__pycache__/
+# ── MLflow ─────────────────────────────────────
+mlruns/
 
-`#Diario` (Rubén)
+# ── Archivos locales / personales ──────────────
 src/classifier/tareas/
