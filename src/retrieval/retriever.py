@@ -102,3 +102,43 @@ def search(query: str, mode: str = "soft", k: int = DEFAULT_K) -> List[Dict[str,
     if mode == "base":
         return search_base(query, k)
     return search_soft(query, k)
+
+
+
+    # --- Tool output for Agents / LangGraph ---
+def search_tool(query: str, k: int = DEFAULT_K, mode: str = "soft", max_chars: int = 3500) -> str:
+    """
+    Devuelve contexto listo para LLM (string), basado en la búsqueda del vectorstore.
+    - No cambia la API 'search()' (que devuelve hits crudos).
+    - Este wrapper es para agentes: texto limpio + fuentes.
+    """
+    hits = search(query=query, mode=mode, k=k)
+
+    if not hits:
+        return "NO_RESULTS"
+
+    blocks = []
+    sources = []
+
+    for i, h in enumerate(hits, start=1):
+        meta = h.get("metadata", {}) or {}
+        src = meta.get("source", "unknown")
+        file = meta.get("file", "unknown")
+        unit = meta.get("unit_title") or meta.get("unit_id") or meta.get("unit_type") or ""
+
+        sources.append(f"{src}:{file}:{unit}".strip(":"))
+
+        text = (h.get("text") or "").strip()
+        if not text:
+            continue
+
+        blocks.append(f"[{i}] source={src} file={file}\n{text}")
+
+    out = "CONTEXT:\n" + "\n\n".join(blocks)
+    out += "\n\nSOURCES:\n" + "\n".join(sorted(set(sources)))
+
+    # Recorte por seguridad
+    if len(out) > max_chars:
+        out = out[:max_chars] + "\n\n[TRUNCATED]"
+
+    return out
