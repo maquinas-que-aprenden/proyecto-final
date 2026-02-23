@@ -20,7 +20,7 @@ aws.pem
 # ── DVC (datos reales ignorados, .dvc metadata trackeada) ─
 /data/raw/
 /data/processed/vectorstore/
-/data/chunks_legal/*.jsonl
+/data/processed/chunks_legal/*.jsonl
 
 # ── IaC (Terraform / Ansible) ──────────────────
 infra/ansible/inventory.ini
