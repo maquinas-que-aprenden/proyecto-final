@@ -10,7 +10,7 @@ NormaBot is an Agentic RAG system for querying Spanish/EU AI regulation (BOE, EU
 
 A **ReAct agent** (LangGraph `create_react_agent`) orchestrates three tools:
 
-1. **RAG Normativo** (`src/rag/main.py`) — Corrective RAG: Retrieve → Grade → Generate with legal citations. Uses ChromaDB + `paraphrase-multilingual-MiniLM-L12-v2` embeddings.
+1. **RAG Normativo** (`src/rag/main.py`) — Corrective RAG: Retrieve → Grade → Generate with legal citations. Uses ChromaDB + `paraphrase-multilingual-MiniLM-L12-v2` embeddings. Data pipeline in `data/ingest.py` (raw→chunks) and `data/index.py` (chunks→embeddings→ChromaDB).
 2. **Clasificador de Riesgo** (`src/classifier/`) — XGBoost classifies AI systems into 4 EU AI Act risk levels (inaceptable, alto, limitado, mínimo). Full ML pipeline in `functions.py`: spaCy text cleaning, TF-IDF + manual keyword features, Grid Search with StratifiedKFold, SHAP explainability, MLflow tracking.
 3. **Informes** (`src/report/main.py`) — Generates structured compliance reports with legal citations.
 
@@ -47,6 +47,10 @@ streamlit run app.py --server.port=8080
 docker build -t normabot .
 docker run -p 8080:8080 --env-file .env normabot
 
+# Data pipeline (requires dvc pull first for raw data)
+python data/ingest.py                  # raw → chunks JSONL
+python data/index.py                   # chunks → embeddings + ChromaDB
+
 # Run individual module (each src module has __main__ block for smoke testing)
 python -m src.rag.main
 python -m src.classifier.main
@@ -55,6 +59,7 @@ python -m src.orchestrator.main
 # Install dependencies (split by context)
 pip install -r requirements/app.txt    # Streamlit + LangGraph + LangChain
 pip install -r requirements/ml.txt     # ML/NLP (spaCy, XGBoost, SHAP, MLflow, torch)
+pip install -r requirements/data.txt   # Data pipeline (sentence-transformers, chromadb, bs4, pypdf)
 pip install -r requirements/dev.txt    # ruff only
 pip install -r requirements/infra.txt  # AWS, DVC, Langfuse, RAGAS
 ```
@@ -64,7 +69,7 @@ pip install -r requirements/infra.txt  # AWS, DVC, Langfuse, RAGAS
 - **Python 3.12**, linter: **ruff**, tests: **pytest**, validation: **Pydantic**
 - Code identifiers in English; docstrings and comments in Spanish (legal domain)
 - Commits and PRs in Spanish
-- Requirements split into `base.txt` (shared pandas/numpy/dotenv), `app.txt`, `ml.txt`, `dev.txt`, `infra.txt`
+- Requirements split into `base.txt` (shared pandas/numpy/dotenv), `app.txt`, `ml.txt`, `data.txt`, `dev.txt`, `infra.txt`
 - spaCy model: `es_core_news_sm` (loaded lazily via singleton `_get_nlp()` / `_get_nlp_ner()` in `functions.py`)
 - MLflow: URI via `MLFLOW_TRACKING_URI` env var, password from `MLFLOW_PASSWORD` env var or `.env` in classifier dir
 
@@ -73,7 +78,15 @@ pip install -r requirements/infra.txt  # AWS, DVC, Langfuse, RAGAS
 - **CI/CD**: GitHub Actions — `pr_lint.yml` (ruff on changed .py/.ipynb files), `ci-develop.yml` (lint → Docker build to ghcr.io :develop), `cicd-main.yml` (lint → Docker build → deploy to EC2 via SSH)
 - **Docker**: `python:3.12-slim`, port 8080, healthcheck on `/_stcore/health`
 - **IaC**: `infra/terraform/` (VPC, EC2, S3, IAM for Bedrock) + `infra/ansible/` (docker-compose deploy, nginx, MLflow server)
-- **DVC**: configured for data versioning; `data/raw/` and `data/processed/` are gitignored
+- **DVC**: configured for data versioning; `data/raw/`, `data/processed/vectorstore/` and `data/processed/chunks_legal/*.jsonl` are gitignored. DVC metadata (`.dvc` files) tracked in `data/processed/`.
+- **Data directory layout**:
+  - `data/ingest.py` — raw→chunks pipeline script
+  - `data/index.py` — chunks→embeddings→ChromaDB pipeline script
+  - `data/raw/` — original legal documents (DVC-managed)
+  - `data/processed/chunks_legal/` — chunked JSONL files (DVC-managed)
+  - `data/processed/vectorstore/` — embeddings + ChromaDB (DVC-managed)
+  - `data/eval/` — RAG evaluation results
+  - `data/notebooks/` — evaluation notebooks (embeddings tuning, retrieval tests, complex queries)
 - **Container registry**: `ghcr.io/maquinas-que-aprenden/proyecto-final`
 - **CodeRabbit**: configured in `.coderabbit.yaml` — reviews focus only on logic/security/performance bugs, all style linters disabled
 
