@@ -1,6 +1,6 @@
 # NormaBot — Diagnóstico Técnico
 
-Fecha: 2026-02-22
+Fecha: 2026-02-23 (actualizado — incluye descubrimientos en ramas no mergeadas)
 
 ---
 
@@ -12,118 +12,123 @@ Fecha: 2026-02-22
 |---|---|---|
 | **Clasificador ML (dataset real)** | `src/classifier/functions.py` | Completo. Pipeline end-to-end: limpieza spaCy, TF-IDF, features manuales por keywords de dominio, LogisticRegression baseline, XGBoost, Grid Search con StratifiedKFold, evaluación (confusion matrix, ROC multiclase, análisis de errores), SHAP (beeswarm + waterfall), serialización joblib, MLflow tracking + Model Registry. |
 | **Clasificador ML (dataset sintético)** | `src/classifier/classifier_2/functions.py` | Completo. Variante con dataset artificial/aumentado. Añade soporte para `extra_columns` en `preparar_dataset()` con protección anti-leakage documentada, y `evaluar_modelo()` que acepta features pre-transformadas. |
-| **NER legal** | `src/classifier/functions.py` → `extraer_entidades()`, `resumen_entidades()` | Funcional. spaCy `es_core_news_sm` con `nlp.pipe` para batch processing. Extrae entidades y genera resúmenes por tipo y clase de riesgo. |
-| **Orquestador ReAct** | `src/orchestrator/main.py` | Funcional pero con tools stub. Agente ReAct con Bedrock Nova Lite, system prompt bien diseñado con disclaimer obligatorio. Las 3 herramientas (`search_legal_docs`, `classify_risk`, `generate_report`) devuelven respuestas hardcodeadas. |
-| **UI Streamlit** | `app.py` | Funcional. Chat conversacional mínimo conectado al orquestador. Sidebar con info de agentes. |
-| **CI/CD** | `.github/workflows/` | Funcional. 3 workflows: PR lint (ruff en archivos cambiados), CI develop (lint + Docker build), CI/CD main (lint + Docker build + deploy EC2 via SSH). |
-| **Docker** | `Dockerfile`, `docker-compose.yml` | Funcional. python:3.12-slim, healthcheck en Streamlit, deploy via ghcr.io. |
-| **IaC** | `infra/terraform/`, `infra/ansible/` | Funcional. Terraform (VPC, EC2, S3, IAM Bedrock) + Ansible (docker-compose, nginx, MLflow server). |
-| **MLflow tracking** | `functions.py` → `configure_mlflow()`, `log_mlflow_safe()` | Funcional. Servidor remoto en EC2 (https://34.244.146.100), autenticación por password, soporte Colab/local/.env. |
-| **DVC** | `.dvc/`, `.dvcignore` | Configurado. Directorios `data/raw/` y `data/processed/` en gitignore. |
+| **NER legal** | `src/classifier/functions.py` → `extraer_entidades()`, `resumen_entidades()` | Funcional. spaCy `es_core_news_sm` con `nlp.pipe` para batch processing. |
+| **Orquestador ReAct** | `src/orchestrator/main.py` | Funcional pero con tools stub. Agente ReAct con Bedrock Nova Lite, system prompt bien diseñado con disclaimer obligatorio. |
+| **UI Streamlit** | `app.py` | Funcional. Chat conversacional mínimo conectado al orquestador. |
+| **CI/CD** | `.github/workflows/` | Funcional. 3 workflows: PR lint, CI develop, CI/CD main. |
+| **Docker** | `Dockerfile`, `docker-compose.yml` | Funcional. python:3.12-slim, healthcheck, ghcr.io. |
+| **IaC** | `infra/terraform/`, `infra/ansible/` | Funcional. Terraform + Ansible. |
+| **MLflow tracking** | `functions.py` → `configure_mlflow()`, `log_mlflow_safe()` | Funcional. Servidor remoto en EC2. |
+| **DVC** | `.dvc/`, `.dvcignore` | Configurado con S3 backend. |
 
-### Componentes STUB (placeholder, no implementados)
+### Componentes EN BRANCHES (implementados pero no mergeados a develop)
+
+| Componente | Ubicación | Rama | Autor | Estado |
+|---|---|---|---|---|
+| **Corpus legal chunkeado** | `data/chunks_legal/chunks_final.jsonl` | develop (DVC) | Dani | 2.4 MB, BOE + EU AI Act + AESIA + LOPD/RGPD |
+| **ChromaDB Retriever** | `src/retrieval/retriever.py` | develop | Dani | `search()`, `search_base()`, `search_soft()` con PersistentClient. Colección `normabot_legal_chunks`. |
+| **Notebook chunking** | `src/data/01_chunking_boe_eu_aesia.ipynb` | develop | Dani | Pipeline completo: HTML, PDF → chunks con metadata |
+| **Langfuse real** | `src/observability/main.py` | `chore/langfuse` | Nati | CallbackHandler v3, session_id, user_id, tags |
+| **Orquestador + Langfuse** | `src/orchestrator/main.py` | `chore/langfuse` | Nati | Instrumentado con `get_langfuse_handler()` |
+| **RAGAS pipeline** | `eval/run_ragas.py`, `eval/helpers.py`, `eval/dataset.json` | `feature/RAGAS` | Nati | 10 preguntas gold, faithfulness >= 0.80, modo CI, MLflow logging |
+| **Clasificador reestructurado** | `src/classifier/` | `feature/model-ml` | Rubén | 161 archivos, separación datasets real/artificial, imágenes SHAP |
+| **Nodos RAG LangGraph** | `src/rag/` | `feature/rag` | Maru | retrieve, grade_documents, transform_query, generate |
+
+### Componentes STUB (placeholder, aún no implementados)
 
 | Componente | Ubicación | Estado |
 |---|---|---|
-| **RAG Pipeline** | `src/rag/main.py` | Stub. `retrieve()`, `grade()`, `generate()` devuelven datos hardcodeados. No hay ChromaDB, no hay embeddings, no hay conexión LLM. |
-| **ChromaDB + Embeddings** | `src/data/main.py` | Stub. `ingest()` y `search()` simulan indexación y búsqueda. Sin sentence-transformers, sin ChromaDB real. |
-| **Generador de Informes** | `src/report/main.py` | Stub. Template string estático, sin llamada a LLM. |
-| **Observabilidad** | `src/observability/main.py` | Stub. `create_trace()` devuelve datos simulados. Sin Langfuse real. |
-| **UI legacy** | `src/ui/main.py` | Stub de consola. Obsoleto (reemplazado por `app.py`). |
-| **Feature extraction standalone** | `src/classifier/feature.py` | Stub. Funciones simuladas de TF-IDF, features manuales y NER. La implementación real está en `functions.py`. |
-| **MLflow stubs** | `src/classifier/mlflow_stub.py`, `classifier_2/mlflow_stub.py` | Stubs. La implementación real de MLflow está en los `functions.py` respectivos. |
+| **RAG Pipeline** | `src/rag/main.py` (en develop) | Stub. `retrieve()`, `grade()`, `generate()` devuelven datos hardcodeados. |
+| **Data ingesta** | `src/data/main.py` (en develop) | Stub. `ingest()` y `search()` simulan indexación. El retriever REAL está en `src/retrieval/retriever.py`. |
+| **Generador de Informes** | `src/report/main.py` | Stub. Template string estático, sin LLM. |
+| **Tools del orquestador** | `src/orchestrator/main.py` | Stubs. Las 3 herramientas devuelven respuestas hardcodeadas. |
 
 ### Componentes VACÍOS
 
 | Componente | Estado |
 |---|---|
-| `tests/` | Vacío. No hay ni un solo test. |
-| `eval/` | Solo `.gitkeep`. No hay evaluación RAGAS/DeepEval implementada. |
-| `scripts/` | Solo `.gitkeep`. No hay scripts de scraping BOE ni ETL. |
-| `data/` | Solo `.gitkeep`. Sin corpus legal indexado en el repo (probablemente en DVC/drive). |
+| `tests/` | Vacío. No hay tests unitarios (RAGAS es evaluación, no tests). |
+| `scripts/` | Solo `.gitkeep`. No hay scripts de scraping versionados. |
 
 ---
 
-## 2. Stack Tecnológico Identificado
+## 2. Stack Tecnológico
 
-| Capa | Tecnología | Versión | Estado |
-|---|---|---|---|
-| LLM (orquestador) | Amazon Bedrock (Nova Lite v1) | via langchain-aws | Integrado |
-| LLM (RAG generation) | Groq / Gemini / Mistral | — | No integrado |
-| Agentes | LangGraph + LangChain | >=0.2.0 / >=0.3.0 | `create_react_agent` funcional |
-| Vector store | ChromaDB | — | No integrado (stub) |
-| Embeddings | sentence-transformers | — | No integrado (stub) |
-| ML | scikit-learn 1.5.2, XGBoost 3.2.0 | Pinned | Funcional |
-| NLP | spaCy 3.8.2 (`es_core_news_sm`) | Pinned | Funcional |
-| Explicabilidad | SHAP 0.46.0 | Pinned | Funcional |
-| Tracking | MLflow 2.17.2 | Pinned | Funcional (servidor remoto) |
-| Fine-tuning | torch, transformers, peft, trl, bitsandbytes | Pinned | En requirements, no hay código |
-| UI | Streamlit >=1.40.0 | — | Funcional |
-| CI/CD | GitHub Actions | — | Funcional |
-| IaC | Terraform + Ansible | — | Funcional |
-| Observabilidad | Langfuse >=2.50.0 | En requirements/infra | Solo stub |
-| Evaluación RAG | RAGAS >=0.2.0 | En requirements/infra | No implementado |
-| Data versioning | DVC >=3.50.0 | En requirements/infra | Configurado |
+| Capa | Tecnología | Estado |
+|---|---|---|
+| LLM (orquestador) | Amazon Bedrock (Nova Lite v1) | Integrado |
+| LLM (RAG generation) | Groq / Gemini / Mistral | No integrado |
+| Agentes | LangGraph `create_react_agent` | Funcional (con stubs) |
+| Vector store | ChromaDB PersistentClient | En develop (retriever.py), no conectado a RAG |
+| Embeddings | paraphrase-multilingual-MiniLM-L12-v2 | En develop (retriever.py) |
+| ML | scikit-learn 1.5.2, XGBoost 3.2.0 | Funcional |
+| NLP | spaCy 3.8.2 (es_core_news_sm) | Funcional |
+| Explicabilidad | SHAP 0.46.0 | Funcional |
+| Tracking | MLflow 2.17.2 | Funcional (servidor remoto) |
+| UI | Streamlit >=1.40.0 | Funcional |
+| Observabilidad | Langfuse (CallbackHandler v3) | En rama chore/langfuse |
+| Evaluación RAG | RAGAS >=0.2.0 | En rama feature/RAGAS |
+| Data versioning | DVC >=3.50.0 | Funcional con S3 |
+| CI/CD | GitHub Actions (3 workflows) | Funcional |
+| IaC | Terraform + Ansible | Funcional |
 
 ---
 
 ## 3. Fortalezas Técnicas
 
-1. **Clasificador ML maduro**: Pipeline completo de producción con dos experimentos paralelos (real vs sintético), pipeline de features bien pensado (TF-IDF + keywords de dominio), evaluación rigurosa (CV, ROC multiclase, análisis de errores), explicabilidad SHAP con manejo robusto de formatos sparse/dense y protección OOM. Esto es el punto más fuerte del proyecto.
-
-2. **MLflow integrado de verdad**: No es un stub — hay servidor remoto desplegado en EC2, autenticación, soporte multi-entorno (Colab/local/.env), `log_mlflow_safe()` como wrapper resiliente, y `registrar_modelo_en_registry()` para promotion a Production. Demuestra MLOps real.
-
-3. **Protección anti-leakage documentada**: `classifier_2/functions.py` documenta explícitamente qué columnas tienen leakage y por qué (`violation`, `severity`, `ambiguity`, `explanation`, `split`). Esto demuestra rigor metodológico.
-
-4. **IaC completa**: Terraform + Ansible para provisionar y desplegar toda la infra. No es un "deploy manual por SSH" — hay reproducibilidad real.
-
-5. **CI/CD funcional con 3 pipelines**: Lint incremental en PRs, build en develop, full CI/CD con deploy en main. Flujo de trabajo profesional.
-
-6. **Diseño del orquestador**: El system prompt de NormaBot es sólido (responde en idioma del usuario, cita fuentes, disclaimer obligatorio). La arquitectura ReAct con tool calling es correcta y extensible.
-
-7. **Gestión de dependencias limpia**: Split en 5 archivos de requirements por contexto. CVE-2024-11392/11393/11394 mitigado con `transformers>=4.48.0`.
+1. **Clasificador ML maduro**: Pipeline completo con dos experimentos paralelos, evaluación rigurosa, SHAP, MLflow tracking + Model Registry. Punto más fuerte del proyecto.
+2. **MLflow integrado de verdad**: Servidor remoto en EC2, autenticación, soporte multi-entorno, `log_mlflow_safe()` resiliente.
+3. **Corpus legal EXISTE**: 2.4 MB de chunks en DVC/S3. No hay que crear datos desde cero.
+4. **Retriever ChromaDB funcional**: `src/retrieval/retriever.py` en develop con búsqueda por prioridad de fuentes.
+5. **Langfuse implementado**: Solo falta merge de la rama.
+6. **RAGAS pipeline completo**: 10 preguntas gold, thresholds definidos, modo CI.
+7. **IaC completa + CI/CD funcional**: Terraform, Ansible, 3 workflows, Docker, ghcr.io.
+8. **Protección anti-leakage documentada** en classifier_2.
 
 ---
 
 ## 4. Gaps Críticos para la Presentación
 
-### P0 — Bloqueantes (el proyecto no funciona end-to-end sin estos)
+### P0 — Bloqueantes (necesarios para demo funcional)
 
-| Gap | Impacto | Detalle |
+| Gap | Acción requerida | Responsable |
 |---|---|---|
-| **RAG pipeline no implementado** | El agente principal no puede responder preguntas legales reales | `src/rag/main.py` es un stub. Necesita: ChromaDB real, embeddings con sentence-transformers, ingesta del corpus legal, grading (filtro determinista + LLM judge), y generación con Groq/Bedrock. |
-| **ChromaDB + Embeddings no implementados** | Sin vector store no hay retrieval | `src/data/main.py` es un stub. Necesita: `SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')`, `chromadb.PersistentClient`, ingesta de documentos chunkeados. |
-| **Tools del orquestador no conectados** | El ReAct agent llama stubs, no los módulos reales | `search_legal_docs`, `classify_risk`, `generate_report` en `orchestrator/main.py` deben importar y llamar a las implementaciones en `src/rag`, `src/classifier`, `src/report`. |
-| **No hay corpus legal ingestado** | Sin datos no hay RAG | `data/` está vacío. Necesita artículos del BOE/EU AI Act chunkeados con metadata (ley, artículo, fecha). |
-| **No hay tests** | Riesgo de regresiones; el CI tiene tests comentados | `tests/` vacío. Mínimo: test del clasificador, test del RAG pipeline, test del orquestador. |
+| **Ramas sin mergear** | Merge chore/langfuse, feature/RAGAS, feature/model-ml a develop | Nati, Rubén |
+| **RAG pipeline stub** | Conectar retriever real + implementar grade + generate con LLM | Dani + Maru |
+| **Tools del orquestador hardcodeados** | Conectar a src/rag, src/classifier, src/report reales | Maru |
+| **Clasificador no expuesto como servicio** | `predict_risk(text) → dict` con SHAP | Rubén |
+| **0 tests** | Mínimo 3 smoke tests | Nati |
 
-### P1 — Importantes (afectan calidad de la presentación)
+### P1 — Importantes (calidad de presentación)
 
-| Gap | Impacto |
+| Gap | Acción requerida |
 |---|---|
-| **Generador de informes es un template estático** | No usa LLM; no personaliza por caso real. |
-| **Observabilidad solo stub** | Langfuse está en requirements pero no integrado. Sin trazas reales de las llamadas LLM. |
-| **Evaluación RAGAS no implementada** | `eval/` vacío. Sin métricas objetivas de calidad del RAG (faithfulness, relevance). |
-| **Sin fallback multi-proveedor** | El orquestador solo usa Bedrock. No hay cadena Groq → Gemini → Mistral. |
-| **Clasificador no integrado en el flujo** | `functions.py` funciona como biblioteca para notebooks, pero no está expuesto como servicio que el orquestador pueda llamar con un texto arbitrario. |
+| **Informes son template estático** | Implementar con LLM |
+| **Sin fallback multi-proveedor** | Cadena Groq → Gemini → Mistral |
+| **UI básica** | Sidebar informativo, manejo de errores |
+| **Docker no probado con todo conectado** | Deploy end-to-end en EC2 |
 
-### P2 — Deseables (diferencian el proyecto)
+### P2 — Deseables (si queda tiempo)
 
-| Gap | Impacto |
-|---|---|
-| **Fine-tuning QLoRA sin código** | Dependencias en `ml.txt` pero no hay scripts ni notebooks de fine-tuning en el repo. |
-| **Sin scripts de scraping** | `scripts/` vacío. El scraping del BOE no está versionado. |
-| **EvidentlyAI no integrado** | Mencionado en CLAUDE.md original pero sin código ni dependencia. |
-| **Sin Corrective RAG completo** | El diseño describe self-reflection y web fallback, pero ni siquiera el retrieve básico existe. |
-| **`src/ui/main.py` obsoleto** | Stub de consola que debería eliminarse (ya existe `app.py`). |
+| Gap |
+|---|
+| Dashboard métricas en Streamlit |
+| Sistema de feedback del usuario |
+| Fine-tuning QLoRA (documentar proceso) |
+| Scripts de scraping versionados |
+| Cache semántico |
 
 ---
 
 ## 5. Resumen Ejecutivo
 
-El proyecto tiene **dos zonas de madurez muy diferentes**:
+El proyecto tiene **más avance del que parece**, pero **disperso en 4 ramas sin mergear**:
 
-- **ML/Clasificador + MLOps + Infra**: maduro, funcional, bien diseñado. Demuestra competencia real en ML supervisado, NLP, MLOps y DevOps.
-- **RAG + Agentes + Observabilidad**: solo stubs y scaffolding. La funcionalidad core del producto (consultar normativa legal) no funciona.
+- **ML/Clasificador + MLOps + Infra**: maduro y funcional.
+- **Data + Retrieval**: corpus existe en DVC, retriever ChromaDB funciona en develop.
+- **Observabilidad + Evaluación**: Langfuse y RAGAS implementados (en branches).
+- **RAG + Orquestador + Report**: stubs en develop. Es la conexión que falta.
 
-**Para la presentación, la prioridad absoluta es cerrar el flujo end-to-end**: ingestar corpus → ChromaDB → RAG pipeline → conectar tools del orquestador → que un usuario pueda hacer una pregunta legal y recibir una respuesta real con citas.
+**Prioridad absoluta:** Mergear branches → conectar módulos reales a tools del orquestador → demo end-to-end funcional.
+
+**Decisión arquitectónica:** Usar el ReAct Agent existente (`create_react_agent`). No construir grafo custom.

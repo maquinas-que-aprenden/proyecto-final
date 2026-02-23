@@ -1,8 +1,10 @@
 # NormaBot — Roadmap de Desarrollo
 
-Fecha: 2026-02-22
+Fecha: 2026-02-22 (actualizado 2026-02-23 con estado real de branches)
 
 Priorizado por **impacto en la presentación / esfuerzo**. Las funcionalidades están alineadas con el temario del bootcamp.
+
+> **Decisión 2026-02-23:** Enfoque ReAct Agent (no grafo custom). Ver `reunion-realineamiento.md`.
 
 ---
 
@@ -17,11 +19,11 @@ Priorizado por **impacto en la presentación / esfuerzo**. Las funcionalidades e
 
 Objetivo: que un usuario pueda hacer una pregunta legal y recibir una respuesta real.
 
-### 1.1 Ingesta del corpus legal en ChromaDB
+### 1.1 Ingesta del corpus legal en ChromaDB — PARCIAL ✓
 - **Descripción**: Implementar `src/data/main.py` con SentenceTransformer (`paraphrase-multilingual-MiniLM-L12-v2`) + ChromaDB persistente. Chunking por artículo/sección con metadata (ley, artículo, fecha, BOE número).
 - **Temario**: Bases de datos vectoriales, NLP
-- **Complejidad**: M
-- **Justificación**: Sin vector store no hay RAG. Es el primer eslabón de toda la cadena.
+- **Complejidad**: M → **S** (ya existe el corpus + retriever)
+- **Estado actual**: Corpus chunkeado en DVC/S3 (2.4 MB). Retriever ChromaDB en `src/retrieval/retriever.py` (develop). **Falta:** trasladar a `src/data/main.py` o conectar directamente.
 
 ### 1.2 RAG Pipeline real (Corrective RAG)
 - **Descripción**: Implementar en `src/rag/main.py`: retrieve desde ChromaDB → grading híbrido (filtro por score + LLM judge) → query transformation si no hay docs relevantes → generate con LLM (Groq/Bedrock) → self-reflection para verificar que la respuesta cita fuentes reales.
@@ -29,10 +31,11 @@ Objetivo: que un usuario pueda hacer una pregunta legal y recibir una respuesta 
 - **Complejidad**: L
 - **Justificación**: Es la funcionalidad core del producto. El Corrective RAG con self-reflection diferencia el proyecto de un RAG naive.
 
-### 1.3 Conectar tools del orquestador
+### 1.3 Conectar tools del orquestador — PENDIENTE (depende de 1.1, 1.2, 2.4)
 - **Descripción**: Reemplazar los stubs en `src/orchestrator/main.py` para que `search_legal_docs` llame a `src/rag`, `classify_risk` llame al clasificador serializado (cargar desde joblib), y `generate_report` use LLM + template.
 - **Temario**: Agentes autónomos, sistemas multiagente
 - **Complejidad**: S
+- **Responsable**: Maru
 - **Justificación**: Sin esto, el agente ReAct devuelve respuestas fake. Es la integración que hace que todo funcione junto.
 
 ### 1.4 Tests mínimos
@@ -47,17 +50,17 @@ Objetivo: que un usuario pueda hacer una pregunta legal y recibir una respuesta 
 
 Objetivo: métricas objetivas de calidad y features que diferencien el proyecto.
 
-### 2.1 Evaluación RAGAS
+### 2.1 Evaluación RAGAS — HECHO ✓ (en rama feature/RAGAS)
 - **Descripción**: Implementar `eval/run_ragas.py` con un dataset de preguntas-respuestas gold. Medir Faithfulness (>= 0.80) y Answer Relevance (>= 0.85). Integrar como paso en CI (gate de calidad).
 - **Temario**: Evaluación de modelos, RAG
-- **Complejidad**: M
-- **Justificación**: KPI objetivo del proyecto. Demuestra que el RAG no alucina, que es crítico en dominio legal. Pocas personas en un bootcamp implementan evaluación automática de RAG.
+- **Complejidad**: ~~M~~ → Hecho por Nati
+- **Estado actual**: Pipeline completo en `eval/run_ragas.py` + `eval/helpers.py` + `eval/dataset.json`. 10 preguntas gold, modo CI, MLflow logging. **Falta:** merge a develop.
 
-### 2.2 Integración Langfuse (observabilidad)
+### 2.2 Integración Langfuse (observabilidad) — HECHO ✓ (en rama chore/langfuse)
 - **Descripción**: Reemplazar stub en `src/observability/main.py` con Langfuse real. Instrumentar: latencia por paso del RAG, tokens consumidos, costes, trazas de las decisiones del agente. Dashboard visible en presentación.
 - **Temario**: MLOps (monitoreo, logging)
-- **Complejidad**: S
-- **Justificación**: Ya está en requirements. Pasar de stub a real es poco esfuerzo y da un dashboard visual muy impactante para la presentación.
+- **Complejidad**: ~~S~~ → Hecho por Nati
+- **Estado actual**: CallbackHandler v3 implementado en `src/observability/main.py` (rama chore/langfuse). Orquestador instrumentado. **Falta:** merge a develop.
 
 ### 2.3 Fallback multi-proveedor LLM
 - **Descripción**: Implementar cadena Groq → Gemini → Mistral con retry y exponential backoff. Si Groq devuelve 429 (rate limit), rotar a Gemini; si falla, a Mistral.
@@ -65,11 +68,12 @@ Objetivo: métricas objetivas de calidad y features que diferencien el proyecto.
 - **Complejidad**: S
 - **Justificación**: Groq tiene 14.400 req/día. En una demo puede agotarse. El fallback asegura disponibilidad y demuestra diseño resiliente.
 
-### 2.4 Clasificador como servicio integrado
+### 2.4 Clasificador como servicio integrado — PARCIAL ✓
 - **Descripción**: Crear una función `predict_risk(text: str) -> dict` en `src/classifier/` que cargue el modelo serializado (joblib), aplique el pipeline de features, y devuelva nivel de riesgo + SHAP explanation. Conectar con el tool del orquestador.
 - **Temario**: ML clásico, APIs
 - **Complejidad**: S
-- **Justificación**: El clasificador está entrenado y serializado pero no expuesto como servicio. Es la pieza que falta para que el agente lo use en producción.
+- **Responsable**: Rubén
+- **Estado actual**: Clasificador entrenado y serializado. Reestructurado en rama feature/model-ml. **Falta:** exponer `predict_risk(text) → dict` como función de servicio + merge.
 
 ### 2.5 Generador de informes con LLM
 - **Descripción**: Reemplazar el template estático en `src/report/main.py` con una llamada a LLM que genere informes personalizados basados en: clasificación de riesgo, artículos relevantes del RAG, y descripción del sistema del usuario.
@@ -143,15 +147,19 @@ ESFUERZO             │                    ESFUERZO
 
 ---
 
-## Orden de Ejecución Recomendado
+## Orden de Ejecución Actualizado (23 feb)
 
-1. **1.1** ChromaDB + Embeddings → **1.2** RAG Pipeline → **1.3** Conectar tools (flujo end-to-end funcionando)
-2. **2.4** Clasificador como servicio → **2.5** Informes con LLM (los 3 agentes funcionan de verdad)
-3. **1.4** Tests mínimos (asegurar que no se rompe nada)
-4. **2.3** Fallback multi-proveedor (estabilidad para la demo)
-5. **2.2** Langfuse (dashboard visual para la presentación)
-6. **2.1** RAGAS eval (métricas objetivas de calidad)
-7. **3.3** Feedback del usuario (toque de producto)
-8. **3.2** Dashboard de métricas (impacto visual)
-9. **3.1** Fine-tuning QLoRA (documentar proceso)
-10. **3.4** Cache semántico, **3.5** Scraping (si queda tiempo)
+> Con los descubrimientos en branches, el orden cambia. 2.1 y 2.2 ya están hechos (solo falta merge).
+
+1. **MERGE** — Mergear chore/langfuse, feature/RAGAS, feature/model-ml a develop
+2. **1.1** Conectar retriever existente (ya no es crear de cero)
+3. **1.2** RAG Pipeline real (retrieve + grade + generate con LLM)
+4. **2.4** Clasificador como servicio (`predict_risk()`)
+5. **1.3** Conectar tools del orquestador a módulos reales
+6. **2.5** Informes con LLM
+7. **1.4** Tests mínimos
+8. **2.3** Fallback multi-proveedor (estabilidad para la demo)
+9. ~~**2.2** Langfuse~~ → ✓ Solo falta merge
+10. ~~**2.1** RAGAS eval~~ → ✓ Solo falta merge + correr con RAG real
+11. **3.3** Feedback del usuario (si queda tiempo)
+12. **3.2** Dashboard de métricas (si queda tiempo)

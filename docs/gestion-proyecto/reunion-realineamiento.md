@@ -6,6 +6,76 @@
 
 ---
 
+## DECISIÓN ARQUITECTÓNICA: Enfoque ReAct (Enfoque A)
+
+> **Decisión:** Usar el `create_react_agent` existente como orquestador final.
+> No construir un grafo LangGraph custom con StateGraph.
+>
+> **Justificación:**
+> - Ya funciona (solo faltan las conexiones reales)
+> - Es arquitectura agentic legítima (ReAct es state-of-the-art)
+> - Permite dedicar el 80% del tiempo a ML + RAG + demo, no a fontanería
+> - Para un bootcamp, lo que importa es: demo funcional > arquitectura elegante
+>
+> **Lo que esto significa:** Conectar los módulos reales a los 3 tools stub del
+> orquestador. No reescribir el orquestador.
+
+---
+
+## Plan de 3 Semanas (17 días hasta presentación)
+
+### Semana 1 (días 1-7): INTEGRAR — Merge + Conectar
+
+**Objetivo:** Todo el código existente en una sola rama, tools conectados a código real.
+
+| Día | Persona | Tarea | Entregable |
+|-----|---------|-------|------------|
+| 1-2 | **Nati** | Crear PR chore/langfuse → develop, merge | Langfuse real en develop |
+| 1-2 | **Nati** | Crear PR feature/RAGAS → develop, merge | eval/ funcional en develop |
+| 1-2 | **Rubén** | Crear PR feature/model-ml → develop, merge | Clasificador reestructurado en develop |
+| 1-3 | **Rubén** | Crear `predict_risk(text) → dict` en src/classifier/main.py | Clasificador como servicio (carga joblib, pipeline features, SHAP) |
+| 1-3 | **Dani** | Trasladar retriever de notebook a src/data/main.py | `search(query) → List[Dict]` usando ChromaDB real + corpus DVC |
+| 3-5 | **Dani** | Implementar src/rag/main.py con Corrective RAG | `retrieve()` → `grade()` → `generate()` conectados a ChromaDB real |
+| 4-6 | **Maru** | Conectar los 3 tools del orquestador a módulos reales | search_legal_docs → src/rag, classify_risk → src/classifier, generate_report → src/report |
+| 5-7 | **Maru** | Implementar src/report/main.py con LLM | Informe personalizado basado en clasificación + RAG |
+| 6-7 | **Todos** | Smoke test end-to-end: pregunta → respuesta real | Demo funcional mínima |
+
+### Semana 2 (días 8-14): PULIR — Tests + Métricas + UI
+
+**Objetivo:** Tests, métricas documentadas, UI presentable.
+
+| Día | Persona | Tarea | Entregable |
+|-----|---------|-------|------------|
+| 8-9 | **Nati** | Tests mínimos: smoke test orquestador, test clasificador, test RAG | Al menos 3 tests en tests/ |
+| 8-9 | **Nati** | Correr RAGAS eval y documentar métricas | Resultados en eval/ + MLflow |
+| 8-10 | **Rubén** | Documentar métricas del clasificador (F1, confusion matrix) | Métricas reales en MLflow |
+| 8-10 | **Dani** | Verificar corpus completo en ChromaDB (cobertura de artículos) | Estadísticas: N chunks, N artículos, N leyes |
+| 10-12 | **Maru** | Pulir UI Streamlit: sidebar con info, manejo de errores | UI funcional y presentable |
+| 10-12 | **Maru** | Fallback multi-proveedor LLM (Groq → Gemini → Mistral) | Resiliencia para la demo |
+| 12-14 | **Nati** | Docker funcional en EC2 con todo conectado | Deploy real accesible |
+| 12-14 | **Todos** | Sesión de QA: cada uno prueba el flujo completo | Lista de bugs → fix inmediato |
+
+### Semana 3 (días 15-17): PRESENTAR
+
+**Objetivo:** Demo impecable, slides con arquitectura y métricas.
+
+| Día | Persona | Tarea |
+|-----|---------|-------|
+| 15 | **Todos** | Preparar 3-5 consultas tipo para la demo (una por funcionalidad) |
+| 15 | **Maru** | Slides: arquitectura (diagrama), métricas (RAGAS, F1), screenshots Langfuse/MLflow |
+| 16 | **Todos** | Ensayo de presentación (20 min + 10 min preguntas) |
+| 17 | **Todos** | Buffer para imprevistos |
+
+### Criterio de éxito por semana
+
+| Semana | La semana fue exitosa si... |
+|--------|-----------------------------|
+| 1 | Un usuario puede hacer una pregunta legal en Streamlit y recibir una respuesta con citas reales |
+| 2 | Hay tests pasando, métricas documentadas, y la app está desplegada en EC2 |
+| 3 | La demo funciona sin fallos y el equipo puede explicar cada decisión técnica |
+
+---
+
 ## Contexto para compartir antes de la reunión
 
 > **Buenas noticias:** Tras revisar los commits de las últimas 48h, el equipo ha avanzado
