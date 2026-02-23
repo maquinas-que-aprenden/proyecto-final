@@ -27,7 +27,7 @@ import mlflow
 try:
     from dotenv import load_dotenv
     from pathlib import Path
-    load_dotenv(dotenv_path=Path(__file__).parent / ".env", override=True)
+    load_dotenv(dotenv_path=Path(__file__).parent / ".env", override=False)
 except ImportError:
     pass  # python-dotenv no instalado; se leen las vars del sistema tal cual
 
@@ -83,9 +83,9 @@ def configure_mlflow():
 
     password = get_mlflow_password()
 
-    # Activar TLS permisivo por defecto para servidores con certificado autofirmado.
-    # setdefault respeta el valor ya definido en el entorno (p. ej. entornos con TLS válido).
-    os.environ.setdefault("MLFLOW_TRACKING_INSECURE_TLS", "true")
+    # Activar TLS permisivo solo en entorno local.
+    if os.getenv("ENVIRONMENT", "local") == "local":
+        os.environ.setdefault("MLFLOW_TRACKING_INSECURE_TLS", "true")
     os.environ["MLFLOW_TRACKING_USERNAME"] = "tracker"
     os.environ["MLFLOW_TRACKING_PASSWORD"] = password
 
@@ -150,6 +150,16 @@ _STOPWORDS_ES = {
 def _limpiar_texto_fallback(texto, lemmatize=False):
     """Limpieza básica con regex cuando spaCy no está disponible."""
     import re
+    import warnings
+    if texto is None or (hasattr(texto, '__float__') and texto != texto):
+        return ""
+    texto = str(texto)
+    if lemmatize:
+        warnings.warn(
+            "Lematización no disponible sin spaCy; se devuelve texto sin lematizar.",
+            UserWarning,
+            stacklevel=2,
+        )
     tokens = re.findall(r'\b[a-záéíóúüñ]{3,}\b', texto.lower())
     return " ".join(t for t in tokens if t not in _STOPWORDS_ES)
 
@@ -448,7 +458,7 @@ def preparar_dataset(df, text_column, label_column, extra_columns=None):
     import ast
 
     df = df.copy()
-    df["text_final"] = df[text_column].apply(limpiar_texto_preprocess)
+    df["text_final"] = df[text_column].fillna("").astype(str).apply(limpiar_texto_preprocess)
 
     # Calcular num_articles si la columna articles está presente
     if "articles" in df.columns:
@@ -624,8 +634,10 @@ def entrenar_xgboost(X_train, y_train, X_val, y_val, params=None):
     if params:
         default_params.update(params)
 
+    from sklearn.utils.class_weight import compute_sample_weight
+    sample_weight = compute_sample_weight(class_weight="balanced", y=y_train_enc)
     modelo = XGBClassifier(**default_params)
-    modelo.fit(X_train, y_train_enc)
+    modelo.fit(X_train, y_train_enc, sample_weight=sample_weight)
 
     y_val_pred_enc = modelo.predict(X_val)
     y_val_pred = le.inverse_transform(y_val_pred_enc)
@@ -683,7 +695,9 @@ def grid_search_cv(X_train, y_train, param_grid, cv=5):
         refit=True,
     )
 
-    grid.fit(X_train, y_train_enc)
+    from sklearn.utils.class_weight import compute_sample_weight
+    sample_weight = compute_sample_weight(class_weight="balanced", y=y_train_enc)
+    grid.fit(X_train, y_train_enc, sample_weight=sample_weight)
 
     print(f"\n=== Resultados Grid Search ({cv}-fold CV) ===")
     print(f"Mejor F1-macro CV: {grid.best_score_:.4f}")
@@ -752,6 +766,8 @@ def evaluar_modelo(modelo, X_test, y_test):
     tuple (y_pred, report_dict)
     """
     y_pred = modelo.predict(X_test)
+    if hasattr(modelo, "label_encoder"):
+        y_pred = modelo.label_encoder.inverse_transform(y_pred)
 
     print("=== Resultados en TEST ===\n")
     report_dict = classification_report(y_test, y_pred, output_dict=True)
@@ -795,8 +811,13 @@ def plot_curva_roc_multiclase(modelo, X_test, y_test):
     fig : matplotlib.figure.Figure
     roc_auc_dict : dict con el AUC por clase.
     """
-    clases = sorted(modelo.classes_)
-    y_test_bin = label_binarize(y_test, classes=clases)
+    if hasattr(modelo, "label_encoder"):
+        clases = list(modelo.label_encoder.classes_)
+        y_test_int = modelo.label_encoder.transform(y_test)
+        y_test_bin = label_binarize(y_test_int, classes=list(range(len(clases))))
+    else:
+        clases = sorted(modelo.classes_)
+        y_test_bin = label_binarize(y_test, classes=clases)
     y_proba = modelo.predict_proba(X_test)
 
     fig, ax = plt.subplots(figsize=(10, 7))
@@ -840,6 +861,8 @@ def analisis_errores(modelo, X_test_features, y_test, X_test_text=None):
     df_errores : pd.DataFrame con las predicciones incorrectas.
     """
     y_pred = modelo.predict(X_test_features)
+    if hasattr(modelo, "label_encoder"):
+        y_pred = modelo.label_encoder.inverse_transform(y_pred)
 
     textos = X_test_text.values if X_test_text is not None else ["[texto no disponible]"] * len(y_test)
     df_resultado = pd.DataFrame({
@@ -1201,10 +1224,10 @@ def registrar_modelo_en_registry(run_id, artifact_path, registered_name, stage="
     model_version = mlflow.register_model(model_uri, registered_name)
 
     client = MlflowClient()
-    client.transition_model_version_stage(
+    client.set_registered_model_alias(
         name=registered_name,
+        alias=stage.lower(),
         version=model_version.version,
-        stage=stage,
     )
     client.update_registered_model(
         name=registered_name,

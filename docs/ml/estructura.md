@@ -98,7 +98,7 @@ src/classifier/
 | Notebook 0 | No existe | `0_traducir_dataset.ipynb` (traducción ES) |
 | Encoder adicional | No | `ohe_encoder.joblib` |
 | Checkpoints QLoRA | No | `qlora_checkpoints/checkpoint-{100,180}/` |
-| Mejor F1-macro test | 0.9530 (Exp 0 LogReg) | Ver `10_modelo_final_y_registro.ipynb` |
+| Mejor F1-macro test | 0.9530 (Exp 0 LogReg) | 0.4517 (Exp 0 LogReg + OHE) |
 
 ---
 
@@ -112,6 +112,11 @@ Para que los notebooks los encuentren al importar, todos incluyen en su primera 
 import sys, os
 sys.path.insert(0, os.path.abspath('..'))
 ```
+
+> **Advertencia**: si el módulo no se encuentra, instálalo en modo editable desde la raíz del proyecto:
+> ```bash
+> pip install -e .
+> ```
 
 ### Funciones principales de `functions.py`
 

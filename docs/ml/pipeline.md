@@ -59,7 +59,7 @@ TfidfVectorizer(
 
 El vectorizador se ajusta **solo sobre train** y se transforma en val/test para evitar data leakage.
 
-Resultado: matriz sparse `(n_muestras, 3811 términos)` para el dataset artificial.
+Resultado: matriz sparse `(n_muestras, N términos)` — N depende del dataset (ej. 3811 para `classifier_dataset_artificial`).
 
 ---
 
@@ -160,7 +160,7 @@ Artefactos guardados con joblib en `model/`:
 
 ## Paso 9 — Registro MLflow (`functions.registrar_modelo_en_registry`)
 
-Servidor: `http://34.240.189.163:5000`
+Servidor: configura `MLFLOW_TRACKING_URI` en tu `.env` (p. ej. `MLFLOW_TRACKING_URI=https://tu-servidor:5000`)
 Experimento: `clasificador_riesgo_ia`
 Nombre registrado: `clasificador_riesgo_ia`
 Stage: `Production`

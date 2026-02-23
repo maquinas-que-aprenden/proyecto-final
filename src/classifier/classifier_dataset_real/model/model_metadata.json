@@ -9,7 +9,7 @@
   "test_f1_macro": 0.4517,
   "test_accuracy": 0.4889,
   "test_roc_auc": 0.6981,
-  "features": "tfidf_bigramas",
+  "features": "tfidf_bigramas_ohe",
   "tfidf_n_terms": 3773,
   "criterio": "Mayor F1-macro en test entre los 3 experimentos"
 }

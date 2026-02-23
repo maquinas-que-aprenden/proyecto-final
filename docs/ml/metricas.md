@@ -2,6 +2,8 @@
 
 ## Resumen de experimentos
 
+> **Nota estadística**: los resultados están obtenidos sobre datasets pequeños (≤300 muestras artificiales / ≤90 reales). Los valores de F1-macro tienen alta varianza y no deben interpretarse como rendimiento en producción sin validación con más datos.
+
 | Exp | Notebook | Modelo | Features | F1-macro val | F1-macro test | Accuracy test | ROC AUC test |
 |-----|----------|--------|----------|:------------:|:-------------:|:-------------:|:------------:|
 | **0** | `3_entrenamiento` | LogReg | TF-IDF (3811 términos) | 0.8698 | **0.9530** | 0.9556 | 0.9968 |
@@ -102,4 +104,4 @@ Análisis generado en `9_shap_explicabilidad.ipynb` con `shap.LinearExplainer`.
 | Modelo serializado | `model/mejor_modelo.joblib` |
 | Vectorizador | `model/mejor_modelo_tfidf.joblib` |
 | Metadatos | `model/model_metadata.json` |
-| Servidor MLflow | `http://34.240.189.163:5000` — experimento `clasificador_riesgo_ia` |
+| Servidor MLflow | `$MLFLOW_TRACKING_URI` — configura esta variable en tu `.env` (ver `src/classifier/.env.example`) |
