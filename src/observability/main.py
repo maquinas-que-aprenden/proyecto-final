@@ -1,37 +1,34 @@
-"""observability/main.py — Langfuse Trazas LLM
-Hello world: simula crear trazas de observabilidad.
-"""
+from __future__ import annotations
 
+import logging
+import os
+from typing import Any
 
-def create_trace(query: str, steps: list[dict]) -> dict:
-    # TODO: reemplazar con Langfuse().trace() + span() + generation()
-    return {
-        "trace_id": "trace-abc123",
-        "query": query,
-        "spans": [
-            {"name": s["name"], "duration_ms": s["duration_ms"], "status": "ok"}
-            for s in steps
-        ],
-        "total_ms": sum(s["duration_ms"] for s in steps),
-    }
+logger = logging.getLogger(__name__)
 
+def get_langfuse_handler(
+    session_id: str | None = None,
+    user_id: str | None = None,
+    tags: list[str] | None = None,
+) -> Any:
+    """Devuelve un CallbackHandler de Langfuse v3 compatible con LangChain."""
+    try:
+        from langfuse.langchain import CallbackHandler
+    except ImportError as exc:
+        raise ImportError("Instala langfuse: pip install langfuse") from exc
 
-if __name__ == "__main__":
-    trace = create_trace(
-        query="¿Qué sistemas de IA son de alto riesgo?",
-        steps=[
-            {"name": "rag_retrieval", "duration_ms": 120},
-            {"name": "rag_grading", "duration_ms": 45},
-            {"name": "llm_generation", "duration_ms": 890},
-            {"name": "self_reflection", "duration_ms": 340},
-        ],
+    public_key = os.getenv("LANGFUSE_PUBLIC_KEY")
+    secret_key = os.getenv("LANGFUSE_SECRET_KEY")
+
+    if not public_key or not secret_key:
+        raise ValueError("Define LANGFUSE_PUBLIC_KEY y LANGFUSE_SECRET_KEY.")
+
+    return CallbackHandler(
+        public_key=public_key,
+        secret_key=secret_key,
+        host=os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com"),
+        session_id=session_id,
+        user_id=user_id,
+        tags=tags or ["produccion"],
+        version=os.getenv("APP_VERSION", "dev")
     )
-    print(f"Trace ID:  {trace['trace_id']}")
-    print(f"Query:     {trace['query']}")
-    print(f"Total:     {trace['total_ms']}ms")
-    print("Spans:")
-    for s in trace["spans"]:
-        print(f"  {s['name']:>20} {s['duration_ms']:>5}ms  {s['status']}")
-
-    print("\n  TODO: Langfuse dashboard → https://cloud.langfuse.com")
-    print("\n✓ observability/main.py OK")
