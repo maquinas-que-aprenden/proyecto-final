@@ -2,114 +2,162 @@
 
 **Fecha:** [próxima reunión disponible]
 **Duración:** 30-40 minutos
-**Objetivo:** Alinear al equipo sobre el estado real del proyecto, asignar tareas claras, y definir el plan para los 18 días restantes hasta la presentación (12 de marzo).
+**Objetivo:** Reconocer los avances recientes, identificar qué falta para cerrar el flujo end-to-end, y asignar tareas concretas para los 17 días restantes (12 de marzo).
 
 ---
 
 ## Contexto para compartir antes de la reunión
 
-> Hemos hecho un diagnóstico técnico del proyecto. Tenemos **dos zonas muy diferentes**:
-> lo que funciona de verdad (clasificador ML, MLOps, CI/CD, Docker, infra) y lo que
-> son stubs/placeholders (RAG, ChromaDB, informes, observabilidad, tools del orquestador).
-> El producto core — que un usuario pueda preguntar sobre normativa legal y recibir una
-> respuesta real — no funciona todavía. Necesitamos alinear y priorizar.
+> **Buenas noticias:** Tras revisar los commits de las últimas 48h, el equipo ha avanzado
+> mucho más de lo que pensábamos. El corpus legal existe y está en DVC/S3, Langfuse está
+> implementado de verdad, RAGAS tiene pipeline y dataset, y el clasificador se ha reestructurado.
+>
+> **Lo que falta:** Hay varias ramas de feature sin mergear a develop (`chore/langfuse`,
+> `feature/RAGAS`, `feature/model-ml`). Y los módulos `src/rag/main.py` y `src/data/main.py`
+> siguen siendo stubs en develop — a pesar de que Dani ya tiene el corpus chunkeado y
+> un notebook de retrieval. La prioridad es conectar todo.
 
 ---
 
-## Agenda (30 min)
+## Estado real descubierto al revisar los commits
 
-### 1. Estado real de cada módulo (10 min)
+### Dani (Data + RAG) — Avances significativos
 
-Cada persona responde **en 2 minutos** sobre su área. No demos, solo estado honesto.
+- **Corpus legal EXISTE** y está en S3 vía DVC:
+  - `data/chunks_legal/chunks_final.jsonl` (2.4 MB, ~cientos de chunks)
+  - `data/chunks_legal/chunks_final_all_sources.jsonl` (merge con LOPD/RGPD)
+- **Notebook de chunking completo** (`src/data/01_chunking_boe_eu_aesia.ipynb`):
+  procesa BOE (HTML), EU AI Act (HTML), AESIA (PDF), LOPD/RGPD (PDF)
+- **ChromaDB en requirements** (`22b643cc`)
+- **Pipeline de retrieval** añadido (`90c64051`)
+- **Rama `feature/data-chunks`** ya mergeada a develop
 
-**Dani (Data + RAG):**
-- [ ] ¿Dónde está el corpus legal? ¿En S3? ¿DVC? ¿Local? ¿Existe?
-- [ ] ¿Has empezado a implementar ChromaDB + embeddings? Si sí, ¿qué funciona?
-- [ ] ¿`src/rag/main.py` y `src/data/main.py` siguen siendo stubs o hay código real?
-- [ ] ¿Tienes bloqueos? (acceso a datos, dependencias, dudas técnicas)
+**Pendiente:** `src/rag/main.py` y `src/data/main.py` en develop siguen siendo stubs.
+El trabajo de Dani está en notebooks pero no se ha trasladado a los módulos Python.
 
-**Rubén (ML + NLP):**
-- [ ] El clasificador está maduro en notebooks. ¿Hay un modelo serializado (.joblib) listo?
-- [ ] ¿Existe una función `predict_risk(text) -> dict` que el orquestador pueda llamar?
-- [ ] ¿Los notebooks de fine-tuning (QLoRA) produjeron resultados? ¿Merece la pena documentar?
-- [ ] ¿Hay algo que puedas hacer para ayudar a Dani con el RAG?
+### Nati (MLOps) — Avances significativos
 
-**Maru (Agents + UI):**
-- [ ] El orquestador ReAct funciona pero las 3 tools son stubs. Para conectarlas necesito que Dani y Rubén expongan sus módulos como funciones invocables.
-- [ ] La UI de Streamlit funciona pero es muy básica. ¿Queremos mejorarla o priorizar backend?
-- [ ] He montado un sistema de tutoría en Claude Code (skills + hooks) para que todos tengamos orientación. Lo explico en 1 minuto.
+- **Langfuse REAL implementado** en `src/observability/main.py` (rama `chore/langfuse`):
+  usa `langfuse.langchain.CallbackHandler` v3 con session_id, user_id, tags
+- **Orquestador instrumentado** con `get_langfuse_handler()` (rama `chore/langfuse`)
+- **RAGAS pipeline completo** (rama `feature/RAGAS`):
+  - `eval/run_ragas.py` — Script principal con modo CI
+  - `eval/helpers.py` — Carga dataset, invoca agente, calcula métricas, loguea en MLflow
+  - `eval/dataset.json` — 10 preguntas gold con contexts y ground_truth
+  - KPIs definidos: faithfulness >= 0.80, answer_relevancy >= 0.85
+- **CI/CD actualizado** para incluir RAGAS como gate de calidad
 
-**Nati (MLOps + Observabilidad):**
-- [ ] ¿Langfuse está solo en requirements o hay algo implementado?
-- [ ] ¿Has probado RAGAS para evaluar la calidad del RAG?
-- [ ] Los tests en CI están comentados. ¿Puedes escribir tests mínimos y activar el job?
-- [ ] ¿El deploy a EC2 sigue funcionando?
+**Pendiente:** Las ramas `chore/langfuse` y `feature/RAGAS` NO están mergeadas a develop.
 
-### 2. Mapa de dependencias (5 min)
+### Rubén (ML + NLP) — Avances
 
-Compartir este diagrama con el equipo:
+- **Reestructuración de carpetas** entre `classifier_Dataset_artificial` y `classifier_Dataset_real` (`d6642661`)
+- **Cambios importantes en `functions.py`** (448 líneas de diff)
+- **Imágenes SHAP generadas** (beeswarm y waterfall por clase)
+- **Documentación añadida** (`ad09516a`)
+- **Notebooks ejecutados** con outputs
+
+**Pendiente:** Rama `feature/model-ml` NO está mergeada a develop. No hay `predict_risk()` como función de servicio aún.
+
+### Maru (Agents + UI)
+
+- **Nodos RAG en LangGraph** añadidos hace ~6 días (rama `feature/rag`):
+  retrieve, grade_documents, transform_query, generate
+- **Sistema de tutoría Claude Code** configurado
+
+---
+
+## Agenda actualizada (30 min)
+
+### 1. Reconocer avances (5 min)
+
+Empezar la reunión reconociendo lo que cada uno ha hecho. El equipo ha trabajado
+más de lo que parece. Esto es importante para la moral.
+
+### 2. Estado de ramas y merges pendientes (10 min)
+
+**Problema principal:** Hay mucho trabajo hecho pero disperso en ramas sin mergear.
+
+| Rama | Autor | Estado | Acción |
+|------|-------|--------|--------|
+| `feature/data-chunks` | Dani | **Mergeada a develop** | Hecho |
+| `chore/langfuse` | Nati | Sin mergear (2 archivos cambiados) | Crear PR → develop |
+| `feature/RAGAS` | Nati | Sin mergear (5 archivos nuevos) | Crear PR → develop |
+| `feature/model-ml` | Rubén | Sin mergear (161 archivos, 4K+ líneas) | Crear PR → develop |
+| `feature/rag` | Maru | Sin mergear (nodos LangGraph) | Evaluar vs estado de Dani |
+
+**Acción:** Mergear TODO a develop esta semana. Sin código en develop, no hay demo.
+
+### 3. La pieza que falta: conectar stubs a código real (10 min)
+
+A pesar de los avances, los módulos Python en `src/` siguen siendo stubs en develop.
+El trabajo real está en notebooks y ramas. La tarea más urgente:
 
 ```
-SEMANA 1 (22-28 feb):
-═══════════════════════
+Notebooks/ramas de Dani ──→ src/data/main.py (ChromaDB real)
+                           ──→ src/rag/main.py (RAG real)
 
-Dani ──→ Corpus legal en ChromaDB + RAG básico
-              │
-Rubén ──→ predict_risk() como servicio
-              │
-              ▼
-SEMANA 2 (1-7 mar):
-═══════════════════
+Rubén (functions.py) ──→ src/classifier/main.py (predict_risk())
 
-Maru ──→ Conectar tools del orquestador (depende de Dani + Rubén)
-              │
-Nati ──→ Tests + Langfuse + descomentar CI
-              │
-              ▼
-SEMANA 3 (8-12 mar):
-═══════════════════
+Nati (chore/langfuse) ──→ merge a develop
 
-TODOS ──→ Pulir demo, preparar presentación, RAGAS eval
+Maru (feature/rag) ──→ conectar tools del orquestador
 ```
 
-**Mensaje clave:** Dani tiene la tarea más bloqueante. Si el RAG no avanza, Maru no puede conectar el orquestador, y no hay demo. ¿Necesita Dani ayuda?
-
-### 3. Acuerdos y asignación (10 min)
-
-Definir para cada persona:
+### 4. Asignación para la semana (10 min)
 
 | Persona | Tarea prioritaria | Entregable concreto | Fecha |
 |---------|-------------------|---------------------|-------|
-| Dani | ChromaDB + RAG básico | `retrieve()` devuelve docs reales de ChromaDB | 27 feb |
-| Rubén | Clasificador como servicio | `predict_risk(text) -> {"risk_level": ..., "explanation": ...}` | 25 feb |
-| Maru | Conectar orquestador | Tools llaman a RAG, classifier, y report reales | 28 feb |
-| Nati | Tests + CI activo | 3+ tests en `tests/`, job de pytest descomentado | 27 feb |
+| **Dani** | Trasladar retrieval de notebook a `src/data/main.py` y `src/rag/main.py` | Funciones reales que usen ChromaDB + embeddings con el corpus DVC | 27 feb |
+| **Rubén** | Exponer clasificador como servicio + mergear model-ml | `predict_risk(text) -> dict` en `src/classifier/main.py` + PR mergeada | 26 feb |
+| **Nati** | Mergear langfuse + RAGAS a develop + tests mínimos | 2 PRs mergeadas + al menos 1 test en `tests/` | 26 feb |
+| **Maru** | Conectar tools del orquestador con módulos reales | Las 3 tools en orchestrator llaman a src/rag, src/classifier, src/report | 28 feb |
 
-### 4. Compromisos rápidos (5 min)
+### 5. Compromisos rápidos (5 min)
 
-- [ ] ¿Todos de acuerdo con las prioridades?
-- [ ] ¿Alguien necesita pair programming o ayuda?
-- [ ] ¿Cuándo es la siguiente check-in? (propuesta: jueves)
+- [ ] Mergear TODAS las ramas feature a develop antes del jueves
+- [ ] ¿Alguien necesita pair programming?
 - [ ] ¿Todos instalan Claude Code y prueban `/tutor`?
+- [ ] Próxima check-in: jueves
 
 ---
 
-## Preguntas decisivas que deben responderse
+## Preguntas para la reunión
 
-1. **¿Existe el corpus legal?** Si no existe, es el bloqueante #1 y Dani necesita ayuda urgente para generarlo (scraping BOE o dataset existente).
+1. **Dani:** ¿El pipeline de retrieval del notebook funciona con ChromaDB real? ¿Falta solo trasladarlo a `src/`?
 
-2. **¿Enfocamos en demo o en completitud?** Con 18 días, recomiendo: demo funcional end-to-end con un subconjunto de artículos > sistema completo que no funciona.
+2. **Rubén:** ¿El modelo serializado (.joblib) está en el repo o en S3? ¿Se puede cargar sin re-entrenar?
 
-3. **¿Quién presenta qué?** Cada persona debería poder explicar su módulo. Esto motiva ownership.
+3. **Nati:** ¿Langfuse funciona en producción o solo local? ¿Las credenciales están en el .env?
+
+4. **Todos:** ¿Enfocamos en demo funcional con subconjunto de artículos o intentamos tener el corpus completo? (Recomendación: demo funcional primero)
+
+---
+
+## Lo que ya NO es un problema (vs diagnóstico anterior)
+
+- ~~No hay corpus legal~~ → Existe en DVC/S3 (chunks_final.jsonl, 2.4 MB)
+- ~~Langfuse es stub~~ → Implementado de verdad (rama chore/langfuse)
+- ~~No hay evaluación RAGAS~~ → Pipeline completo con 10 preguntas gold + CI gate
+- ~~ChromaDB no existe~~ → Ya está en requirements, Dani tiene notebook de retrieval
+- ~~CI sin tests~~ → Nati ha trabajado en RAGAS como gate de calidad
+
+## Lo que SÍ sigue siendo crítico
+
+- `src/rag/main.py` y `src/data/main.py` **siguen siendo stubs en develop**
+- No hay `predict_risk()` expuesta como función de servicio
+- Las tools del orquestador **siguen devolviendo datos hardcodeados**
+- **Ramas sin mergear** — el trabajo existe pero no está integrado
+- **0 tests unitarios** en `tests/` (RAGAS es evaluación, no tests)
 
 ---
 
 ## Después de la reunión
 
-1. Actualizar `NORMABOT_PROGRESS.md` con los acuerdos
-2. Crear issues en GitHub para cada tarea asignada
-3. Cada miembro puede usar `/tutor` en Claude Code para orientación diaria
-4. Siguiente check-in: [fecha]
+1. Cada persona crea PR para su rama → develop
+2. Actualizar `docs/gestion-proyecto/NORMABOT_PROGRESS.md` con acuerdos
+3. Cada miembro prueba `/tutor` en Claude Code
+4. Próxima check-in con demo parcial
 
 ---
 
@@ -124,5 +172,5 @@ Hemos montado un sistema de skills en `.claude/` que todo el equipo puede usar:
 - **`/evaluar`** → "¿Qué nota sacaríamos hoy?" (auto-evaluación vs rúbrica)
 - **`/revisar [archivo]`** → "¿Está bien mi código?" (code review)
 
-Además, al abrir el proyecto Claude te recuerda el deadline y los skills disponibles,
-y si editas código en `src/` te recuerda escribir tests.
+Además hay hooks automáticos: al abrir el proyecto se recuerda el deadline y los
+skills disponibles, y al editar código en `src/` se recuerda escribir tests.
