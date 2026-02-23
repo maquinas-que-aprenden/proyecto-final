@@ -38,7 +38,7 @@ MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "")
 MLFLOW_EXPERIMENT = "clasificador_riesgo_dataset_fusionado"
 
 # Marca del dataset para MLflow
-_DATASET_TAGS = {"dataset_type": "real", "dataset_source": "eu_ai_act_flagged"}
+_DATASET_TAGS = {"dataset_type": "fusionado", "dataset_source": "eu_ai_act_flagged"}
 
 
 def get_mlflow_password():
