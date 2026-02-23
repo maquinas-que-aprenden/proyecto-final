@@ -35,10 +35,10 @@ except ImportError:
 # Configuración MLflow
 # ──────────────────────────────────────────────
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "")
-MLFLOW_EXPERIMENT = "clasificador_riesgo_ia_artificial"
+MLFLOW_EXPERIMENT = "clasificador_riesgo_dataset_fusionado"
 
 # Marca del dataset para MLflow
-_DATASET_TAGS = {"dataset_type": "artificial", "dataset_source": "eu_ai_act_flagged"}
+_DATASET_TAGS = {"dataset_type": "real", "dataset_source": "eu_ai_act_flagged"}
 
 
 def get_mlflow_password():
@@ -215,20 +215,58 @@ def limpiar_texto_preprocess(texto):
 # 2. FUNCIONES DE FEATURES MANUALES
 # ══════════════════════════════════════════════
 
-# Palabras clave discriminativas por clase, extraídas del análisis exploratorio
+# Palabras clave discriminativas por clase, basadas en el EU AI Act y
+# análisis de errores del clasificador (confusión riesgo_minimo→inaceptable
+# y riesgo_limitado→alto_riesgo).
+# NOTA: Se usan palabras únicas (no frases) porque el matching es token-exacto
+# sobre texto lematizado (kw in t.split()).
 KEYWORDS_DOMINIO = {
-    "inaceptable": ["inferir", "vender", "emocional", "conocimiento", "biométrico",
-                     "cámara", "facial", "vigilancia", "sindical", "parental"],
-    "alto_riesgo": ["determinar", "autónomamente", "control", "supervisión",
-                     "penitenciario", "juez", "autónomo", "reincidencia",
-                     "medicación", "crediticio"],
-    "riesgo_limitado": ["advertir", "indicar", "chatbot", "informar",
-                         "automatizado", "limitación", "asesoramiento",
-                         "artificial", "revelar", "asistente"],
-    "riesgo_minimo": ["industrial", "sensor", "optimizar", "mejora",
-                       "clasificación", "optimización", "investigador",
-                       "gestión", "avería", "maquinaria"],
+    # Sistemas prohibidos: biometría masiva en espacios públicos, venta de
+    # datos sensibles, manipulación subconsciente, puntuación social,
+    # categorización por etnia/religión/sindicato. Verbos en forma lematizada.
+    "inaceptable": [
+        "inferir", "vender", "manipular", "subconsciente", "biométrico",
+        "facial", "vigilancia", "sindical", "racial", "etnia",
+        "religioso", "discriminar", "coerción", "prohibido",
+    ],
+    # Anexo III EU AI Act: infraestructura crítica, acceso educativo/laboral,
+    # servicios esenciales, aplicación ley, migración/asilo, justicia.
+    # Incluye contextos de sector que distinguen de inaceptable:
+    # seguros/reclamaciones, triaje médico, aviación, subsidios sociales.
+    "alto_riesgo": [
+        "penitenciario", "juez", "reincidencia", "crediticio",
+        "diagnóstico", "sanitario", "migración", "asilo",
+        "policial", "empleabilidad", "infraestructura", "vinculante",
+        "medicación", "autónomamente",
+        "reclamación", "subsidio", "escolar", "triage",
+        "urgencia", "aeronave", "piloto", "laboral",
+    ],
+    # Obligaciones de transparencia: chatbots, deepfakes, contenido sintético
+    # deben identificarse como IA.
+    "riesgo_limitado": [
+        "chatbot", "revelar", "transparencia", "deepfake",
+        "sintético", "notificar", "asesoramiento", "asistente",
+        "informar", "advertir", "indicar",
+    ],
+    # Sin obligaciones específicas: herramientas de sugerencia/asistencia,
+    # juegos, spam, optimización industrial, IoT de mantenimiento.
+    "riesgo_minimo": [
+        "sugerir", "borrador", "juego", "spam", "entretenimiento",
+        "filtro", "aficionado", "hobby", "receta",
+        "avería", "maquinaria", "logística", "mantenimiento",
+        "sensor", "industrial", "gestión",
+    ],
 }
+
+
+# Palabras que indican supervisión humana o propósito legítimo en sector regulado.
+# Su presencia es señal de alto_riesgo (no de inaceptable): los sistemas prohibidos
+# no tienen supervisión humana posible porque el daño es el propósito mismo.
+_PALABRAS_SUPERVISION = [
+    "supervisión", "supervisar", "revisar", "revisión", "garantía",
+    "confirmación", "criterio", "auditoría", "humano",
+    "pediatra", "médico", "piloto", "pedagógico",
+]
 
 
 def crear_features_manuales(X_texts):
@@ -242,6 +280,9 @@ def crear_features_manuales(X_texts):
     - kw_alto_riesgo: conteo de keywords de la clase alto_riesgo
     - kw_riesgo_limitado: conteo de keywords de la clase riesgo_limitado
     - kw_riesgo_minimo: conteo de keywords de la clase riesgo_minimo
+    - kw_salvaguarda: conteo de palabras de supervisión/garantía humana
+      (discrimina alto_riesgo vs inaceptable: en inaceptable el daño es
+      el propósito y no hay supervisión posible; en alto_riesgo sí la hay)
 
     Parameters:
     X_texts : pd.Series con los textos lematizados.
@@ -257,6 +298,10 @@ def crear_features_manuales(X_texts):
         features[f"kw_{clase}"] = X_texts.apply(
             lambda t, kws=keywords: sum(1 for kw in kws if kw in t.split())
         )
+
+    features["kw_salvaguarda"] = X_texts.apply(
+        lambda t: sum(1 for kw in _PALABRAS_SUPERVISION if kw in t.split())
+    )
 
     return features
 
@@ -554,10 +599,16 @@ def split_dataset(df, label_column, test_size=0.15, val_size=0.15, random_state=
 # 5. FUNCIONES DE ENTRENAMIENTO
 # ══════════════════════════════════════════════
 
-def crear_tfidf(X_train, X_val, X_test, max_features=5000, ngram_range=(1, 2)):
+def crear_tfidf(X_train, X_val, X_test, max_features=5000, ngram_range=(1, 2), min_df=1):
     """
     Crea y ajusta un vectorizador TF-IDF sobre el conjunto de entrenamiento
     y transforma train, validation y test.
+
+    Parameters:
+    min_df : int
+        Mínimo de documentos en los que debe aparecer un término para incluirse.
+        Por defecto 1 (sin filtrado). Con max_features=5000 y este corpus, la
+        cota de vocabulario es max_features, no min_df.
 
     Returns:
     tuple (tfidf, X_train_tfidf, X_val_tfidf, X_test_tfidf)
@@ -566,6 +617,7 @@ def crear_tfidf(X_train, X_val, X_test, max_features=5000, ngram_range=(1, 2)):
         max_features=max_features,
         ngram_range=ngram_range,
         sublinear_tf=True,
+        min_df=min_df,
         token_pattern=r"(?u)\b[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]{3,}\b",
     )
     X_train_tfidf = tfidf.fit_transform(X_train)
