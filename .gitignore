@@ -17,9 +17,10 @@ aws.pem
 *.csv
 !*.dvc
 
-# ── DVC ────────────────────────────────────────
+# ── DVC (datos reales ignorados, .dvc metadata trackeada) ─
 /data/raw/
-/data/processed/
+/data/processed/vectorstore/
+/data/chunks_legal/*.jsonl
 
 # ── IaC (Terraform / Ansible) ──────────────────
 infra/ansible/inventory.ini
@@ -44,7 +45,4 @@ mlruns/
 
 # ── Archivos locales / personales ──────────────
 src/classifier/tareas/
-# --- DVC: allow metadata files for processed/ ---
-!processed/*.dvc
-!processed/.gitignore
 .venv_rag/
