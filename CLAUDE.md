@@ -1,118 +1,128 @@
-# NormaBot — Agentic RAG sobre Normativa Española
+# CLAUDE.md
 
-## Qué es este proyecto
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-NormaBot es un sistema **Agentic RAG** que permite consultar en lenguaje natural el BOE, el EU AI Act y regulaciones sectoriales, clasificar sistemas de IA por nivel de riesgo y generar informes de cumplimiento. Deploy en AWS SageMaker.
+## Project Overview
 
-## Arquitectura
+NormaBot is an Agentic RAG system for querying Spanish/EU AI regulation (BOE, EU AI Act), classifying AI systems by risk level, and generating compliance reports. Deployed on AWS EC2 via Docker.
 
-3 agentes orquestados por **LangGraph** con routing condicional:
+## Architecture
 
-1. **Agente RAG Normativo** (Corrective RAG): Retrieve → Grade → Transform query → Web fallback → Generate → Self-reflection. ChromaDB como vector store. **Grading híbrido**: filtro determinista primero (metadata + umbral score) para descartar irrelevantes sin consumir cuota LLM, seguido de LLM como juez binario solo para los documentos que pasen el primer filtro. Decisión motivada por el dominio legal (requiere precisión en citas) y el rate limiting de Groq.
-2. **Agente Clasificador de Riesgo** (ML): XGBoost clasifica sistemas de IA en 4 niveles del EU AI Act (inaceptable, alto, limitado, mínimo).
-3. **Agente de Informes**: genera informes de cumplimiento con citas legales exactas.
+A **ReAct agent** (LangGraph `create_react_agent`) orchestrates three tools:
 
-Flujo: Consulta → Orquestador LangGraph → Agente(s) correspondiente(s) → Respuesta con fuentes + riesgo + recomendaciones.
+1. **RAG Normativo** (`src/rag/main.py`) — Corrective RAG: Retrieve → Grade → Generate with legal citations. Uses ChromaDB + `paraphrase-multilingual-MiniLM-L12-v2` embeddings.
+2. **Clasificador de Riesgo** (`src/classifier/`) — XGBoost classifies AI systems into 4 EU AI Act risk levels (inaceptable, alto, limitado, mínimo). Full ML pipeline in `functions.py`: spaCy text cleaning, TF-IDF + manual keyword features, Grid Search with StratifiedKFold, SHAP explainability, MLflow tracking.
+3. **Informes** (`src/report/main.py`) — Generates structured compliance reports with legal citations.
 
-## Estructura del proyecto
+**Orchestrator** (`src/orchestrator/main.py`): ReAct agent using Amazon Bedrock (Nova Lite v1) with tool calling. The LLM decides which tool(s) to invoke based on the user query. The three `@tool` functions are currently stubs returning hardcoded responses — they need to be connected to the real implementations in `src/rag`, `src/classifier`, and `src/report`.
 
-```
-proyecto-final/
-├── app.py                  # Streamlit UI (chat + clasificador + informes)
-├── src/
-│   ├── agents/             # LangGraph: grafo de estados, routing, 3 agentes
-│   ├── rag/                # Corrective RAG pipeline, ChromaDB, retrieval
-│   ├── classifier/         # XGBoost clasificador riesgo, SHAP, MLflow tracking
-│   └── nlp/                # spaCy NER legal, fine-tuning QLoRA
-├── data/                   # Corpus legal (BOE, EU AI Act, AESIA, LOPD)
-├── eval/                   # RAGAS + DeepEval: evaluación automática RAG
-├── scripts/                # Scraping BOE, ETL, utilidades
-├── tests/                  # pytest (unitarios + E2E)
-├── docs/                   # Especificaciones del proyecto
-├── Dockerfile              # Docker para AWS SageMaker (python:3.12-slim, puerto 8080)
-├── docker.compose.yml
-└── requirements.txt
-```
+**State** (`src/agents/state.py`): `AgentState` TypedDict with `Annotated[list, operator.add]` for accumulating documents and sources across nodes.
 
-## Stack tecnológico (todo gratuito)
+**Entry point**: `app.py` — Streamlit chat UI that calls `src.orchestrator.main.run(query)`.
 
-- **LLM**: Groq API (Llama 3.3 70B, 14.400 req/día) → Gemini fallback → Mistral fallback
-- **Agentes**: LangGraph + LangChain
-- **Vector store**: ChromaDB (embebido, persistido)
-- **Embeddings**: `paraphrase-multilingual-MiniLM-L12-v2` (sentence-transformers, CPU)
-- **ML**: scikit-learn, XGBoost, Grid Search, Stratified k-fold (k=5)
-- **NLP**: spaCy (`es_core_news_lg`) para NER legal
-- **Fine-tuning**: QLoRA con Unsloth, Llama 3.2 3B, en Google Colab T4
-- **MLOps**: MLflow (tracking + registry), DVC (versionado corpus con Google Drive)
-- **Observabilidad**: Langfuse (trazas LLM), EvidentlyAI (drift), RAGAS + DeepEval (eval RAG)
-- **CI/CD**: GitHub Actions (test → lint → RAGAS eval → build Docker → deploy AWS SageMaker)
-- **UI**: Streamlit
-- **Deploy**: AWS SageMaker
+## Classifier: Two Parallel Experiments
 
-## Lenguaje y convenciones
+There are two classifier variants under `src/classifier/`:
+- **Root level** (`functions.py`, `feature.py`, `main.py`) — trained on real manually-labeled dataset. MLflow experiment: `clasificador_riesgo_ia`.
+- **`classifier_2/`** — trained on synthetic/augmented dataset (`eu_ai_act_flagged`). MLflow experiment: `clasificador_riesgo_ia_artificial`. Has extended `preparar_dataset()` supporting `extra_columns` with leakage-safe features.
 
-- **100% Python** (3.12)
-- Linter: **ruff**
-- Tests: **pytest**
-- Schemas/validación: **Pydantic**
-- Idioma del código: inglés para nombres de variables/funciones, español para docstrings y comentarios donde sea necesario (el dominio es legislación española)
-- Commits y PRs en español
+Both share similar function signatures but differ in: `evaluar_modelo()` (root takes `tfidf` param and transforms internally; `classifier_2` expects pre-transformed features), `preparar_dataset()` (classifier_2 supports `extra_columns` and auto-derives `num_articles`), and `analisis_errores()` (classifier_2 takes separate `X_test_text` param).
 
-## Datos
-
-Todas las fuentes son públicas y gratuitas:
-
-| Dato | Fuente | Obtención |
-|------|--------|-----------|
-| BOE (legislación IA, datos, financiero) | boe.es | Scraping |
-| EU AI Act (Reglamento UE 2024/1689) | EUR-Lex | Público |
-| Guías AESIA + sandbox | aesia.gob.es | Público |
-| Dataset clasificación riesgo (200-300 desc.) | Elaboración propia | Etiquetado manual |
-| Artículos BOE etiquetados (~500) | BOE + manual | Etiquetado manual |
-| LOPD-GDD, RGPD | boe.es / aepd.es | Público |
-| Regulación sectorial (banca, seguros) | BOE / CNMV / BdE | Scraping |
-
-Chunking: por artículo/sección (no por tokens arbitrarios). Metadata: ley, artículo, fecha, BOE número.
-
-## KPIs objetivo
-
-- RAGAS Faithfulness: **>= 0.80**
-- RAGAS Answer Relevance: **>= 0.85**
-- F1-macro clasificador riesgo: **>= 0.80**
-- Latencia respuesta: **<= 5s**
-- CI/CD funcional: **100%**
-
-## Comandos principales
+## Commands
 
 ```bash
-# Tests
-pytest tests/ -v
-
 # Lint
 ruff check .
 
-# Evaluación RAG
-python eval/run_ragas.py
+# Tests (tests/ is currently empty)
+pytest tests/ -v
 
-# App local
+# Run single test file
+pytest tests/test_something.py -v
+
+# Run app locally
 streamlit run app.py --server.port=8080
 
 # Docker
 docker build -t normabot .
-docker run -p 8080:8080 normabot
+docker run -p 8080:8080 --env-file .env normabot
+
+# Run individual module (each src module has __main__ block for smoke testing)
+python -m src.rag.main
+python -m src.classifier.main
+python -m src.orchestrator.main
+
+# Install dependencies (split by context)
+pip install -r requirements/app.txt    # Streamlit + LangGraph + LangChain
+pip install -r requirements/ml.txt     # ML/NLP (spaCy, XGBoost, SHAP, MLflow, torch)
+pip install -r requirements/dev.txt    # ruff only
+pip install -r requirements/infra.txt  # AWS, DVC, Langfuse, RAGAS
 ```
 
-## Consideraciones importantes
+## Conventions
 
-- **Alucinaciones**: el dominio legal exige citas exactas. Siempre usar Corrective RAG con self-reflection. Toda respuesta debe incluir artículos fuente del BOE/EU AI Act.
-- **Disclaimer obligatorio**: "Informe preliminar, consulte profesional jurídico" en toda respuesta generada.
-- **Rate limiting**: implementar fallback multi-proveedor (Groq → Gemini → Mistral) y cache de respuestas frecuentes.
-- **Clasificador**: dataset pequeño (200-300 ejemplos). Usar `class_weight='balanced'`, augmentation con paráfrasis, y documentar como limitación conocida.
-- **Explicabilidad**: SHAP para features relevantes del clasificador ML.
+- **Python 3.12**, linter: **ruff**, tests: **pytest**, validation: **Pydantic**
+- Code identifiers in English; docstrings and comments in Spanish (legal domain)
+- Commits and PRs in Spanish
+- Requirements split into `base.txt` (shared pandas/numpy/dotenv), `app.txt`, `ml.txt`, `dev.txt`, `infra.txt`
+- spaCy model: `es_core_news_sm` (loaded lazily via singleton `_get_nlp()` / `_get_nlp_ner()` in `functions.py`)
+- MLflow: URI via `MLFLOW_TRACKING_URI` env var, password from `MLFLOW_PASSWORD` env var or `.env` in classifier dir
 
-## Equipo (4 personas, 17 días)
+## Infrastructure
 
-- **Persona A**: Data + RAG Engineer (scraping BOE, chunking, ChromaDB, deploy AWS)
-- **Persona B**: ML + NLP Engineer (clasificador riesgo, NER spaCy, fine-tuning QLoRA)
-- **Persona C**: Agents + UI Lead (LangGraph, 3 agentes, Streamlit)
-- **Persona D**: MLOps + Observabilidad (MLflow, DVC, CI/CD, Langfuse, RAGAS eval)
+- **CI/CD**: GitHub Actions — `pr_lint.yml` (ruff on changed .py/.ipynb files), `ci-develop.yml` (lint → Docker build to ghcr.io :develop), `cicd-main.yml` (lint → Docker build → deploy to EC2 via SSH)
+- **Docker**: `python:3.12-slim`, port 8080, healthcheck on `/_stcore/health`
+- **IaC**: `infra/terraform/` (VPC, EC2, S3, IAM for Bedrock) + `infra/ansible/` (docker-compose deploy, nginx, MLflow server)
+- **DVC**: configured for data versioning; `data/raw/` and `data/processed/` are gitignored
+- **Container registry**: `ghcr.io/maquinas-que-aprenden/proyecto-final`
+- **CodeRabbit**: configured in `.coderabbit.yaml` — reviews focus only on logic/security/performance bugs, all style linters disabled
+
+## Key Domain Rules
+
+- Every generated response MUST include the disclaimer: *"Informe preliminar generado por IA. Consulte profesional jurídico."*
+- Legal citations must be exact (law, article, date). Hallucinated citations are unacceptable.
+- Classifier dataset is small (200-300 examples). Always use `class_weight='balanced'` and document as a known limitation.
+- LLM: Bedrock Nova Lite for orchestrator. Groq (Llama 3.3 70B) planned for RAG generation, with Gemini → Mistral fallback chain for rate limiting.
+
+## Environment Variables
+
+Required in `.env`:
+- `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` — Bedrock access
+- `BEDROCK_MODEL_ID` — defaults to `eu.amazon.nova-lite-v1:0`
+- `MLFLOW_PASSWORD` — MLflow tracking server auth
+- `MLFLOW_TRACKING_URI` — defaults to `https://34.244.146.100`
+- `MLFLOW_TRACKING_INSECURE_TLS` — set if using self-signed certs
+
+## Team
+
+| Member | Role | Areas | GitHub |
+|--------|------|-------|--------|
+| Dani | Data + RAG Engineer | ChromaDB, embeddings, corpus, RAG pipeline | @danyocando-git |
+| Rubén | ML + NLP Engineer | Classifier, spaCy, XGBoost, SHAP, fine-tuning | @Rcerezo-dev |
+| Maru | Agents + UI Lead | Orchestrator, Streamlit, integration | @mariaeugenia-alvarez |
+| Nati | MLOps + Observability | CI/CD, Langfuse, RAGAS, MLflow, Docker | @natgarea |
+
+## Deadline
+
+**Presentation: March 12, 2026**
+
+## Tutoring System (Claude Code Skills)
+
+This project includes a Claude Code tutoring system to help the team stay focused and deliver a working product. See `AGENTS.md` for full architecture documentation.
+
+### Quick Reference
+
+| Skill | Purpose |
+|-------|---------|
+| `/tutor` | Main orchestrator — project guidance, priorities, next steps |
+| `/diagnostico` | Technical audit of code state (functional vs stub vs empty) |
+| `/planificar [fase\|sprint]` | Sprint planning with tasks assigned to team members |
+| `/progreso` | Progress tracking — updates NORMABOT_PROGRESS.md |
+| `/evaluar` | Self-evaluation against bootcamp rubric |
+| `/revisar [archivo\|PR]` | Code review with bootcamp context |
+
+### Project State Files
+
+- `docs/gestion-proyecto/NORMABOT_DIAGNOSIS.md` — Technical audit: what's functional, stub, or empty
+- `docs/gestion-proyecto/NORMABOT_ROADMAP.md` — Prioritized roadmap (P0/P1/P2) with effort estimates
+- `docs/gestion-proyecto/NORMABOT_PROGRESS.md` — Progress tracking: completed, in-progress, pending

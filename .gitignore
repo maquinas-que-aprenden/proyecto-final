@@ -33,7 +33,11 @@ terraform.rc
 
 # ── IDE ────────────────────────────────────────
 .vscode/
-.claude/
+
+# ── Claude Code ───────────────────────────────
+# Permitir .claude/ para compartir skills, agents y hooks con el equipo
+# Solo ignorar configuración local
+.claude/settings.local.json
 
 # ── MLflow ─────────────────────────────────────
 mlruns/
