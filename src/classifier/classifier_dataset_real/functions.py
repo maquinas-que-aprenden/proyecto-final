@@ -83,8 +83,8 @@ def configure_mlflow():
 
     password = get_mlflow_password()
 
-    # Activar TLS permisivo solo en entorno local.
-    if os.getenv("ENVIRONMENT", "local") == "local":
+    # Activar TLS permisivo solo si ENVIRONMENT está explícitamente definida como "local".
+    if os.getenv("ENVIRONMENT") == "local":
         os.environ.setdefault("MLFLOW_TRACKING_INSECURE_TLS", "true")
     os.environ["MLFLOW_TRACKING_USERNAME"] = os.getenv("MLFLOW_TRACKING_USERNAME", "tracker")
     os.environ["MLFLOW_TRACKING_PASSWORD"] = password
@@ -117,8 +117,11 @@ def _get_nlp():
     if not _check_spacy():
         return None
     if _nlp is None:
-        import spacy
-        _nlp = spacy.load("es_core_news_sm", disable=["parser", "ner"])
+        try:
+            import spacy
+            _nlp = spacy.load("es_core_news_sm", disable=["parser", "ner"])
+        except Exception:
+            return None
     return _nlp
 
 
@@ -127,8 +130,11 @@ def _get_nlp_ner():
     if not _check_spacy():
         return None
     if _nlp_ner is None:
-        import spacy
-        _nlp_ner = spacy.load("es_core_news_sm")
+        try:
+            import spacy
+            _nlp_ner = spacy.load("es_core_news_sm")
+        except Exception:
+            return None
     return _nlp_ner
 
 
@@ -186,10 +192,10 @@ def limpiar_texto(texto, lemmatize=False):
         El texto limpio.
     """
     nlp = _get_nlp()
-    if nlp is None:
+    if nlp is None or texto is None or (isinstance(texto, float) and texto != texto):
         return _limpiar_texto_fallback(texto, lemmatize)
 
-    doc = nlp(texto.lower())
+    doc = nlp(str(texto).lower())
     tokens = [
         (token.lemma_ if lemmatize else token.text)
         for token in doc
