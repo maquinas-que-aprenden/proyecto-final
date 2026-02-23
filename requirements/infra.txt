@@ -13,5 +13,3 @@ ragas==0.2.0
 # AWS CLI se tiene que instalar manualmente:
 # https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html#getting-started-install-instructions
 # DVC: pipx install 'dvc[s3]'
-
-
