@@ -2,13 +2,19 @@
 Flujo Retrieve → Grade → Generate con citas legales desde ChromaDB.
 """
 
+from __future__ import annotations
+
 import logging
+import os
 
 from langchain_ollama import ChatOllama
 
 from src.retrieval.retriever import search
 
 logger = logging.getLogger(__name__)
+
+BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "eu.amazon.nova-lite-v1:0")
+BEDROCK_REGION = os.environ.get("AWS_REGION", "eu-west-1")
 
 GRADING_PROMPT = (
     "Dado el siguiente documento y la pregunta, "
@@ -86,12 +92,80 @@ def grade(query: str, docs: list[dict], threshold: float = 0.7) -> list[dict]:
     return relevant
 
 
+GENERATE_PROMPT = """\
+Eres un asistente juridico especializado en el EU AI Act y normativa española de IA.
+Responde la pregunta usando SOLO la informacion de los documentos proporcionados.
+Cita siempre la ley y articulo exactos. Si no hay informacion suficiente, dilo.
+No inventes articulos ni citas que no aparezcan en los documentos.
+
+Documentos:
+{context}
+
+Pregunta: {query}
+
+Responde de forma clara y estructurada. Cita las fuentes al final."""
+
+_generate_llm = None
+
+
+def _get_generate_llm():
+    """Devuelve el LLM para generacion (Bedrock Nova Lite, singleton)."""
+    global _generate_llm
+    if _generate_llm is None:
+        from langchain_aws import ChatBedrockConverse
+        _generate_llm = ChatBedrockConverse(
+            model=BEDROCK_MODEL_ID,
+            region_name=BEDROCK_REGION,
+            temperature=0.1,
+            max_tokens=1024,
+        )
+    return _generate_llm
+
+
+def _format_context(docs: list[dict]) -> str:
+    """Formatea los documentos recuperados como contexto para el prompt."""
+    blocks = []
+    for i, d in enumerate(docs, 1):
+        meta = d.get("metadata", {})
+        source = meta.get("source", "")
+        unit = meta.get("unit_title") or meta.get("unit_id", "")
+        header = f"[{i}] {source} — {unit}".strip(" —")
+        blocks.append(f"{header}\n{d['doc']}")
+    return "\n\n".join(blocks)
+
+
 def generate(query: str, context: list[dict]) -> dict:
-    # TODO: reemplazar con Groq LLM call
-    citations = ", ".join(f"Art. {d['metadata']['articulo']} {d['metadata']['ley']}" for d in context)
+    """Genera una respuesta con citas legales usando Bedrock Nova Lite.
+
+    Fallback a resumen por concatenacion si el LLM no esta disponible.
+    """
+    sources = [d.get("metadata", {}) for d in context]
+
+    if not context:
+        return {
+            "answer": "No se encontraron documentos relevantes para esta consulta.",
+            "sources": [],
+            "grounded": False,
+        }
+
+    formatted_context = _format_context(context)
+    prompt = GENERATE_PROMPT.format(context=formatted_context, query=query)
+
+    try:
+        llm = _get_generate_llm()
+        response = llm.invoke(prompt)
+        answer = response.content.strip()
+    except Exception:
+        logger.warning("LLM de generacion no disponible, usando fallback")
+        # Fallback: concatenar extractos relevantes
+        snippets = [d["doc"][:200] for d in context[:3]]
+        answer = "Segun los documentos encontrados:\n\n" + "\n\n".join(snippets)
+
+    answer += "\n\n_Informe preliminar generado por IA. Consulte profesional juridico._"
+
     return {
-        "answer": f"Según {citations}: las prácticas de IA que manipulen el comportamiento humano están prohibidas por el EU AI Act.",
-        "sources": [d["metadata"] for d in context],
+        "answer": answer,
+        "sources": sources,
         "grounded": True,
     }
 

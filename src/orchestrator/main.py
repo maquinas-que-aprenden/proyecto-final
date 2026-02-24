@@ -44,7 +44,7 @@ profesional jurídico._"\
 """
 
 # ---------------------------------------------------------------------------
-# Herramientas (stubs → se conectarán con src/rag, src/classifier, src/report)
+# Herramientas
 # ---------------------------------------------------------------------------
 
 
@@ -56,13 +56,18 @@ def search_legal_docs(query: str) -> str:
     Usa esta herramienta cuando el usuario pregunta sobre leyes, artículos,
     prohibiciones, obligaciones, definiciones o cualquier contenido normativo.
     """
-    # TODO: conectar con src/rag (retrieve → grade → transform → generate)
-    return (
-        "Resultado de búsqueda:\n"
-        "- Art. 5 EU AI Act: Quedan prohibidas las prácticas de IA que "
-        "manipulen el comportamiento humano.\n"
-        "Fuentes: Art. 5 EU AI Act"
-    )
+    from src.rag.main import retrieve, grade, generate
+
+    docs = retrieve(query)
+    if not docs:
+        return "No se encontraron documentos relevantes para esta consulta."
+
+    relevant = grade(query, docs)
+    if not relevant:
+        return "Se encontraron documentos pero ninguno fue relevante para la consulta."
+
+    result = generate(query, relevant)
+    return result["answer"]
 
 
 @tool
