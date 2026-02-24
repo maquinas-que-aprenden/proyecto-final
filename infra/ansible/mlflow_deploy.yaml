@@ -78,6 +78,21 @@
         group: ubuntu
         mode: '0644'
 
+    - name: Mover Docker data-root al EBS
+      become: true
+      copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "data-root": "/home/ubuntu/mlflow/docker-data"
+          }
+
+    - name: Reiniciar Docker con nuevo data-root
+      become: true
+      systemd:
+        name: docker
+        state: restarted
+
     - name: Levantar stack de MLflow
       shell: docker compose up -d --pull always
       args:
@@ -91,9 +106,9 @@
 
     - name: Resumen del despliegue
       debug:
-        msg: 
+        msg:
           - "=========================================="
-          - "MLflow SERVER: https://{{ ansible_host }}/mlflow/"
+          - "MLflow SERVER: https://{{ ansible_host }}"
           - "Estado del servicio:"
           - "{{ compose_status.stdout }}"
           - "=========================================="
