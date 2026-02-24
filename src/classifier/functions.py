@@ -954,7 +954,7 @@ def analisis_errores(modelo, X_test_features, y_test, X_test_text=None):
 # 7. MLFLOW — HELPER SEGURO
 # ══════════════════════════════════════════════
 
-def log_mlflow_safe(run_name, params=None, metrics=None, artifacts=None, tags=None):
+def log_mlflow_safe(run_name, params=None, metrics=None, artifacts=None, tags=None, datasets=None):
     """
     Registra un experimento en MLflow de forma centralizada.
 
@@ -968,6 +968,10 @@ def log_mlflow_safe(run_name, params=None, metrics=None, artifacts=None, tags=No
     metrics   : dict — métricas numéricas a loguear.
     artifacts : list — rutas de ficheros locales a subir como artefactos.
     tags      : dict — etiquetas adicionales del run.
+    datasets  : list — lista de tuplas (df, context, name) para registrar datasets.
+                       context: "training", "test" o "validation".
+                       Ejemplo: [(df_train, "training", "fusionado_train"),
+                                 (df_test,  "test",     "fusionado_test")]
     """
     configure_mlflow()
     mlflow.set_experiment(MLFLOW_EXPERIMENT)
@@ -982,6 +986,10 @@ def log_mlflow_safe(run_name, params=None, metrics=None, artifacts=None, tags=No
         if artifacts:
             for path in artifacts:
                 mlflow.log_artifact(path)
+        if datasets:
+            for df, context, name in datasets:
+                dataset = mlflow.data.from_pandas(df, name=name)
+                mlflow.log_input(dataset, context=context)
         mlflow.set_tags(_all_tags)
 
     print(f"✓ Run '{run_name}' registrado en MLflow ({MLFLOW_TRACKING_URI})")
