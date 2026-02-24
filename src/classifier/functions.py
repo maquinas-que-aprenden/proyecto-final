@@ -903,6 +903,85 @@ def plot_curva_roc_multiclase(modelo, X_test, y_test):
     return fig, roc_auc_dict
 
 
+def generar_resumen_metricas(y_test, y_pred, modelo, X_test, metrics_dict,
+                             class_names=None, output_dir="model/plots",
+                             filename="resumen_metricas.png"):
+    """
+    Genera una figura resumen con las métricas clave del modelo en un único gráfico:
+    - Matriz de confusión
+    - Métricas principales (F1-macro, Accuracy, ROC-AUC) en barras horizontales
+    - Curvas ROC multiclase (One-vs-Rest)
+
+    Útil para loguear en MLflow como artefacto único en lugar de imágenes dispersas.
+
+    Parameters:
+    y_test       : pd.Series — etiquetas reales de test.
+    y_pred       : array — predicciones del modelo.
+    modelo       : modelo sklearn con predict_proba.
+    X_test       : sparse matrix o array — features de test ya transformadas.
+    metrics_dict : dict con claves "f1_macro", "accuracy", "roc_auc".
+    class_names  : list de str — nombres de clases. Si None, se infiere de y_test.
+    output_dir   : str — carpeta donde guardar la figura.
+    filename     : str — nombre del archivo PNG.
+
+    Returns:
+    str — ruta completa al archivo guardado.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+
+    if class_names is None:
+        class_names = sorted(y_test.unique())
+
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+    fig.suptitle("Resumen de Métricas del Modelo", fontsize=14, fontweight="bold")
+
+    # 1. Matriz de confusión
+    cm = confusion_matrix(y_test, y_pred, labels=class_names)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=class_names)
+    disp.plot(ax=axes[0], cmap="Blues", values_format="d", colorbar=False)
+    axes[0].set_title("Matriz de Confusión")
+    axes[0].tick_params(axis="x", rotation=45)
+
+    # 2. Métricas principales en barras horizontales
+    metric_labels = ["F1-macro", "Accuracy", "ROC-AUC"]
+    metric_values = [
+        metrics_dict.get("f1_macro", 0),
+        metrics_dict.get("accuracy", 0),
+        metrics_dict.get("roc_auc", 0),
+    ]
+    colors = ["#2196F3", "#4CAF50", "#FF9800"]
+    bars = axes[1].barh(metric_labels, metric_values, color=colors)
+    axes[1].set_xlim(0, 1.1)
+    axes[1].set_title("Métricas Principales")
+    for bar, val in zip(bars, metric_values):
+        axes[1].text(
+            bar.get_width() + 0.01, bar.get_y() + bar.get_height() / 2,
+            f"{val:.3f}", va="center", fontsize=11,
+        )
+
+    # 3. Curvas ROC multiclase (One-vs-Rest)
+    y_test_bin = label_binarize(y_test, classes=class_names)
+    y_proba = modelo.predict_proba(X_test)
+    for i, cls in enumerate(class_names):
+        fpr, tpr, _ = roc_curve(y_test_bin[:, i], y_proba[:, i])
+        roc_auc_val = auc(fpr, tpr)
+        axes[2].plot(fpr, tpr, label=f"{cls} (AUC={roc_auc_val:.2f})")
+    axes[2].plot([0, 1], [0, 1], "k--", alpha=0.5, label="Azar")
+    axes[2].set_title("Curvas ROC (OvR)")
+    axes[2].set_xlabel("Tasa de falsos positivos")
+    axes[2].set_ylabel("Tasa de verdaderos positivos")
+    axes[2].legend(fontsize=8, loc="lower right")
+
+    plt.tight_layout()
+    path = os.path.join(output_dir, filename)
+    plt.savefig(path, dpi=150, bbox_inches="tight")
+    plt.show()
+    plt.close()
+
+    print(f"Resumen de métricas guardado: {path}")
+    return path
+
+
 def analisis_errores(modelo, X_test_features, y_test, X_test_text=None):
     """
     Muestra los ejemplos mal clasificados para analizar patrones de error.
@@ -967,6 +1046,12 @@ def log_mlflow_safe(run_name, params=None, metrics=None, artifacts=None, tags=No
     params    : dict — hiperparámetros / configuración a loguear.
     metrics   : dict — métricas numéricas a loguear.
     artifacts : list — rutas de ficheros locales a subir como artefactos.
+                       Acepta strings simples o tuplas (path, subfolder) para
+                       organizar en subcarpetas de la UI de MLflow.
+                       Ejemplo: [
+                           "model/resumen_metricas.png",          # raíz
+                           ("model/plots/shap/beeswarm.png", "plots/shap"),  # subcarpeta
+                       ]
     tags      : dict — etiquetas adicionales del run.
     datasets  : list — lista de tuplas (df, context, name) para registrar datasets.
                        context: "training", "test" o "validation".
@@ -984,8 +1069,12 @@ def log_mlflow_safe(run_name, params=None, metrics=None, artifacts=None, tags=No
         if metrics:
             mlflow.log_metrics(metrics)
         if artifacts:
-            for path in artifacts:
-                mlflow.log_artifact(path)
+            for item in artifacts:
+                if isinstance(item, (list, tuple)):
+                    path, artifact_subdir = item
+                    mlflow.log_artifact(path, artifact_path=artifact_subdir)
+                else:
+                    mlflow.log_artifact(item)
         if datasets:
             for df, context, name in datasets:
                 dataset = mlflow.data.from_pandas(df, name=name)
