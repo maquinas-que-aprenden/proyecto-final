@@ -12,7 +12,9 @@ Artefactos requeridos en ``classifier_dataset_fusionado/model/``:
 
 from __future__ import annotations
 
+import json
 import logging
+import threading
 from pathlib import Path
 
 import joblib
@@ -24,27 +26,41 @@ logger = logging.getLogger(__name__)
 # Ruta al mejor modelo (dataset fusionado, F1-macro test: 0.8583)
 _MODEL_DIR = Path(__file__).parent / "classifier_dataset_fusionado" / "model"
 
-# Singletons — se cargan en el primer uso
+# Singletons — se cargan en el primer uso (thread-safe)
 _modelo = None
 _tfidf = None
 _ohe = None
+_lock = threading.Lock()
 
 
 def _load_artifacts():
-    """Carga lazy de modelo, TF-IDF y OHE encoder."""
+    """Carga lazy de modelo, TF-IDF y OHE encoder (thread-safe, double-check locking)."""
     global _modelo, _tfidf, _ohe
     if _modelo is not None:
         return
+    with _lock:
+        if _modelo is not None:
+            return
 
-    _modelo = joblib.load(_MODEL_DIR / "mejor_modelo.joblib")
-    _tfidf = joblib.load(_MODEL_DIR / "mejor_modelo_tfidf.joblib")
-    _ohe = joblib.load(_MODEL_DIR / "ohe_encoder.joblib")
-    logger.info(
-        "Clasificador cargado: %s (%d features) desde %s",
-        type(_modelo).__name__,
-        _modelo.n_features_in_,
-        _MODEL_DIR,
-    )
+        meta_path = _MODEL_DIR / "mejor_modelo_seleccion.json"
+        if meta_path.exists():
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            model_file = _MODEL_DIR.parent / meta["model_file"]
+            tfidf_file = _MODEL_DIR.parent / meta["tfidf_file"]
+            logger.info("Cargando modelo desde metadata: %s", meta.get("nombre", ""))
+        else:
+            model_file = _MODEL_DIR / "mejor_modelo.joblib"
+            tfidf_file = _MODEL_DIR / "mejor_modelo_tfidf.joblib"
+
+        _modelo = joblib.load(model_file)
+        _tfidf = joblib.load(tfidf_file)
+        _ohe = joblib.load(_MODEL_DIR / "ohe_encoder.joblib")
+        logger.info(
+            "Clasificador cargado: %s (%d features) desde %s",
+            type(_modelo).__name__,
+            _modelo.n_features_in_,
+            _MODEL_DIR,
+        )
 
 
 def _limpiar_texto_fallback(texto: str) -> str:
@@ -121,6 +137,10 @@ def predict_risk(text: str) -> dict:
     result = {
         "risk_level": risk_level,
         "confidence": confidence,
+        "probabilities": {
+            cls: round(float(p), 4)
+            for cls, p in zip(_modelo.classes_, proba)
+        },
     }
 
     # 7. Explicabilidad — contribuciones lineales (coef * feature_value)
