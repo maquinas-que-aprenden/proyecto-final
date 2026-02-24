@@ -1,6 +1,6 @@
 # NormaBot — Roadmap de Desarrollo
 
-Fecha: 2026-02-22 (actualizado 2026-02-23 con estado real de branches)
+Fecha: 2026-02-22 (actualizado 2026-02-24 con progreso Sprint 1)
 
 Priorizado por **impacto en la presentación / esfuerzo**. Las funcionalidades están alineadas con el temario del bootcamp.
 
@@ -25,10 +25,12 @@ Objetivo: que un usuario pueda hacer una pregunta legal y recibir una respuesta 
 - **Complejidad**: M → **S** (ya existe el corpus + retriever)
 - **Estado actual**: Corpus chunkeado en DVC/S3 (2.4 MB). Retriever ChromaDB en `src/retrieval/retriever.py` (develop). **Falta:** trasladar a `src/data/main.py` o conectar directamente.
 
-### 1.2 RAG Pipeline real (Corrective RAG)
-- **Descripción**: Implementar en `src/rag/main.py`: retrieve desde ChromaDB → grading híbrido (filtro por score + LLM judge) → query transformation si no hay docs relevantes → generate con LLM (Groq/Bedrock) → self-reflection para verificar que la respuesta cita fuentes reales.
+### 1.2 RAG Pipeline real (Corrective RAG) — PARCIAL ✓
+- **Descripción**: Implementar en `src/rag/main.py`: retrieve desde ChromaDB → grading híbrido (filtro por score + LLM judge) → query transformation si no hay docs relevantes → generate con LLM → self-reflection para verificar que la respuesta cita fuentes reales.
 - **Temario**: RAG, LLMs, Prompt Engineering
 - **Complejidad**: L
+- **Estado actual (2026-02-24)**: `retrieve()` FUNCIONAL (ChromaDB real via `src.retrieval.retriever.search()`). `grade()` FUNCIONAL (Ollama Qwen 2.5 3B, LLM local para evaluación binaria de relevancia). **Falta:** `generate()` con LLM (Tarea 1.3 del Sprint 1).
+- **Decisión de modelo**: Se eligió Ollama Qwen 2.5 3B (local) sobre APIs externas (Groq/Gemini) para grading. Razonamiento: clasificación binaria (sí/no) no justifica API key adicional; Qwen 2.5 3B tiene mejor soporte de español que alternativas de tamaño similar.
 - **Justificación**: Es la funcionalidad core del producto. El Corrective RAG con self-reflection diferencia el proyecto de un RAG naive.
 
 ### 1.3 Conectar tools del orquestador — PENDIENTE (depende de 1.1, 1.2, 2.4)
@@ -63,10 +65,11 @@ Objetivo: métricas objetivas de calidad y features que diferencien el proyecto.
 - **Estado actual**: CallbackHandler v3 implementado en `src/observability/main.py` (rama chore/langfuse). Orquestador instrumentado. **Falta:** merge a develop.
 
 ### 2.3 Fallback multi-proveedor LLM
-- **Descripción**: Implementar cadena Groq → Gemini → Mistral con retry y exponential backoff. Si Groq devuelve 429 (rate limit), rotar a Gemini; si falla, a Mistral.
+- **Descripción**: Implementar fallback chain para generate() y report. Si el proveedor primario falla (rate limit, timeout), rotar al siguiente.
 - **Temario**: APIs y despliegue, resiliencia
 - **Complejidad**: S
-- **Justificación**: Groq tiene 14.400 req/día. En una demo puede agotarse. El fallback asegura disponibilidad y demuestra diseño resiliente.
+- **Nota**: El grading ya tiene fallback built-in (Ollama → score threshold). Este item aplica a generate() y report.
+- **Justificación**: En una demo puede agotarse el rate limit. El fallback asegura disponibilidad y demuestra diseño resiliente.
 
 ### 2.4 Clasificador como servicio integrado — PARCIAL ✓
 - **Descripción**: Crear una función `predict_risk(text: str) -> dict` en `src/classifier/` que cargue el modelo serializado (joblib), aplique el pipeline de features, y devuelva nivel de riesgo + SHAP explanation. Conectar con el tool del orquestador.
@@ -152,14 +155,15 @@ ESFUERZO             │                    ESFUERZO
 > Con los descubrimientos en branches, el orden cambia. 2.1 y 2.2 ya están hechos (solo falta merge).
 
 1. **MERGE** — Mergear chore/langfuse, feature/RAGAS, feature/model-ml a develop
-2. **1.1** Conectar retriever existente (ya no es crear de cero)
-3. **1.2** RAG Pipeline real (retrieve + grade + generate con LLM)
-4. **2.4** Clasificador como servicio (`predict_risk()`)
-5. **1.3** Conectar tools del orquestador a módulos reales
-6. **2.5** Informes con LLM
-7. **1.4** Tests mínimos
-8. **2.3** Fallback multi-proveedor (estabilidad para la demo)
-9. ~~**2.2** Langfuse~~ → ✓ Solo falta merge
-10. ~~**2.1** RAGAS eval~~ → ✓ Solo falta merge + correr con RAG real
-11. **3.3** Feedback del usuario (si queda tiempo)
-12. **3.2** Dashboard de métricas (si queda tiempo)
+2. ~~**1.1** Conectar retriever existente~~ → ✓ HECHO (2026-02-24, Tarea 1.1)
+3. ~~**1.2** RAG Pipeline: retrieve + grade~~ → ✓ PARCIAL (retrieve + grade HECHO con Ollama Qwen 2.5 3B)
+4. **1.2** RAG Pipeline: generate con LLM (Tarea 1.3 del Sprint) ← **SIGUIENTE**
+5. **2.4** Clasificador como servicio (`predict_risk()`)
+6. **1.3** Conectar tools del orquestador a módulos reales
+7. **2.5** Informes con LLM
+8. **1.4** Tests mínimos
+9. **2.3** Fallback multi-proveedor (estabilidad para la demo)
+10. ~~**2.2** Langfuse~~ → ✓ Solo falta merge
+11. ~~**2.1** RAGAS eval~~ → ✓ Solo falta merge + correr con RAG real
+12. **3.3** Feedback del usuario (si queda tiempo)
+13. **3.2** Dashboard de métricas (si queda tiempo)

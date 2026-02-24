@@ -1,19 +1,88 @@
 """rag/main.py — Agente RAG Normativo (Corrective RAG)
-Hello world: simula el flujo Retrieve → Grade → Generate con citas.
+Flujo Retrieve → Grade → Generate con citas legales desde ChromaDB.
 """
 
+import logging
 
-def retrieve(query: str) -> list[dict]:
-    # TODO: reemplazar con ChromaDB query real
+from langchain_ollama import ChatOllama
+
+from src.retrieval.retriever import search
+
+logger = logging.getLogger(__name__)
+
+GRADING_PROMPT = (
+    "Dado el siguiente documento y la pregunta, "
+    "¿el documento contiene información útil para responder la pregunta?\n\n"
+    "Documento: {document}\n"
+    "Pregunta: {query}\n\n"
+    'Responde solo con "si" o "no":'
+)
+
+_grading_llm = None
+
+
+def _get_grading_llm():
+    """Devuelve el LLM local para grading (Qwen 2.5 3B via Ollama)."""
+    global _grading_llm
+    if _grading_llm is None:
+        _grading_llm = ChatOllama(
+            model="qwen2.5:3b",
+            temperature=0,
+            num_predict=10,
+        )
+    return _grading_llm
+
+
+def retrieve(query: str, k: int = 5) -> list[dict]:
+    """Recupera documentos de ChromaDB y los formatea para grade()."""
+    try:
+        results = search(query, k=k, mode="soft")
+    except Exception:
+        logger.exception("Error al buscar en ChromaDB")
+        return []
+
     return [
-        {"doc": "Art. 5: Quedan prohibidas las prácticas de IA que manipulen el comportamiento humano.", "metadata": {"ley": "EU AI Act", "articulo": "5"}, "score": 0.89},
-        {"doc": "Art. 6: Los sistemas de alto riesgo del Anexo III deberán cumplir requisitos.", "metadata": {"ley": "EU AI Act", "articulo": "6"}, "score": 0.62},
+        {
+            "doc": r["text"],
+            "metadata": r.get("metadata", {}),
+            "score": max(0.0, 1.0 - r.get("distance", 1.0)),
+        }
+        for r in results
     ]
 
 
-def grade(docs: list[dict], threshold: float = 0.7) -> list[dict]:
-    # TODO: reemplazar con LLM que evalúe relevancia
-    relevant = [d for d in docs if d["score"] >= threshold]
+def _grade_by_score(docs: list[dict], threshold: float = 0.7) -> list[dict]:
+    """Fallback: filtra documentos por score de similitud."""
+    return [d for d in docs if d["score"] >= threshold]
+
+
+def grade(query: str, docs: list[dict], threshold: float = 0.7) -> list[dict]:
+    """Evalúa relevancia de cada documento con LLM local (Ollama).
+
+    Fallback a filtro por score si Ollama no está disponible.
+    """
+    if not docs:
+        return []
+
+    try:
+        llm = _get_grading_llm()
+    except Exception:
+        logger.warning("Ollama no disponible, usando fallback por score")
+        return _grade_by_score(docs, threshold)
+
+    relevant = []
+    for doc in docs:
+        prompt = GRADING_PROMPT.format(document=doc["doc"], query=query)
+        try:
+            response = llm.invoke(prompt)
+            answer = response.content.strip().lower()
+            if answer.startswith("si") or answer.startswith("sí"):
+                relevant.append(doc)
+        except Exception:
+            logger.warning("Error en grading LLM, incluyendo doc por score")
+            if doc["score"] >= threshold:
+                relevant.append(doc)
+
     return relevant
 
 
@@ -34,8 +103,8 @@ if __name__ == "__main__":
     docs = retrieve(query)
     print(f"Retrieve:  {len(docs)} docs encontrados")
 
-    relevant = grade(docs)
-    print(f"Grade:     {len(relevant)} relevantes (threshold=0.7)")
+    relevant = grade(query, docs)
+    print(f"Grade:     {len(relevant)} relevantes")
 
     result = generate(query, relevant)
     print(f"Generate:  {result['answer']}")
