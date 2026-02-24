@@ -1,6 +1,6 @@
 # NormaBot — Tracking de Progreso
 
-Última actualización: **2026-02-24 (sesión tracker — post-merge model-ml + refactor/data)**
+Última actualización: **2026-02-24 (tarde) — PRs #36, #37, #43 mergeadas; Langfuse + RAGAS ya en develop**
 
 ---
 
