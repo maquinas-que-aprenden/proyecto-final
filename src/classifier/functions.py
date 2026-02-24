@@ -1033,7 +1033,8 @@ def analisis_errores(modelo, X_test_features, y_test, X_test_text=None):
 # 7. MLFLOW — HELPER SEGURO
 # ══════════════════════════════════════════════
 
-def log_mlflow_safe(run_name, params=None, metrics=None, artifacts=None, tags=None, datasets=None):
+def log_mlflow_safe(run_name, params=None, metrics=None, artifacts=None, tags=None,
+                    datasets=None, models=None):
     """
     Registra un experimento en MLflow de forma centralizada.
 
@@ -1049,14 +1050,26 @@ def log_mlflow_safe(run_name, params=None, metrics=None, artifacts=None, tags=No
                        Acepta strings simples o tuplas (path, subfolder) para
                        organizar en subcarpetas de la UI de MLflow.
                        Ejemplo: [
-                           "model/resumen_metricas.png",          # raíz
-                           ("model/plots/shap/beeswarm.png", "plots/shap"),  # subcarpeta
+                           "model/resumen_metricas.png",                        # raíz
+                           ("model/plots/shap/beeswarm.png", "plots/shap"),     # subcarpeta
                        ]
     tags      : dict — etiquetas adicionales del run.
     datasets  : list — lista de tuplas (df, context, name) para registrar datasets.
                        context: "training", "test" o "validation".
                        Ejemplo: [(df_train, "training", "fusionado_train"),
                                  (df_test,  "test",     "fusionado_test")]
+    models    : list — lista de dicts para loguear modelos sklearn con mlflow.sklearn.
+                       Claves: "model" (requerido), "artifact_path" (default "model"),
+                       "signature" (opcional), "input_example" (opcional).
+                       Ejemplo: [
+                           {
+                               "model": clf,
+                               "artifact_path": "classifier",
+                               "signature": infer_signature(X_train, clf.predict(X_train)),
+                               "input_example": X_train[:3],
+                           },
+                           {"model": tfidf, "artifact_path": "tfidf_vectorizer"},
+                       ]
     """
     configure_mlflow()
     mlflow.set_experiment(MLFLOW_EXPERIMENT)
@@ -1079,6 +1092,14 @@ def log_mlflow_safe(run_name, params=None, metrics=None, artifacts=None, tags=No
             for df, context, name in datasets:
                 dataset = mlflow.data.from_pandas(df, name=name)
                 mlflow.log_input(dataset, context=context)
+        if models:
+            for model_entry in models:
+                mlflow.sklearn.log_model(
+                    sk_model=model_entry["model"],
+                    artifact_path=model_entry.get("artifact_path", "model"),
+                    signature=model_entry.get("signature"),
+                    input_example=model_entry.get("input_example"),
+                )
         mlflow.set_tags(_all_tags)
 
     print(f"✓ Run '{run_name}' registrado en MLflow ({MLFLOW_TRACKING_URI})")
