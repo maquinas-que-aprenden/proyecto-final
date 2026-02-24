@@ -15,6 +15,7 @@ from langchain_aws import ChatBedrockConverse
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 from src.observability.main import get_langfuse_handler
+from src.classifier.main import predict_risk
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +23,7 @@ logger = logging.getLogger(__name__)
 # Configuración
 # ---------------------------------------------------------------------------
 
-BEDROCK_MODEL_ID = os.environ.get(
-    "BEDROCK_MODEL_ID", "eu.amazon.nova-lite-v1:0"
-)
+BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "eu.amazon.nova-lite-v1:0")
 BEDROCK_REGION = os.environ.get("AWS_REGION", "eu-west-1")
 
 SYSTEM_PROMPT = """\
@@ -74,13 +73,38 @@ def classify_risk(system_description: str) -> str:
     Usa esta herramienta cuando el usuario describe un sistema de IA y quiere
     saber su nivel de riesgo según el EU AI Act.
     """
-    # TODO: conectar con src/classifier (XGBoost + SHAP)
-    return (
-        "Clasificación: ALTO RIESGO\n"
-        "El sistema descrito se clasifica como alto riesgo según el Anexo III "
-        "del EU AI Act, Art. 6.\n"
-        "Fuentes: Art. 6 EU AI Act, Anexo III EU AI Act"
+    result = predict_risk(system_description)
+    response = (
+        f"Clasificacion: {result['risk_level'].upper()}\n"
+        f"Confianza: {result['confidence']:.0%}\n"
     )
+    if result.get("shap_top_features"):
+        features = ", ".join(f["feature"] for f in result["shap_top_features"][:3])
+        response += f"Factores clave: {features}\n"
+    if result.get("shap_explanation"):
+        response += f"Explicacion: {result['shap_explanation']}\n"
+    return response
+
+
+# Artículos por defecto cuando el retriever no está disponible
+_DEFAULT_ARTICLES = {
+    "inaceptable": [
+        "Art. 5 EU AI Act — Prácticas de IA prohibidas",
+        "Art. 99 EU AI Act — Sanciones",
+    ],
+    "alto_riesgo": [
+        "Art. 6 EU AI Act — Reglas de clasificación de alto riesgo",
+        "Art. 9 EU AI Act — Sistema de gestión de riesgos",
+        "Art. 43 EU AI Act — Evaluación de conformidad",
+    ],
+    "riesgo_limitado": [
+        "Art. 50 EU AI Act — Obligaciones de transparencia",
+        "Art. 52 EU AI Act — Información a los usuarios",
+    ],
+    "riesgo_minimo": [
+        "Art. 69 EU AI Act — Códigos de conducta voluntarios",
+    ],
+}
 
 
 @tool
@@ -90,15 +114,32 @@ def generate_report(system_description: str) -> str:
     Usa esta herramienta cuando el usuario quiere un informe, reporte o
     evaluación de conformidad para su sistema.
     """
-    # TODO: conectar con src/report (template + LLM)
-    return (
-        "## Informe de Cumplimiento\n\n"
-        "Sistema evaluado según EU AI Act.\n"
-        "Obligaciones aplicables: Art. 9 (gestión de riesgos), "
-        "Art. 43 (evaluación de conformidad).\n"
-        "Fuentes: Art. 9 EU AI Act, Art. 43 EU AI Act\n\n"
-        "*Informe preliminar, consulte profesional jurídico.*"
-    )
+    from src.report.main import generate_report as _build_report
+
+    # 1. Clasificar riesgo del sistema
+    risk_result = predict_risk(system_description)
+    risk_level = risk_result["risk_level"]
+
+    # 2. Buscar artículos relevantes en el corpus legal
+    articles = []
+    try:
+        from src.retrieval.retriever import search as search_docs
+        hits = search_docs(f"obligaciones {risk_level} EU AI Act", k=3)
+        for h in hits:
+            meta = h.get("metadata", {}) or {}
+            source = meta.get("source", "")
+            unit = meta.get("unit_title") or meta.get("unit_id", "")
+            label = f"{source} — {unit}".strip(" —")
+            if label:
+                articles.append(label)
+    except Exception as e:
+        logger.warning("Retriever no disponible para informe: %s", e)
+
+    if not articles:
+        articles = _DEFAULT_ARTICLES.get(risk_level, _DEFAULT_ARTICLES["alto_riesgo"])
+
+    # 3. Generar informe con template
+    return _build_report(system_description, risk_level, articles)
 
 
 # ---------------------------------------------------------------------------
@@ -130,13 +171,15 @@ def _get_agent():
 def run(query: str, session_id: str | None = None, user_id: str | None = None) -> dict:
     """Ejecuta el agente ReAct con una consulta del usuario."""
     agent = _get_agent()
-    
+
     try:
-        callbacks = [get_langfuse_handler(
-            session_id=session_id,
-            user_id=user_id,
-            tags=["produccion", "normabot-v1"]
-        )]
+        callbacks = [
+            get_langfuse_handler(
+                session_id=session_id,
+                user_id=user_id,
+                tags=["produccion", "normabot-v1"],
+            )
+        ]
     except (ImportError, ValueError) as e:
         logger.warning("Langfuse no disponible: %s — continuando sin trazas", e)
         callbacks = []
@@ -147,22 +190,25 @@ def run(query: str, session_id: str | None = None, user_id: str | None = None) -
     )
     return result
 
+
 if __name__ == "__main__":
     import uuid
+
     # Generamos un ID único para agrupar estas consultas en una misma sesión de Langfuse
     test_session = f"session-{uuid.uuid4().short if hasattr(uuid.uuid4(), 'short') else str(uuid.uuid4())[:8]}"
-    
+
     queries = [
         "¿Qué dice el artículo 5 del EU AI Act?",
         "Clasifica mi sistema de reconocimiento facial",
         "Genera un informe de cumplimiento para mi chatbot",
+        "Clasifica un sistema de scoring crediticio y dime que articulos aplican",
     ]
-    
+
     for q in queries:
         print(f"{'=' * 60}")
         # Pasamos el session_id para que Langfuse v3 lo capture mediante el CallbackHandler
         result = run(q, session_id=test_session)
-        
+
         final_message = result["messages"][-1]
         print(f"  Query:    {q}")
         print(f"  Response: {final_message.content[:200]}...")

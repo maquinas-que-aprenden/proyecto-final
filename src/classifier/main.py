@@ -1,56 +1,173 @@
-"""classifier/main.py — XGBoost Clasificador de Riesgo
-Hello world: simula clasificación en 4 niveles EU AI Act.
+"""classifier/main.py — Servicio de clasificacion de riesgo EU AI Act.
+
+Carga el modelo serializado (LogisticRegression + TF-IDF + OHE) entrenado
+en el dataset fusionado y expone ``predict_risk(text) -> dict`` para que
+el orquestador lo invoque como tool.
+
+Artefactos requeridos en ``classifier_dataset_fusionado/model/``:
+- mejor_modelo.joblib       (LogisticRegression, 5024 features)
+- mejor_modelo_tfidf.joblib (TfidfVectorizer, vocab 5000)
+- ohe_encoder.joblib        (OneHotEncoder: category + context)
 """
 
-LABEL_NAMES = ["inaceptable", "alto", "limitado", "minimo"]
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+
+import joblib
+import numpy as np
+from scipy.sparse import csr_matrix, hstack
+
+logger = logging.getLogger(__name__)
+
+# Ruta al mejor modelo (dataset fusionado, F1-macro test: 0.8583)
+_MODEL_DIR = Path(__file__).parent / "classifier_dataset_fusionado" / "model"
+
+# Singletons — se cargan en el primer uso
+_modelo = None
+_tfidf = None
+_ohe = None
 
 
-def train(descriptions: list[str], labels: list[int]) -> dict:
-    # TODO: reemplazar con TfidfVectorizer + XGBClassifier + StratifiedKFold
-    return {
-        "model": "XGBClassifier",
-        "n_estimators": 50,
-        "max_depth": 3,
-        "cv_f1_macro": 0.82,
-        "cv_std": 0.04,
+def _load_artifacts():
+    """Carga lazy de modelo, TF-IDF y OHE encoder."""
+    global _modelo, _tfidf, _ohe
+    if _modelo is not None:
+        return
+
+    _modelo = joblib.load(_MODEL_DIR / "mejor_modelo.joblib")
+    _tfidf = joblib.load(_MODEL_DIR / "mejor_modelo_tfidf.joblib")
+    _ohe = joblib.load(_MODEL_DIR / "ohe_encoder.joblib")
+    logger.info(
+        "Clasificador cargado: %s (%d features) desde %s",
+        type(_modelo).__name__,
+        _modelo.n_features_in_,
+        _MODEL_DIR,
+    )
+
+
+def _limpiar_texto_fallback(texto: str) -> str:
+    """Limpieza basica con regex (misma logica que functions._limpiar_texto_fallback)."""
+    import re
+
+    _stopwords = {
+        "a", "al", "algo", "algunas", "algunos", "ante", "antes", "como",
+        "con", "contra", "cual", "cuando", "de", "del", "desde", "donde",
+        "durante", "e", "el", "ella", "ellos", "en", "entre", "era", "es",
+        "esa", "esas", "ese", "eso", "esos", "esta", "estas", "este", "esto",
+        "estos", "fue", "ha", "han", "hasta", "hay", "he", "la", "las", "le",
+        "les", "lo", "los", "me", "mi", "mis", "muy", "ni", "no", "nos",
+        "o", "os", "otro", "para", "pero", "por", "que", "quien", "quienes",
+        "se", "si", "sin", "sobre", "son", "su", "sus", "también", "tanto",
+        "te", "todo", "todos", "tu", "tus", "un", "una", "unas", "uno",
+        "unos", "ya", "yo",
+    }
+    tokens = re.findall(r"\b[a-záéíóúüñ]{3,}\b", texto.lower())
+    return " ".join(t for t in tokens if t not in _stopwords)
+
+
+def _limpiar_texto(texto: str) -> str:
+    """Limpia texto para inferencia, usando spaCy si esta disponible."""
+    try:
+        from src.classifier.functions import limpiar_texto
+        return limpiar_texto(texto)
+    except ImportError:
+        return _limpiar_texto_fallback(texto)
+
+
+def predict_risk(text: str) -> dict:
+    """Clasifica un sistema de IA por nivel de riesgo EU AI Act.
+
+    Parameters
+    ----------
+    text : str
+        Descripcion del sistema de IA en lenguaje natural.
+
+    Returns
+    -------
+    dict
+        risk_level: str (alto_riesgo | inaceptable | riesgo_limitado | riesgo_minimo)
+        confidence: float (0-1)
+        shap_top_features: list[dict] (top 5 features por contribucion)
+        shap_explanation: str (resumen textual)
+    """
+    _load_artifacts()
+
+    # 1. Limpiar texto (mismo preprocesado que en entrenamiento)
+    cleaned = _limpiar_texto(text)
+
+    # 2. TF-IDF
+    X_tfidf = _tfidf.transform([cleaned])
+
+    # 3. OHE — en inferencia libre no tenemos category/context estructurados,
+    #    asi que pasamos vectores zero (handle_unknown="ignore" en entrenamiento).
+    #    El TF-IDF (5000 features) lleva la mayor parte de la senal.
+    n_ohe = sum(len(c) for c in _ohe.categories_)
+    X_ohe = csr_matrix((1, n_ohe))
+
+    # 4. Features numericas: longitud y num_articles
+    #    Sin metadata estructurada, usamos 0 para evitar sesgos por escala.
+    X_num = csr_matrix((1, 2), dtype=float)
+
+    # 5. Combinar (mismo orden que en entrenamiento: tfidf + ohe + num)
+    X_final = hstack([X_tfidf, X_ohe, X_num])
+
+    # 6. Prediccion
+    risk_level = _modelo.predict(X_final)[0]
+    proba = _modelo.predict_proba(X_final)[0]
+    confidence = float(proba.max())
+
+    result = {
+        "risk_level": risk_level,
+        "confidence": confidence,
     }
 
+    # 7. Explicabilidad — contribuciones lineales (coef * feature_value)
+    try:
+        pred_idx = list(_modelo.classes_).index(risk_level)
+        coefs = _modelo.coef_[pred_idx]
+        X_dense = X_final.toarray().flatten()
+        contributions = coefs * X_dense
 
-def predict(description: str) -> dict:
-    # TODO: reemplazar con clf.predict(tfidf.transform([description]))
-    keywords_risk = {
-        "reconocimiento facial": 1,
-        "scoring crediticio": 1,
-        "puntuación social": 0,
-        "chatbot": 2,
-        "filtro de spam": 3,
-    }
-    label = 1  # default alto
-    for kw, lvl in keywords_risk.items():
-        if kw in description.lower():
-            label = lvl
-            break
-    return {
-        "description": description,
-        "risk_level": label,
-        "risk_name": LABEL_NAMES[label],
-    }
+        tfidf_names = _tfidf.get_feature_names_out().tolist()
+        ohe_names = _ohe.get_feature_names_out().tolist()
+        num_names = ["longitud", "num_articles"]
+        feature_names = tfidf_names + ohe_names + num_names
+
+        top_idx = np.argsort(np.abs(contributions))[::-1][:5]
+        shap_top = [
+            {"feature": feature_names[i], "contribution": float(contributions[i])}
+            for i in top_idx
+            if contributions[i] != 0
+        ]
+
+        if shap_top:
+            result["shap_top_features"] = shap_top
+            top_words = ", ".join(f["feature"] for f in shap_top[:3])
+            result["shap_explanation"] = (
+                f"Factores principales para '{risk_level}': {top_words}."
+            )
+    except Exception as e:
+        logger.warning("No se pudo calcular explicabilidad: %s", e)
+
+    return result
 
 
 if __name__ == "__main__":
-    model_info = train([], [])
-    print(f"Model:     {model_info['model']} (n_est={model_info['n_estimators']}, depth={model_info['max_depth']})")
-    print(f"CV F1:     {model_info['cv_f1_macro']:.2f} (+/- {model_info['cv_std']:.2f})")
-
     test_cases = [
-        "Sistema de puntuación social de ciudadanos",
-        "Reconocimiento facial en aeropuertos",
-        "Chatbot de atención al cliente",
-        "Filtro de spam de email",
+        "Sistema de puntuacion social de ciudadanos",
+        "Reconocimiento facial en aeropuertos para control de acceso",
+        "Chatbot de atencion al cliente para una tienda online",
+        "Filtro de spam de email corporativo",
+        "Sistema de scoring crediticio para concesion de prestamos bancarios",
     ]
-    print("\nPredicciones:")
     for desc in test_cases:
-        result = predict(desc)
-        print(f"  {result['risk_name']:>13} ← {desc}")
+        r = predict_risk(desc)
+        print(f"  {r['risk_level']:>17} ({r['confidence']:.0%}) <- {desc}")
+        if r.get("shap_top_features"):
+            top = ", ".join(f["feature"] for f in r["shap_top_features"][:3])
+            print(f"                    Factores: {top}")
+        print()
 
-    print("\n✓ classifier/main.py OK")
+    print("classifier/main.py OK")
