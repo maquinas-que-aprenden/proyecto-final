@@ -6,6 +6,7 @@ predict_risk(text) para uso desde el orquestador.
 
 import json
 import joblib
+import threading
 import numpy as np
 from pathlib import Path
 from scipy.sparse import csr_matrix
@@ -17,34 +18,49 @@ _LABEL_NAMES = ["inaceptable", "alto", "limitado", "minimo"]
 
 _clf = None
 _tfidf = None
+_lock = threading.Lock()
 
 
 def _cargar_si_necesario() -> None:
-    """Carga el modelo y vectorizador la primera vez que se invocan (lazy loading)."""
+    """Carga el modelo y vectorizador la primera vez que se invocan (lazy loading, thread-safe)."""
     global _clf, _tfidf
     if _clf is not None:
         return
-    meta = json.loads(
-        (_EXPERIMENT_DIR / "model" / "mejor_modelo_seleccion.json").read_text(encoding="utf-8")
-    )
-    _clf = joblib.load(_EXPERIMENT_DIR / meta["model_file"])
-    _tfidf = joblib.load(_EXPERIMENT_DIR / meta["tfidf_file"])
+    with _lock:
+        if _clf is not None:  # doble-check dentro del lock
+            return
+        meta = json.loads(
+            (_EXPERIMENT_DIR / "model" / "mejor_modelo_seleccion.json").read_text(encoding="utf-8")
+        )
+        _clf = joblib.load(_EXPERIMENT_DIR / meta["model_file"])
+        _tfidf = joblib.load(_EXPERIMENT_DIR / meta["tfidf_file"])
 
 
 def _shap_top_features(X_sparse, label_idx: int, top_n: int = 5) -> list[dict]:
     """
     Devuelve las top_n features con mayor contribución SHAP para la clase predicha.
-    Usa zero background (apropiado para TF-IDF: ausencia de término = 0).
-    Fallback: coef * x, matemáticamente equivalente para modelos lineales con zero background.
+    Selecciona el explainer según el tipo de modelo:
+      - LinearExplainer para modelos lineales (LogisticRegression) con zero background.
+      - TreeExplainer para modelos de árbol (XGBoost, RandomForest).
+    Fallback para modelos lineales: coef * x (matemáticamente equivalente con zero background).
     """
     try:
         import shap
-        background = csr_matrix(np.zeros((1, X_sparse.shape[1])))
-        explainer = shap.LinearExplainer(_clf, background)
-        shap_vals = explainer.shap_values(X_sparse)
-        vals = shap_vals[label_idx][0]
+        if hasattr(_clf, "get_booster"):  # XGBoost
+            explainer = shap.TreeExplainer(_clf)
+            shap_vals = explainer.shap_values(X_sparse)
+            # TreeExplainer multiclase devuelve lista [n_classes] de (n_samples, n_features)
+            vals = (shap_vals[label_idx][0] if isinstance(shap_vals, list) else shap_vals[0])
+        else:  # modelos lineales (LogisticRegression, etc.)
+            background = csr_matrix(np.zeros((1, X_sparse.shape[1])))
+            explainer = shap.LinearExplainer(_clf, background)
+            shap_vals = explainer.shap_values(X_sparse)
+            vals = shap_vals[label_idx][0]
     except Exception:
-        vals = _clf.coef_[label_idx] * X_sparse.toarray()[0]
+        if hasattr(_clf, "coef_"):  # fallback solo para modelos lineales
+            vals = _clf.coef_[label_idx] * X_sparse.toarray()[0]
+        else:
+            return []
 
     feature_names = _tfidf.get_feature_names_out()
     top_idx = np.argsort(np.abs(vals))[-top_n:][::-1]
