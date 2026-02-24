@@ -3,14 +3,12 @@ events {}
 http {
     server {
         listen 80;
-        # Redirige todo el tráfico HTTP a HTTPS
         return 301 https://$host$request_uri;
     }
 
     server {
         listen 443 ssl;
 
-        # Configuración de certificados
         ssl_certificate     /etc/nginx/certs/mlflow.crt;
         ssl_certificate_key /etc/nginx/certs/mlflow.key;
 
@@ -19,19 +17,18 @@ http {
 
         client_max_body_size 500M;
 
-        # Ahora usamos la raíz / en lugar de /mlflow/
         location / {
-            auth_basic           "NormaBot MLflow"; 
+            auth_basic           "NormaBot MLflow";
             auth_basic_user_file /etc/nginx/certs/.htpasswd;
 
-            # Apuntamos directamente al contenedor sin subrutas
             proxy_pass         http://mlflow:5000;
-            
             proxy_set_header   Host              $host;
             proxy_set_header   X-Real-IP         $remote_addr;
             proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
             proxy_set_header   X-Forwarded-Proto $scheme;
-             proxy_set_header Authorization "";
+            proxy_set_header   Authorization     "";
+            proxy_set_header   Origin            "";
+            proxy_set_header   Referer           "";
 
             proxy_read_timeout    300s;
             proxy_connect_timeout 300s;
