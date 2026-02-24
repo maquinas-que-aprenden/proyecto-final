@@ -1,4 +1,3 @@
-import spacy
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -22,13 +21,24 @@ import os
 import mlflow
 
 # ──────────────────────────────────────────────
+# Cargar .env al importar el módulo
+# (Jupyter no propaga las vars del sistema al kernel automáticamente)
+# ──────────────────────────────────────────────
+try:
+    from dotenv import load_dotenv
+    from pathlib import Path
+    load_dotenv(dotenv_path=Path(__file__).parent / ".env", override=False)
+except ImportError:
+    pass  # python-dotenv no instalado; se leen las vars del sistema tal cual
+
+# ──────────────────────────────────────────────
 # Configuración MLflow
 # ──────────────────────────────────────────────
-MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "https://34.244.146.100")
-MLFLOW_EXPERIMENT = "clasificador_riesgo_ia"
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "")
+MLFLOW_EXPERIMENT = "clasificador_riesgo_dataset_fusionado"
 
 # Marca del dataset para MLflow
-_DATASET_TAGS = {"dataset_type": "real", "dataset_source": "dataset_riesgo"}
+_DATASET_TAGS = {"dataset_type": "fusionado", "dataset_source": "eu_ai_act_flagged"}
 
 
 def get_mlflow_password():
@@ -48,18 +58,7 @@ def get_mlflow_password():
     except ImportError:
         pass
 
-    # Cargar .env si existe (necesario en Jupyter, donde las vars del sistema
-    # no se propagan al kernel automáticamente).
-    # Se usa la ruta del propio functions.py para no depender del directorio
-    # de trabajo del kernel.
-    try:
-        from dotenv import load_dotenv
-        from pathlib import Path
-        dotenv_path = Path(__file__).parent / ".env"
-        load_dotenv(dotenv_path=dotenv_path, override=True)
-    except ImportError:
-        pass  # python-dotenv no instalado, se continúa sin él
-
+    # El .env ya se cargó al importar el módulo; aquí solo leemos la variable.
     password = os.getenv("MLFLOW_PASSWORD")
     if password:
         print("Password obtenida desde variable de entorno local.")
@@ -75,16 +74,19 @@ def get_mlflow_password():
 
 
 def configure_mlflow():
-    """
-    Configure MLflow credentials and tracking URI for the current process.
-    
-    Sets the MLFLOW_TRACKING_USERNAME and MLFLOW_TRACKING_PASSWORD environment variables (using the configured MLflow password), applies the module-level tracking URI via mlflow.set_tracking_uri, and prints a confirmation message. Does not modify MLFLOW_TRACKING_INSECURE_TLS.
-    """
+    """Configura las credenciales y la URI de seguimiento de MLflow."""
+    if not MLFLOW_TRACKING_URI:
+        raise EnvironmentError(
+            "MLFLOW_TRACKING_URI no está configurada.\n"
+            "Añádela al archivo .env: MLFLOW_TRACKING_URI=https://..."
+        )
+
     password = get_mlflow_password()
 
-    # No sobreescribir MLFLOW_TRACKING_INSECURE_TLS: respetar el valor que
-    # el usuario haya configurado en su entorno (p. ej. para entornos con TLS válido).
-    os.environ["MLFLOW_TRACKING_USERNAME"] = "tracker"
+    # Activar TLS permisivo solo si ENVIRONMENT está explícitamente definida como "local".
+    if os.getenv("ENVIRONMENT") == "local":
+        os.environ.setdefault("MLFLOW_TRACKING_INSECURE_TLS", "true")
+    os.environ["MLFLOW_TRACKING_USERNAME"] = os.getenv("MLFLOW_TRACKING_USERNAME", "tracker")
     os.environ["MLFLOW_TRACKING_PASSWORD"] = password
 
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
@@ -95,20 +97,77 @@ def configure_mlflow():
 # ──────────────────────────────────────────────
 _nlp = None
 _nlp_ner = None
+_spacy_available = None  # None = no comprobado aún
+
+
+def _check_spacy():
+    """Comprueba si spaCy es importable y devuelve True/False."""
+    global _spacy_available
+    if _spacy_available is None:
+        try:
+            import spacy  # noqa: F401
+            _spacy_available = True
+        except Exception:
+            _spacy_available = False
+    return _spacy_available
 
 
 def _get_nlp():
     global _nlp
+    if not _check_spacy():
+        return None
     if _nlp is None:
-        _nlp = spacy.load("es_core_news_sm", disable=["parser", "ner"])
+        try:
+            import spacy
+            _nlp = spacy.load("es_core_news_sm", disable=["parser", "ner"])
+        except Exception:
+            return None
     return _nlp
 
 
 def _get_nlp_ner():
     global _nlp_ner
+    if not _check_spacy():
+        return None
     if _nlp_ner is None:
-        _nlp_ner = spacy.load("es_core_news_sm")
+        try:
+            import spacy
+            _nlp_ner = spacy.load("es_core_news_sm")
+        except Exception:
+            return None
     return _nlp_ner
+
+
+# Stopwords básicas en español para el fallback sin spaCy
+_STOPWORDS_ES = {
+    "a", "al", "algo", "algunas", "algunos", "ante", "antes", "como",
+    "con", "contra", "cual", "cuando", "de", "del", "desde", "donde",
+    "durante", "e", "el", "ella", "ellos", "en", "entre", "era", "es",
+    "esa", "esas", "ese", "eso", "esos", "esta", "estas", "este", "esto",
+    "estos", "fue", "ha", "han", "hasta", "hay", "he", "la", "las", "le",
+    "les", "lo", "los", "me", "mi", "mis", "muy", "ni", "no", "nos",
+    "o", "os", "otro", "para", "pero", "por", "que", "quien", "quienes",
+    "se", "si", "sin", "sobre", "son", "su", "sus", "también", "tanto",
+    "te", "todo", "todos", "tu", "tus", "un", "una", "unas", "uno",
+    "unos", "ya", "yo",
+}
+
+
+def _limpiar_texto_fallback(texto, lemmatize=False):
+    """Limpieza básica con regex cuando spaCy no está disponible."""
+    import re
+    import warnings
+    if texto is None or (hasattr(texto, '__float__') and texto != texto):
+        return ""
+    texto = str(texto)
+    if lemmatize:
+        warnings.warn(
+            "Lematización no disponible sin spaCy; se devuelve texto sin lematizar.",
+            UserWarning,
+            stacklevel=2,
+        )
+    tokens = re.findall(r'\b[a-záéíóúüñ]{3,}\b', texto.lower())
+    return " ".join(t for t in tokens if t not in _STOPWORDS_ES)
 
 
 # ══════════════════════════════════════════════
@@ -117,11 +176,10 @@ def _get_nlp_ner():
 
 def limpiar_texto(texto, lemmatize=False):
     """
-    Limpia el texto utilizando spaCy:
+    Limpia el texto utilizando spaCy (si está disponible) o regex como fallback:
     - Convierte a minúsculas
     - Elimina puntuación, espacios y stop words
-    - Opcionalmente lematiza las palabras (reduce a su forma base o raíz).
-      Por ejemplo, "corriendo", "corrí" y "correrá" se lematizan a "correr".
+    - Opcionalmente lematiza las palabras (solo con spaCy).
 
     Parameters:
     texto : str
@@ -133,7 +191,11 @@ def limpiar_texto(texto, lemmatize=False):
     str
         El texto limpio.
     """
-    doc = _get_nlp()(texto.lower())
+    nlp = _get_nlp()
+    if nlp is None or texto is None or (isinstance(texto, float) and texto != texto):
+        return _limpiar_texto_fallback(texto, lemmatize)
+
+    doc = nlp(str(texto).lower())
     tokens = [
         (token.lemma_ if lemmatize else token.text)
         for token in doc
@@ -153,20 +215,58 @@ def limpiar_texto_preprocess(texto):
 # 2. FUNCIONES DE FEATURES MANUALES
 # ══════════════════════════════════════════════
 
-# Palabras clave discriminativas por clase, extraídas del análisis exploratorio
+# Palabras clave discriminativas por clase, basadas en el EU AI Act y
+# análisis de errores del clasificador (confusión riesgo_minimo→inaceptable
+# y riesgo_limitado→alto_riesgo).
+# NOTA: Se usan palabras únicas (no frases) porque el matching es token-exacto
+# sobre texto lematizado (kw in t.split()).
 KEYWORDS_DOMINIO = {
-    "inaceptable": ["inferir", "vender", "emocional", "conocimiento", "biométrico",
-                     "cámara", "facial", "vigilancia", "sindical", "parental"],
-    "alto_riesgo": ["determinar", "autónomamente", "control", "supervisión",
-                     "penitenciario", "juez", "autónomo", "reincidencia",
-                     "medicación", "crediticio"],
-    "riesgo_limitado": ["advertir", "indicar", "chatbot", "informar",
-                         "automatizado", "limitación", "asesoramiento",
-                         "artificial", "revelar", "asistente"],
-    "riesgo_minimo": ["industrial", "sensor", "optimizar", "mejora",
-                       "clasificación", "optimización", "investigador",
-                       "gestión", "avería", "maquinaria"],
+    # Sistemas prohibidos: biometría masiva en espacios públicos, venta de
+    # datos sensibles, manipulación subconsciente, puntuación social,
+    # categorización por etnia/religión/sindicato. Verbos en forma lematizada.
+    "inaceptable": [
+        "inferir", "vender", "manipular", "subconsciente", "biométrico",
+        "facial", "vigilancia", "sindical", "racial", "etnia",
+        "religioso", "discriminar", "coerción", "prohibido",
+    ],
+    # Anexo III EU AI Act: infraestructura crítica, acceso educativo/laboral,
+    # servicios esenciales, aplicación ley, migración/asilo, justicia.
+    # Incluye contextos de sector que distinguen de inaceptable:
+    # seguros/reclamaciones, triaje médico, aviación, subsidios sociales.
+    "alto_riesgo": [
+        "penitenciario", "juez", "reincidencia", "crediticio",
+        "diagnóstico", "sanitario", "migración", "asilo",
+        "policial", "empleabilidad", "infraestructura", "vinculante",
+        "medicación", "autónomamente",
+        "reclamación", "subsidio", "escolar", "triage",
+        "urgencia", "aeronave", "piloto", "laboral",
+    ],
+    # Obligaciones de transparencia: chatbots, deepfakes, contenido sintético
+    # deben identificarse como IA.
+    "riesgo_limitado": [
+        "chatbot", "revelar", "transparencia", "deepfake",
+        "sintético", "notificar", "asesoramiento", "asistente",
+        "informar", "advertir", "indicar",
+    ],
+    # Sin obligaciones específicas: herramientas de sugerencia/asistencia,
+    # juegos, spam, optimización industrial, IoT de mantenimiento.
+    "riesgo_minimo": [
+        "sugerir", "borrador", "juego", "spam", "entretenimiento",
+        "filtro", "aficionado", "hobby", "receta",
+        "avería", "maquinaria", "logística", "mantenimiento",
+        "sensor", "industrial", "gestión",
+    ],
 }
+
+
+# Palabras que indican supervisión humana o propósito legítimo en sector regulado.
+# Su presencia es señal de alto_riesgo (no de inaceptable): los sistemas prohibidos
+# no tienen supervisión humana posible porque el daño es el propósito mismo.
+_PALABRAS_SUPERVISION = [
+    "supervisión", "supervisar", "revisar", "revisión", "garantía",
+    "confirmación", "criterio", "auditoría", "humano",
+    "pediatra", "médico", "piloto", "pedagógico",
+]
 
 
 def crear_features_manuales(X_texts):
@@ -180,6 +280,9 @@ def crear_features_manuales(X_texts):
     - kw_alto_riesgo: conteo de keywords de la clase alto_riesgo
     - kw_riesgo_limitado: conteo de keywords de la clase riesgo_limitado
     - kw_riesgo_minimo: conteo de keywords de la clase riesgo_minimo
+    - kw_salvaguarda: conteo de palabras de supervisión/garantía humana
+      (discrimina alto_riesgo vs inaceptable: en inaceptable el daño es
+      el propósito y no hay supervisión posible; en alto_riesgo sí la hay)
 
     Parameters:
     X_texts : pd.Series con los textos lematizados.
@@ -195,6 +298,10 @@ def crear_features_manuales(X_texts):
         features[f"kw_{clase}"] = X_texts.apply(
             lambda t, kws=keywords: sum(1 for kw in kws if kw in t.split())
         )
+
+    features["kw_salvaguarda"] = X_texts.apply(
+        lambda t: sum(1 for kw in _PALABRAS_SUPERVISION if kw in t.split())
+    )
 
     return features
 
@@ -298,8 +405,15 @@ def extraer_entidades(df, text_column):
     df = df.copy()
     textos = df[text_column].fillna("").astype(str).tolist()
 
+    nlp_ner = _get_nlp_ner()
+    if nlp_ner is None:
+        print("⚠ spaCy no disponible — columna 'entidades' vacía (fallback sin NER).")
+        df["entidades"] = [[] for _ in range(len(df))]
+        return df
+
+    import spacy
     resultados = []
-    for doc in _get_nlp_ner().pipe(textos, batch_size=100):
+    for doc in nlp_ner.pipe(textos, batch_size=100):
         entidades = [
             {
                 "texto": ent.text,
@@ -359,14 +473,62 @@ def resumen_entidades(df):
 # 4. FUNCIONES DE PREPROCESADO Y DIVISIÓN
 # ══════════════════════════════════════════════
 
-def preparar_dataset(df, text_column, label_column):
+def preparar_dataset(df, text_column, label_column, extra_columns=None):
     """
-    Prepara el dataset aplicando limpieza con lematización.
-    Devuelve un DataFrame con las columnas 'text_final' y la etiqueta.
+    Prepara el dataset aplicando limpieza con lematización y añade
+    opcionalmente features estructuradas seguras (sin leakage).
+
+    Si 'articles' está presente en el DataFrame, calcula automáticamente
+    la feature derivada 'num_articles' (número de artículos citados).
+
+    Columnas con leakage que NUNCA deben incluirse en extra_columns:
+      - violation, severity  → mapeo 1-a-1 con la etiqueta
+      - ambiguity            → 93 % NULL, identifica riesgo_limitado al 100 %
+      - explanation          → solo existe en etiquetado, no en producción
+      - split                → metadato del pipeline
+
+    Columnas seguras recomendadas:
+      - category, context, longitud, num_articles
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+    text_column : str
+        Columna con el texto original (se lematiza para crear 'text_final').
+    label_column : str
+        Columna de etiquetas (target).
+    extra_columns : list[str] | None
+        Columnas adicionales a incluir en el output. 'num_articles' puede
+        incluirse aunque no exista aún en df; se calcula internamente si
+        la columna 'articles' está disponible.
+
+    Returns
+    -------
+    pd.DataFrame con columnas ['text_final', label_column, *extra_columns].
     """
+    import ast
+
     df = df.copy()
-    df["text_final"] = df[text_column].apply(limpiar_texto_preprocess)
-    return df[["text_final", label_column]]
+    df["text_final"] = df[text_column].fillna("").astype(str).apply(limpiar_texto_preprocess)
+
+    # Calcular num_articles si la columna articles está presente
+    if "articles" in df.columns:
+        def _count_articles(val):
+            try:
+                return len(ast.literal_eval(str(val)))
+            except Exception:
+                return 0
+        df["num_articles"] = df["articles"].apply(_count_articles)
+
+    cols_output = ["text_final", label_column]
+    if extra_columns:
+        for col in extra_columns:
+            if col in df.columns and col not in cols_output:
+                cols_output.append(col)
+            elif col not in df.columns:
+                print(f"  ⚠ Columna '{col}' no encontrada en el DataFrame, se omite.")
+
+    return df[cols_output]
 
 
 def split_dataset(df, label_column, test_size=0.15, val_size=0.15, random_state=42):
@@ -398,7 +560,9 @@ def split_dataset(df, label_column, test_size=0.15, val_size=0.15, random_state=
             f"para que queden muestras de entrenamiento."
         )
 
-    X = df["text_final"]
+    # Separar features (todas las columnas menos la etiqueta) y target
+    feature_cols = [c for c in df.columns if c != label_column]
+    X = df[feature_cols]
     y = df[label_column]
 
     # Primera división: separar test
@@ -419,9 +583,10 @@ def split_dataset(df, label_column, test_size=0.15, val_size=0.15, random_state=
         random_state=random_state,
     )
 
-    train_df = X_train.to_frame().join(y_train)
-    val_df = X_val.to_frame().join(y_val)
-    test_df = X_test.to_frame().join(y_test)
+    # Recombinar features + etiqueta preservando todas las columnas
+    train_df = X_train.join(y_train)
+    val_df = X_val.join(y_val)
+    test_df = X_test.join(y_test)
 
     print(f"Train: {len(train_df)} muestras")
     print(f"Validation: {len(val_df)} muestras")
@@ -434,28 +599,25 @@ def split_dataset(df, label_column, test_size=0.15, val_size=0.15, random_state=
 # 5. FUNCIONES DE ENTRENAMIENTO
 # ══════════════════════════════════════════════
 
-def crear_tfidf(X_train, X_val, X_test, max_features=5000, ngram_range=(1, 2)):
+def crear_tfidf(X_train, X_val, X_test, max_features=5000, ngram_range=(1, 2), min_df=1):
     """
-    Create and fit a TF-IDF vectorizer on training texts and transform train, validation, and test sets.
-    
+    Crea y ajusta un vectorizador TF-IDF sobre el conjunto de entrenamiento
+    y transforma train, validation y test.
+
     Parameters:
-        X_train (Sequence[str]): Iterable of raw training texts.
-        X_val (Sequence[str]): Iterable of raw validation texts.
-        X_test (Sequence[str]): Iterable of raw test texts.
-        max_features (int): Maximum number of features (vocabulary size) for the vectorizer.
-        ngram_range (tuple[int, int]): The lower and upper boundary of the range of n-values for different n-grams to be extracted.
-    
+    min_df : int
+        Mínimo de documentos en los que debe aparecer un término para incluirse.
+        Por defecto 1 (sin filtrado). Con max_features=5000 y este corpus, la
+        cota de vocabulario es max_features, no min_df.
+
     Returns:
-        tuple: (tfidf, X_train_tfidf, X_val_tfidf, X_test_tfidf)
-            - tfidf: Fitted TfidfVectorizer instance.
-            - X_train_tfidf: Sparse matrix of TF-IDF features for the training set.
-            - X_val_tfidf: Sparse matrix of TF-IDF features for the validation set.
-            - X_test_tfidf: Sparse matrix of TF-IDF features for the test set.
+    tuple (tfidf, X_train_tfidf, X_val_tfidf, X_test_tfidf)
     """
     tfidf = TfidfVectorizer(
         max_features=max_features,
         ngram_range=ngram_range,
         sublinear_tf=True,
+        min_df=min_df,
         token_pattern=r"(?u)\b[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]{3,}\b",
     )
     X_train_tfidf = tfidf.fit_transform(X_train)
@@ -470,22 +632,20 @@ def crear_tfidf(X_train, X_val, X_test, max_features=5000, ngram_range=(1, 2)):
     return tfidf, X_train_tfidf, X_val_tfidf, X_test_tfidf
 
 
-def entrenar_modelo_baseline(X_train_tfidf, y_train, X_val_tfidf, y_val):
+def entrenar_modelo_baseline(X_train_tfidf, y_train, X_val_tfidf, y_val, class_weight=None):
     """
-    Train a logistic regression baseline and print validation metrics.
-    
-    Train a LogisticRegression classifier on the provided TF-IDF training matrix and print a classification report and macro F1 score computed on the validation set.
-    
+    Entrena un modelo LogisticRegression como baseline y muestra resultados
+    sobre el conjunto de validación.
+
     Parameters:
-        X_train_tfidf (sparse matrix or ndarray): TF-IDF features for training.
-        y_train (array-like): Training labels.
-        X_val_tfidf (sparse matrix or ndarray): TF-IDF features for validation.
-        y_val (array-like): Validation labels.
-    
+    class_weight : str | dict | None
+        Parámetro class_weight de LogisticRegression (e.g. 'balanced').
+        Por defecto None (sin balanceo de clases).
+
     Returns:
-        modelo (LogisticRegression): Fitted LogisticRegression model.
+    modelo : LogisticRegression entrenado
     """
-    modelo = LogisticRegression(max_iter=2000, random_state=42)
+    modelo = LogisticRegression(max_iter=2000, random_state=42, class_weight=class_weight)
     modelo.fit(X_train_tfidf, y_train)
 
     y_val_pred = modelo.predict(X_val_tfidf)
@@ -532,8 +692,10 @@ def entrenar_xgboost(X_train, y_train, X_val, y_val, params=None):
     if params:
         default_params.update(params)
 
+    from sklearn.utils.class_weight import compute_sample_weight
+    sample_weight = compute_sample_weight(class_weight="balanced", y=y_train_enc)
     modelo = XGBClassifier(**default_params)
-    modelo.fit(X_train, y_train_enc)
+    modelo.fit(X_train, y_train_enc, sample_weight=sample_weight)
 
     y_val_pred_enc = modelo.predict(X_val)
     y_val_pred = le.inverse_transform(y_val_pred_enc)
@@ -591,7 +753,9 @@ def grid_search_cv(X_train, y_train, param_grid, cv=5):
         refit=True,
     )
 
-    grid.fit(X_train, y_train_enc)
+    from sklearn.utils.class_weight import compute_sample_weight
+    sample_weight = compute_sample_weight(class_weight="balanced", y=y_train_enc)
+    grid.fit(X_train, y_train_enc, sample_weight=sample_weight)
 
     print(f"\n=== Resultados Grid Search ({cv}-fold CV) ===")
     print(f"Mejor F1-macro CV: {grid.best_score_:.4f}")
@@ -643,18 +807,25 @@ def cargar_artefactos(model_dir):
 # 6. FUNCIONES DE MÉTRICAS Y EVALUACIÓN
 # ══════════════════════════════════════════════
 
-def evaluar_modelo(modelo, tfidf, X_test, y_test):
+def evaluar_modelo(modelo, X_test, y_test):
     """
     Evalúa el modelo sobre el conjunto de test y muestra:
     - Classification report
     - F1-score macro
-    - Matriz de confusión
+
+    Parameters:
+    modelo : modelo sklearn entrenado.
+    X_test : sparse matrix o array — features de test ya transformadas
+             (TF-IDF, TF-IDF + OHE + numéricas, o cualquier pipeline).
+             El notebook es responsable de construir esta matriz antes de llamar.
+    y_test : pd.Series con las etiquetas reales.
 
     Returns:
     tuple (y_pred, report_dict)
     """
-    X_test_tfidf = tfidf.transform(X_test)
-    y_pred = modelo.predict(X_test_tfidf)
+    y_pred = modelo.predict(X_test)
+    if hasattr(modelo, "label_encoder"):
+        y_pred = modelo.label_encoder.inverse_transform(y_pred)
 
     print("=== Resultados en TEST ===\n")
     report_dict = classification_report(y_test, y_pred, output_dict=True)
@@ -684,24 +855,28 @@ def mostrar_matriz_confusion(y_test, y_pred, labels=None):
     return fig
 
 
-def plot_curva_roc_multiclase(modelo, tfidf, X_test, y_test):
+def plot_curva_roc_multiclase(modelo, X_test, y_test):
     """
     Genera la curva ROC multiclase (One-vs-Rest) para el modelo.
 
     Parameters:
     modelo : modelo entrenado con predict_proba.
-    tfidf : TfidfVectorizer ajustado.
-    X_test : pd.Series con los textos de test.
+    X_test : sparse matrix o array — features de test ya transformadas.
+             El notebook es responsable de construir esta matriz antes de llamar.
     y_test : pd.Series con las etiquetas reales.
 
     Returns:
     fig : matplotlib.figure.Figure
     roc_auc_dict : dict con el AUC por clase.
     """
-    clases = sorted(modelo.classes_)
-    X_test_tfidf = tfidf.transform(X_test)
-    y_test_bin = label_binarize(y_test, classes=clases)
-    y_proba = modelo.predict_proba(X_test_tfidf)
+    if hasattr(modelo, "label_encoder"):
+        clases = list(modelo.label_encoder.classes_)
+        y_test_int = modelo.label_encoder.transform(y_test)
+        y_test_bin = label_binarize(y_test_int, classes=list(range(len(clases))))
+    else:
+        clases = sorted(modelo.classes_)
+        y_test_bin = label_binarize(y_test, classes=clases)
+    y_proba = modelo.predict_proba(X_test)
 
     fig, ax = plt.subplots(figsize=(10, 7))
     roc_auc_dict = {}
@@ -728,27 +903,28 @@ def plot_curva_roc_multiclase(modelo, tfidf, X_test, y_test):
     return fig, roc_auc_dict
 
 
-def analisis_errores(modelo, tfidf, X_test, y_test):
+def analisis_errores(modelo, X_test_features, y_test, X_test_text=None):
     """
-    Show misclassified test examples to assist error analysis.
-    
-    Parameters:
-        modelo: Trained classifier with a `predict` method.
-        tfidf: Fitted vectorizer with a `transform` method.
-        X_test (pd.Series or array-like): Raw text samples to classify.
-        y_test (pd.Series or array-like): True labels corresponding to X_test.
-    
-    Returns:
-        df_errores (pd.DataFrame): Rows where predictions differ from true labels, with columns:
-            - texto: original input text,
-            - etiqueta_real: true label,
-            - etiqueta_predicha: model prediction.
-    """
-    X_test_tfidf = tfidf.transform(X_test)
-    y_pred = modelo.predict(X_test_tfidf)
+    Muestra los ejemplos mal clasificados para analizar patrones de error.
 
+    Parameters:
+    modelo          : modelo sklearn entrenado.
+    X_test_features : sparse matrix o array — features de test ya transformadas.
+                      El notebook es responsable de construir esta matriz antes de llamar.
+    y_test          : pd.Series con las etiquetas reales.
+    X_test_text     : pd.Series con el texto original (opcional).
+                      Si se pasa, se muestra en los ejemplos de error.
+
+    Returns:
+    df_errores : pd.DataFrame con las predicciones incorrectas.
+    """
+    y_pred = modelo.predict(X_test_features)
+    if hasattr(modelo, "label_encoder"):
+        y_pred = modelo.label_encoder.inverse_transform(y_pred)
+
+    textos = X_test_text.values if X_test_text is not None else ["[texto no disponible]"] * len(y_test)
     df_resultado = pd.DataFrame({
-        "texto": X_test.values,
+        "texto": textos,
         "etiqueta_real": y_test.values,
         "etiqueta_predicha": y_pred,
     })
@@ -780,14 +956,18 @@ def analisis_errores(modelo, tfidf, X_test, y_test):
 
 def log_mlflow_safe(run_name, params=None, metrics=None, artifacts=None, tags=None):
     """
-    Log parameters, metrics, artifacts, and tags to a named MLflow run after configuring MLflow.
-    
+    Registra un experimento en MLflow de forma centralizada.
+
+    Diseñado para ser la única llamada dentro del bloque try/except de la
+    última celda de cada notebook, de modo que solo esa celda falle si el
+    servidor no está disponible.
+
     Parameters:
-        run_name (str): Name for the MLflow run.
-        params (dict, optional): Hyperparameters or configuration key-value pairs to log.
-        metrics (dict, optional): Numeric metrics to log.
-        artifacts (list[str], optional): Local file paths to upload as run artifacts.
-        tags (dict, optional): Additional tags to attach to the run.
+    run_name  : str  — nombre del run en MLflow.
+    params    : dict — hiperparámetros / configuración a loguear.
+    metrics   : dict — métricas numéricas a loguear.
+    artifacts : list — rutas de ficheros locales a subir como artefactos.
+    tags      : dict — etiquetas adicionales del run.
     """
     configure_mlflow()
     mlflow.set_experiment(MLFLOW_EXPERIMENT)
@@ -816,26 +996,9 @@ _MAX_DENSE_ELEMENTS = 50_000_000  # ~400 MB en float64; ajustable según entorno
 
 def _sparse_to_dense_safe(X, label="X", max_elements=_MAX_DENSE_ELEMENTS):
     """
-    Safely convert a sparse matrix to a dense numpy array with a memory-size guard.
-    
-    If the input supports `toarray()`, the function converts it to a dense numpy array unless
-    the total number of elements (rows × columns) exceeds `max_elements`, in which case a
-    random subset of rows is sampled and converted to avoid out-of-memory errors; a warning
-    is emitted when sampling occurs.
-    
-    Parameters:
-        X: object
-            Input matrix or array. If `X` does not implement `toarray()`, it is returned unchanged.
-        label (str): optional
-            Human-readable name used in the warning message when sampling is performed.
-        max_elements (int): optional
-            Maximum allowed number of elements (rows × columns) for a full dense conversion.
-            If exceeded, the function samples rows so the resulting matrix has at most this many elements.
-    
-    Returns:
-        numpy.ndarray or original input:
-            A dense numpy array converted from `X` (or from a sampled subset of `X` if sampling occurred),
-            or the original `X` when it does not support `toarray()`.
+    Convierte una matriz sparse a densa solo si no supera el umbral de memoria.
+    Si lo supera, hace un muestreo aleatorio de filas antes de convertir y emite
+    una advertencia.
     """
     import warnings
     import numpy as np
@@ -863,19 +1026,19 @@ def _sparse_to_dense_safe(X, label="X", max_elements=_MAX_DENSE_ELEMENTS):
 
 def explicar_con_shap(modelo, X_background, X_explain):
     """
-    Compute SHAP explanations for a trained classifier.
-    
-    Uses a linear SHAP explainer for sklearn LogisticRegression models and a tree explainer for other model types; sparse inputs will be converted to dense when required. The returned SHAP values are normalized to a list of 2-D arrays (n_samples, n_features), one array per class.
-    
+    Calcula valores SHAP para el modelo dado.
+
+    - LogisticRegression → shap.LinearExplainer (admite matrices sparse)
+    - XGBClassifier      → shap.TreeExplainer   (convierte a denso internamente)
+
     Parameters:
-        modelo: Trained classifier (e.g., sklearn LogisticRegression or tree-based model).
-        X_background: Reference dataset (array or sparse matrix) used to initialize the explainer.
-        X_explain: Samples (array or sparse matrix) to explain.
-    
+    modelo       : modelo sklearn/xgboost entrenado.
+    X_background : sparse matrix o array — datos de referencia para el explainer.
+    X_explain    : sparse matrix o array — muestras a explicar.
+
     Returns:
-        tuple: (explainer, shap_values)
-            explainer: The fitted SHAP explainer object.
-            shap_values: List of 2-D numpy arrays, each of shape (n_samples, n_features), one entry per class.
+    tuple (explainer, shap_values)
+        shap_values es una lista de arrays (n_samples, n_features), uno por clase.
     """
     import shap
     import numpy as np
@@ -914,35 +1077,26 @@ def explicar_con_shap(modelo, X_background, X_explain):
 
 def plot_shap_summary(shap_values, X_explain, feature_names, class_names, output_dir, max_display=20):
     """
-    Generate and save SHAP summary visualizations: a beeswarm plot for each class and a global per-class importance bar chart.
-    
+    Genera y guarda los plots SHAP de resumen:
+    - Un beeswarm por clase (top features más influyentes).
+    - Un bar plot global con la importancia media por clase.
+
     Parameters:
-        shap_values: list or ndarray
-            SHAP values as either a list of 2D arrays (one per class, shape (n_samples, n_features))
-            or a 3D ndarray with one of the two shapes:
-            - (n_samples, n_features, n_classes) or
-            - (n_classes, n_samples, n_features).
-            The function accepts these formats and normalizes them internally.
-        X_explain: array-like or sparse matrix
-            Samples used for plotting (rows correspond to samples). A sparse matrix will be converted to dense.
-        feature_names: list[str]
-            Names of the features (length = n_features).
-        class_names: list[str]
-            Names of the target classes (length = n_classes).
-        output_dir: str
-            Directory where plot files will be saved; created if it does not exist.
-        max_display: int, optional
-            Maximum number of features to display in each plot (default 20).
-    
+    shap_values   : lista de arrays SHAP (uno por clase).
+    X_explain     : sparse matrix o array con las muestras explicadas.
+    feature_names : list de str con los nombres de las features.
+    class_names   : list de str con los nombres de las clases.
+    output_dir    : str — carpeta donde guardar los plots.
+    max_display   : int — número máximo de features a mostrar (default 20).
+
     Returns:
-        saved_paths: list[str]
-            Paths to the image files written to disk.
+    saved_paths : list de rutas de los archivos guardados.
     """
     import shap
     import numpy as np
 
     os.makedirs(output_dir, exist_ok=True)
-    X_dense = _sparse_to_dense_safe(X_explain, label="X_explain")
+    X_dense = X_explain.toarray() if hasattr(X_explain, "toarray") else X_explain
     saved_paths = []
 
     # Normalizar shap_values a lista de arrays 2D (n_samples, n_features), uno por clase.
@@ -963,18 +1117,10 @@ def plot_shap_summary(shap_values, X_explain, feature_names, class_names, output
             f"Ejecuta primero explicar_con_shap para obtener el formato correcto."
         )
 
-    # Validar que sv_list y class_names tienen la misma longitud
-    if len(sv_list) != len(class_names):
-        raise ValueError(
-            f"Número de arrays SHAP ({len(sv_list)}) no coincide con "
-            f"número de clases ({len(class_names)}). "
-            f"Clases: {class_names}"
-        )
-
     # Beeswarm por clase
-    for sv, clase in zip(sv_list, class_names):
+    for i, clase in enumerate(class_names):
         shap.summary_plot(
-            sv, X_dense,
+            sv_list[i], X_dense,
             feature_names=feature_names,
             max_display=max_display,
             show=False,
@@ -1013,25 +1159,25 @@ def plot_shap_summary(shap_values, X_explain, feature_names, class_names, output
 
 def plot_shap_waterfall(explainer, shap_values, X_explain, idx, feature_names, class_names, output_dir, max_display=15):
     """
-    Create and save SHAP waterfall plots for a single sample, producing one plot per class.
-    
+    Genera un waterfall plot para la muestra `idx`, uno por clase.
+
     Parameters:
-        explainer: A fitted SHAP Explainer whose `expected_value` provides base values.
-        shap_values: List-like of SHAP value arrays (one entry per class) where each array has shape (n_samples, n_features).
-        X_explain: 2D array or sparse matrix of samples used for explanations; the row at `idx` will be plotted.
-        idx (int): Index of the sample (row) in `X_explain` to visualize.
-        feature_names (list[str]): Names of the input features, in the same order as columns of `X_explain`.
-        class_names (list[str]): Names of classes corresponding to entries in `shap_values`.
-        output_dir (str): Directory where PNG files will be saved; the directory will be created if it does not exist.
-        max_display (int): Maximum number of features to show in each waterfall plot.
-    
+    explainer     : SHAP explainer ajustado.
+    shap_values   : lista de arrays SHAP (uno por clase).
+    X_explain     : sparse matrix o array con las muestras explicadas.
+    idx           : int — índice de la muestra a visualizar.
+    feature_names : list de str con los nombres de las features.
+    class_names   : list de str con los nombres de las clases.
+    output_dir    : str — carpeta donde guardar los plots.
+    max_display   : int — número máximo de features a mostrar (default 15).
+
     Returns:
-        saved_paths (list[str]): Paths to the saved waterfall plot image files, one per class.
+    saved_paths : list de rutas de los archivos guardados.
     """
     import shap
 
     os.makedirs(output_dir, exist_ok=True)
-    X_dense = _sparse_to_dense_safe(X_explain, label="X_explain")
+    X_dense = X_explain.toarray() if hasattr(X_explain, "toarray") else X_explain
     expected = explainer.expected_value
     saved_paths = []
 
@@ -1062,17 +1208,23 @@ def plot_shap_waterfall(explainer, shap_values, X_explain, idx, feature_names, c
 
 def guardar_pipeline_completo(modelo, tfidf, label_encoder=None, metadata=None, output_dir="model"):
     """
-    Save the full trained pipeline (model, TF-IDF vectorizer, optional label encoder) and metadata to disk using a clear naming convention.
-    
+    Guarda el pipeline completo del mejor modelo con naming convention claro.
+
+    Artefactos generados:
+    - mejor_modelo.joblib
+    - mejor_modelo_tfidf.joblib
+    - mejor_modelo_label_encoder.joblib  (solo si se pasa label_encoder)
+    - model_metadata.json
+
     Parameters:
-        modelo: Trained model object to serialize (e.g., sklearn or XGBoost estimator).
-        tfidf: Fitted TfidfVectorizer to serialize.
-        label_encoder: Optional LabelEncoder to serialize alongside the model.
-        metadata: Optional dict with additional metadata to merge into the saved JSON (e.g., experiment info or metrics).
-        output_dir: Directory path where artefacts will be written. Files created: mejor_modelo.joblib, mejor_modelo_tfidf.joblib, optionally mejor_modelo_label_encoder.joblib, and model_metadata.json.
-    
+    modelo         : modelo sklearn entrenado.
+    tfidf          : TfidfVectorizer ajustado.
+    label_encoder  : LabelEncoder opcional (para modelos XGBoost).
+    metadata       : dict con información adicional (experimento, métricas, etc.).
+    output_dir     : str — carpeta donde guardar los artefactos.
+
     Returns:
-        tuple: (path_modelo, path_tfidf, path_meta) — filesystem paths to the saved model file, TF-IDF file, and metadata JSON respectively.
+    tuple (path_modelo, path_tfidf, path_meta)
     """
     import json
     from datetime import datetime
@@ -1112,18 +1264,17 @@ def guardar_pipeline_completo(modelo, tfidf, label_encoder=None, metadata=None, 
 
 def registrar_modelo_en_registry(run_id, artifact_path, registered_name, stage="Production"):
     """
-    Register a model artifact produced in an MLflow run to the MLflow Model Registry and transition it to the specified stage.
-    
-    This function registers the model located at the given run artifact path under the provided registered name, transitions the created model version to `stage` (for example "Staging" or "Production"), updates the registered model description, and tags the registered model with `best_model=true`.
-    
+    Registra un modelo de un run de MLflow en el Model Registry y lo
+    transita al stage indicado.
+
     Parameters:
-        run_id (str): MLflow run identifier that contains the logged model.
-        artifact_path (str): Relative artifact path inside the run (e.g., "modelo" or "model").
-        registered_name (str): Name to use for the registered model in the Model Registry.
-        stage (str): Target stage to transition the new model version to (e.g., "Staging" or "Production").
-    
+    run_id          : str — ID del run de MLflow donde está logueado el modelo.
+    artifact_path   : str — ruta relativa del artefacto dentro del run (e.g. "modelo").
+    registered_name : str — nombre con el que registrar el modelo.
+    stage           : str — stage al que transitar ("Staging" o "Production").
+
     Returns:
-        model_version: The created mlflow.entities.model_registry.ModelVersion object for the registered model.
+    model_version : mlflow.entities.model_registry.ModelVersion
     """
     from mlflow.tracking import MlflowClient
 
@@ -1131,10 +1282,10 @@ def registrar_modelo_en_registry(run_id, artifact_path, registered_name, stage="
     model_version = mlflow.register_model(model_uri, registered_name)
 
     client = MlflowClient()
-    client.transition_model_version_stage(
+    client.set_registered_model_alias(
         name=registered_name,
+        alias=stage.lower(),
         version=model_version.version,
-        stage=stage,
     )
     client.update_registered_model(
         name=registered_name,

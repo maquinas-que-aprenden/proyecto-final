@@ -1,6 +1,6 @@
 # NormaBot — Tracking de Progreso
 
-Última actualización: 2026-02-23
+Última actualización: 2026-02-23 (sesión tarde)
 
 ---
 
@@ -27,12 +27,16 @@
 | 2026-02-22 | Roadmap priorizado | Maru/Claude | `NORMABOT_ROADMAP.md` |
 | 2026-02-23 | Sistema de tutoría Claude Code | Maru | 6 skills, 2 agents, 3 hooks. `.claude/` configurado para todo el equipo. |
 | 2026-02-23 | Plan de 3 semanas (enfoque ReAct) | Maru/Claude | Decisión arquitectónica + sprint plan en `reunion-realineamiento.md` |
+| 2026-02-23 | Sync `feature/model-ml` con develop | Rubén | Fetch + rebase local + force-push. Rama actualizada sobre develop. |
+| 2026-02-23 | Fix lint ruff (F541, F811) en notebooks fusionado | Rubén | `5_entrenamiento_v2.ipynb` y `7_entrenamiento_v3.ipynb`: eliminados `import os` duplicados y f-string sin placeholder. |
+| 2026-02-23 | Unificación de `functions.py` del clasificador | Rubén | **Un único `functions.py`** en `src/classifier/`. Eliminados los 3 archivos duplicados de subcarpetas. Base: versión fusionado (keywords expandidos, `kw_salvaguarda`, `min_df`). |
+| 2026-02-23 | Actualización de 33 notebooks (sys.path robusto) | Rubén | Celda de setup en todos los notebooks: búsqueda de `functions.py` en 3 candidatos (raíz proyecto, `..`, `.`). Compatible con VS Code y Jupyter clásico. |
 
 ## En Progreso
 
 | Item | Responsable | Estado | Bloqueos |
 |---|---|---|---|
-| Merge ramas feature → develop | Todos | Pendiente de reunión | 4 ramas sin mergear: chore/langfuse, feature/RAGAS, feature/model-ml, feature/rag |
+| Merge ramas feature → develop | Todos | Pendiente de reunión | 3 ramas sin mergear: chore/langfuse, feature/RAGAS, feature/rag. `feature/model-ml` synced con develop (pendiente PR) |
 | `predict_risk()` como servicio | Rubén | En rama, no expuesto | Necesita: cargar joblib, pipeline features, devolver dict con SHAP |
 | `src/rag/main.py` real | Dani/Maru | Stub en develop | Dani tiene retriever; falta grade + generate con LLM |
 | `src/data/main.py` real | Dani | Stub en develop | Retriever existe en `src/retrieval/retriever.py` pero no está en src/data/main.py |
@@ -73,7 +77,8 @@
 - **Componentes stub:** 4 (RAG pipeline, data/main.py, report, tools del orquestador)
 - **Tests:** 0 archivos de test
 - **Coverage estimado:** 0%
-- **Ramas sin mergear:** 4 (chore/langfuse, feature/RAGAS, feature/model-ml, feature/rag)
+- **Ramas sin mergear:** 3 (chore/langfuse, feature/RAGAS, feature/rag) — `feature/model-ml` synced con develop
+- **`functions.py` del clasificador:** unificado (1 archivo en root, 3 subcarpetas eliminadas)
 
 ## Decisiones Tomadas
 

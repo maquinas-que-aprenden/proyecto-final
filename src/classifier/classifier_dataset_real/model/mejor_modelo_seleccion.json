@@ -1,0 +1,12 @@
+{
+  "nombre": "Exp 0: LogReg + TF-IDF + OHE",
+  "model_file": "model/modelo_baseline.joblib",
+  "tfidf_file": "model/tfidf_vectorizer.joblib",
+  "model_type": "LogisticRegression",
+  "experimento": "0",
+  "needs_manual_features": false,
+  "test_f1_macro": 0.4517,
+  "test_accuracy": 0.4889,
+  "test_roc_auc": 0.6981,
+  "criterio": "Mayor F1-macro en test entre los 3 experimentos"
+}
