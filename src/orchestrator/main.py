@@ -14,6 +14,8 @@ import os
 from langchain_aws import ChatBedrockConverse
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
+from pydantic import BaseModel, Field
+
 from src.observability.main import get_langfuse_handler
 from src.classifier.main import predict_risk
 
@@ -24,7 +26,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "eu.amazon.nova-lite-v1:0")
-BEDROCK_REGION = os.environ.get("AWS_REGION", "eu-west-1")
+BEDROCK_REGION = os.environ.get("BEDROCK_REGION") or os.environ.get("AWS_REGION", "eu-west-1")
 
 SYSTEM_PROMPT = """\
 Eres NormaBot, un asistente jurídico especializado en el EU AI Act \
@@ -44,6 +46,19 @@ profesional jurídico._"\
 """
 
 # ---------------------------------------------------------------------------
+# Validacion de entrada (Pydantic)
+# ---------------------------------------------------------------------------
+
+
+class _QueryInput(BaseModel):
+    query: str = Field(min_length=1, max_length=4000)
+
+
+class _SystemDescriptionInput(BaseModel):
+    system_description: str = Field(min_length=1, max_length=5000)
+
+
+# ---------------------------------------------------------------------------
 # Herramientas
 # ---------------------------------------------------------------------------
 
@@ -56,6 +71,11 @@ def search_legal_docs(query: str) -> str:
     Usa esta herramienta cuando el usuario pregunta sobre leyes, artículos,
     prohibiciones, obligaciones, definiciones o cualquier contenido normativo.
     """
+    try:
+        _QueryInput(query=query)
+    except Exception as e:
+        return f"Error de validacion: {e}"
+
     from src.rag.main import retrieve, grade, generate
 
     docs = retrieve(query)
@@ -78,6 +98,11 @@ def classify_risk(system_description: str) -> str:
     Usa esta herramienta cuando el usuario describe un sistema de IA y quiere
     saber su nivel de riesgo según el EU AI Act.
     """
+    try:
+        _SystemDescriptionInput(system_description=system_description)
+    except Exception as e:
+        return f"Error de validacion: {e}"
+
     result = predict_risk(system_description)
     response = (
         f"Clasificacion: {result['risk_level'].upper()}\n"
@@ -119,6 +144,11 @@ def generate_report(system_description: str) -> str:
     Usa esta herramienta cuando el usuario quiere un informe, reporte o
     evaluación de conformidad para su sistema.
     """
+    try:
+        _SystemDescriptionInput(system_description=system_description)
+    except Exception as e:
+        return f"Error de validacion: {e}"
+
     from src.report.main import generate_report as _build_report
 
     # 1. Clasificar riesgo del sistema

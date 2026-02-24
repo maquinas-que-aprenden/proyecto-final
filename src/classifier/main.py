@@ -19,9 +19,15 @@ from pathlib import Path
 
 import joblib
 import numpy as np
+from pydantic import BaseModel, Field
 from scipy.sparse import csr_matrix, hstack
 
 logger = logging.getLogger(__name__)
+
+
+class _TextInput(BaseModel):
+    text: str = Field(min_length=1, max_length=5000)
+
 
 # Ruta al mejor modelo (dataset fusionado, F1-macro test: 0.8583)
 _MODEL_DIR = Path(__file__).parent / "classifier_dataset_fusionado" / "model"
@@ -111,6 +117,7 @@ def predict_risk(text: str) -> dict:
         shap_top_features: list[dict] (top 5 features por contribucion)
         shap_explanation: str (resumen textual)
     """
+    _TextInput(text=text)
     _load_artifacts()
 
     # 1. Limpiar texto (mismo preprocesado que en entrenamiento)

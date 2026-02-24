@@ -14,7 +14,7 @@ from src.retrieval.retriever import search
 logger = logging.getLogger(__name__)
 
 BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "eu.amazon.nova-lite-v1:0")
-BEDROCK_REGION = os.environ.get("AWS_REGION", "eu-west-1")
+BEDROCK_REGION = os.environ.get("BEDROCK_REGION") or os.environ.get("AWS_REGION", "eu-west-1")
 
 GRADING_PROMPT = (
     "Dado el siguiente documento y la pregunta, "
@@ -156,8 +156,8 @@ def generate(query: str, context: list[dict]) -> dict:
         llm = _get_generate_llm()
         response = llm.invoke(prompt)
         answer = response.content.strip()
-    except Exception:
-        logger.warning("LLM de generacion no disponible, usando fallback")
+    except Exception as e:
+        logger.warning("LLM de generacion no disponible, usando fallback: %s", e)
         # Fallback: concatenar extractos relevantes (sin citas verificadas por LLM)
         snippets = [d["doc"][:200] for d in context[:3]]
         answer = "Segun los documentos encontrados:\n\n" + "\n\n".join(snippets)
