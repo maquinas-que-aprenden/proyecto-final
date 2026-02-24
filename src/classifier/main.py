@@ -67,6 +67,9 @@ def _limpiar_texto_fallback(texto: str) -> str:
     """Limpieza basica con regex (misma logica que functions._limpiar_texto_fallback)."""
     import re
 
+    if not texto or not isinstance(texto, str):
+        return ""
+
     _stopwords = {
         "a", "al", "algo", "algunas", "algunos", "ante", "antes", "como",
         "con", "contra", "cual", "cuando", "de", "del", "desde", "donde",

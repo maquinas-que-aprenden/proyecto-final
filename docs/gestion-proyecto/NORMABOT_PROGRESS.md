@@ -27,7 +27,8 @@
 | 2026-02-24 | **Tarea 1.1 COMPLETADA**: retrieve() + ChromaDB real | Maru | `src/rag/main.py:42-57`: importa `search()` de `src.retrieval.retriever`, convierte formato, error handling. Lazy init en retriever. |
 | 2026-02-24 | **Tarea 1.2 COMPLETADA**: grade() con Ollama Qwen 2.5 3B | Maru | `src/rag/main.py:65-92`: evaluación documental con LLM local. Prompt sí/no. Fallback a score threshold. Firma: `grade(query, docs)`. `langchain-ollama>=0.3.0` en requirements. |
 | 2026-02-24 | **Tarea 1.3 COMPLETADA**: generate() con Bedrock + fallback | Maru | `src/rag/main.py:137-170`: sintetiza respuesta con Bedrock Nova Lite. Fallback: concatena docs. Disclaimer legal automático. |
-| 2026-02-24 | **Tarea 2.4 COMPLETADA**: `predict_risk()` funcional | Rubén | `src/classifier/main.py` (174 líneas): carga joblib (mejor_modelo.joblib), TF-IDF + OHE, predicción + SHAP. Expuesto para orquestador. |
+| 2026-02-24 | **Tarea 2.1 COMPLETADA**: `predict_risk()` funcional | Maru | `src/classifier/main.py`: carga joblib (mejor_modelo.joblib), TF-IDF + OHE zeros + num zeros, predicción con LogReg. Thread-safe (Lock). |
+| 2026-02-24 | **Tarea 2.2 COMPLETADA**: Explicabilidad SHAP integrada | Maru | Contribuciones lineales (coef * feature_value), top 5 features, nombres reales de TF-IDF/OHE/num. |
 | 2026-02-24 | **Tarea 3.1 COMPLETADA**: Tool `search_legal_docs()` conectada | Maru | `src/orchestrator/main.py:52-70`: llama a `retrieve() → grade(query, docs) → generate(query, relevant)` real. RAG pipeline funcional end-to-end. |
 | 2026-02-24 | **Tarea 3.2 COMPLETADA**: Tool `classify_risk()` conectada | Maru | `src/orchestrator/main.py:74-91`: llama a `predict_risk()` real, devuelve risk_level + confidence + SHAP top 3 features. FUNCIONAL. |
 | 2026-02-24 | **Tarea 3.3 COMPLETADA**: Tool `generate_report()` con fallback | Maru | `src/orchestrator/main.py:116-147`: clasifica sistema, busca artículos relevantes, llama template. Fallback a _DEFAULT_ARTICLES si retriever no disponible. |
@@ -37,7 +38,7 @@
 
 | Item | Responsable | Estado | Bloqueos |
 |---|---|---|---|
-| **Tarea 4.1**: Escribir 3 smoke tests | Nati | **NO INICIADA** | Sin bloqueos técnicos. Crear tests/test_retrieve.py, test_classify.py, test_generate.py |
+| **Tarea 4.1**: Escribir 3 smoke tests | Nati | **NO INICIADA** | Sin bloqueos técnicos. Crear `tests/test_smoke.py` con 3 funciones test |
 | **Tarea 3.3 (avanzada)**: report.py con Groq LLM | Maru | PARCIAL | Opcional para Sprint 1. report.py actualmente es template estático. |
 | **PR #47 merge** | Rubén + Maru | LISTO PARA MERGE | Sin bloqueos. CodeRabbit aprobó. Mergear a develop hoy. |
 | **PR #46 (ansible)** | Nati | ABIERTO | MLflow deploy tuning. Puede mergear después de #47. |
@@ -50,12 +51,11 @@
    - Incluye: predict_risk() 174 líneas, thread safety con Lock, SHAP robustness
    - Impacto: desbloquea integración del orquestador
 
-2. **Tarea 4.1** (Nati, 1.5h): Crear 3 smoke tests
-   - `tests/test_retrieve.py`: Verificar que retrieve() devuelve list[dict] con doc/metadata/score
-   - `tests/test_classify.py`: Verificar que predict_risk() devuelve dict con risk_level + confidence
-   - `tests/test_generate.py`: Verificar que generate() devuelve dict con answer + sources
-   - Usar pytest, fixtures minimal
-   - CI integration ready
+2. **Tarea 4.1** (Nati, 1.5h): Crear 3 smoke tests en `tests/test_smoke.py`
+   - `test_retrieve()`: Verificar que retrieve() devuelve list[dict] con doc/metadata/score
+   - `test_classify()`: Verificar que predict_risk() devuelve dict con risk_level + confidence
+   - `test_generate_report()`: Verificar que generate_report() retorna string con disclaimer
+   - Usar pytest, `@pytest.mark.skipif` si falta ChromaDB/modelo
 
 ### Mañana (25 feb) — 3h
 
@@ -85,9 +85,9 @@
 | Métrica | Valor | Estado |
 |---|---|---|
 | **Días restantes hasta presentación** | 16 | 12 de marzo 2026 |
-| **Sprint actual** | Sprint 1 — INTEGRAR | Día 1: 7 tareas P0 completadas ✓ |
-| **Tareas Sprint 1 completadas** | 7 de 13 | 1.1 ✓, 1.2 ✓, 1.3 ✓, 2.4 ✓, 3.1 ✓, 3.2 ✓, 3.3 ✓ |
-| **Tareas Sprint 1 pendientes** | 6 de 13 | 4.1 + merges + Docker + UI polish + optional 3.3 LLM |
+| **Sprint actual** | Sprint 1 — INTEGRAR | Día 1: 8 tareas P0 completadas ✓ |
+| **Tareas Sprint 1 completadas** | 8 de 14 | 1.1 ✓, 1.2 ✓, 1.3 ✓, 2.1 ✓, 2.2 ✓, 3.1 ✓, 3.2 ✓, 3.3 ✓ |
+| **Tareas Sprint 1 pendientes** | 6 de 14 | 1.4, 2.3, 3.4, 3.5, 4.1, 4.2 |
 | **Componentes funcionales** | 11 de 13 | Clasificador ✓, ChromaDB ✓, RAG retrieve ✓, RAG grade ✓, RAG generate ✓, search_legal_docs ✓, classify_risk ✓, generate_report ✓, Langfuse ✓, RAGAS ✓, MLflow ✓ |
 | **Componentes parciales** | 1 | report.py (template estático, sin LLM) |
 | **Componentes stub** | 0 | NINGUNO — todas las herramientas están funcionales |
@@ -261,17 +261,19 @@ def grade(query: str, docs: list[dict], threshold: float = 0.7) -> list[dict]:
 def generate(query: str, context: list[dict]) -> dict:
     formatted_context = _format_context(context)
     prompt = GENERATE_PROMPT.format(context=formatted_context, query=query)
+    grounded = True
     try:
         llm = _get_generate_llm()  # ChatBedrockConverse(model=BEDROCK_MODEL_ID)
         response = llm.invoke(prompt)
         answer = response.content.strip()
     except Exception:
-        # Fallback: concatenar extractos
+        # Fallback: concatenar extractos (sin citas verificadas por LLM)
         snippets = [d["doc"][:200] for d in context[:3]]
         answer = "Segun los documentos encontrados:\n\n" + "\n\n".join(snippets)
+        grounded = False
     
     answer += "\n\n_Informe preliminar generado por IA. Consulte profesional juridico._"
-    return {"answer": answer, "sources": [d.get("metadata", {}) for d in context], "grounded": True}
+    return {"answer": answer, "sources": [d.get("metadata", {}) for d in context], "grounded": grounded}
 ```
 
 ### Implementación Tools en Orquestador
