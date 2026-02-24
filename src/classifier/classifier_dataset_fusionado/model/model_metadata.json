@@ -1,5 +1,5 @@
 {
-  "fecha": "2026-02-24T18:05:04.865567",
+  "fecha": "2026-02-24T18:29:03.688444",
   "model_type": "XGBClassifier",
   "tfidf_vocab_size": 5000,
   "tfidf_ngram_range": "(1, 2)",

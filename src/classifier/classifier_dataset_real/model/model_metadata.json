@@ -1,5 +1,5 @@
 {
-  "fecha": "2026-02-24T18:07:00.186934",
+  "fecha": "2026-02-24T18:33:40.988485",
   "model_type": "LogisticRegression",
   "tfidf_vocab_size": 5000,
   "tfidf_ngram_range": "(1, 2)",
