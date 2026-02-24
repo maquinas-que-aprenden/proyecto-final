@@ -6,7 +6,7 @@ import chromadb
 
 DEFAULT_K = 5
 
-CHROMA_DIR = Path(__file__).resolve().parents[2] / "processed" / "vectorstore" / "chroma"
+CHROMA_DIR = Path(__file__).resolve().parents[2] / "data" / "processed" / "vectorstore" / "chroma"
 COLLECTION_NAME = "normabot_legal_chunks"
 
 
