@@ -12,4 +12,4 @@ langchain-core>=0.3.0
 chromadb
 
 # LLM providers
-# TODO: añadir groq, google-generativeai, mistralai cuando se integren
+langchain-ollama>=0.3.0
