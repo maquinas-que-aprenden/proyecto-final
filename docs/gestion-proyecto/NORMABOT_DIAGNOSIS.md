@@ -1,5 +1,6 @@
 # NormaBot — Diagnóstico Técnico
 
+Fecha: 2026-02-23 (actualizado sesión tarde — unificación classifier + sync develop)
 Fecha: 2026-02-24 (actualizado) | Rama: feature/tools
 
 ---
@@ -10,6 +11,31 @@ Fecha: 2026-02-24 (actualizado) | Rama: feature/tools
 
 | Componente | Ubicación | Estado |
 |---|---|---|
+| **Clasificador ML — 3 experimentos paralelos** | `src/classifier/` | Completo. Tres carpetas: `classifier_dataset_artificial/`, `classifier_dataset_fusionado/`, `classifier_dataset_real/`. Cada una con notebooks 1–12 y subcarpetas `data/`, `model/`, `datasets/`. MLflow registra en experimentos separados. |
+| **`functions.py` unificado** | `src/classifier/functions.py` | **Un único archivo** compartido por los 3 experimentos. Base: versión fusionado (la más completa). Incluye: `KEYWORDS_DOMINIO` expandido (55+ kw), `_PALABRAS_SUPERVISION`, `crear_features_manuales()` con 5 features (incluye `kw_salvaguarda`), `crear_tfidf()` con `min_df`, pipeline completo XGBoost + Grid Search + SHAP + MLflow. Cada notebook sobreescribe `functions.MLFLOW_EXPERIMENT` y `functions._DATASET_TAGS` en su celda de setup. |
+| **NER legal** | `src/classifier/functions.py` → `extraer_entidades()`, `resumen_entidades()` | Funcional. spaCy `es_core_news_sm` con `nlp.pipe` para batch processing. |
+| **Orquestador ReAct** | `src/orchestrator/main.py` | Funcional pero con tools stub. Agente ReAct con Bedrock Nova Lite, system prompt bien diseñado con disclaimer obligatorio. |
+| **UI Streamlit** | `app.py` | Funcional. Chat conversacional mínimo conectado al orquestador. |
+| **CI/CD** | `.github/workflows/` | Funcional. 3 workflows: PR lint, CI develop, CI/CD main. |
+| **Docker** | `Dockerfile`, `docker-compose.yml` | Funcional. python:3.12-slim, healthcheck, ghcr.io. |
+| **IaC** | `infra/terraform/`, `infra/ansible/` | Funcional. Terraform + Ansible. |
+| **MLflow tracking** | `functions.py` → `configure_mlflow()`, `log_mlflow_safe()` | Funcional. Servidor remoto en EC2. |
+| **DVC** | `.dvc/`, `.dvcignore` | Configurado con S3 backend. |
+
+### Componentes EN BRANCHES (implementados pero no mergeados a develop)
+
+| Componente | Ubicación | Rama | Autor | Estado |
+|---|---|---|---|---|
+| **Corpus legal chunkeado** | `data/chunks_legal/chunks_final.jsonl` | develop (DVC) | Dani | 2.4 MB, BOE + EU AI Act + AESIA + LOPD/RGPD |
+| **ChromaDB Retriever** | `src/retrieval/retriever.py` | develop | Dani | `search()`, `search_base()`, `search_soft()` con PersistentClient. Colección `normabot_legal_chunks`. |
+| **Notebook chunking** | `src/data/01_chunking_boe_eu_aesia.ipynb` | develop | Dani | Pipeline completo: HTML, PDF → chunks con metadata |
+| **Langfuse real** | `src/observability/main.py` | `chore/langfuse` | Nati | CallbackHandler v3, session_id, user_id, tags |
+| **Orquestador + Langfuse** | `src/orchestrator/main.py` | `chore/langfuse` | Nati | Instrumentado con `get_langfuse_handler()` |
+| **RAGAS pipeline** | `eval/run_ragas.py`, `eval/helpers.py`, `eval/dataset.json` | `feature/RAGAS` | Nati | 10 preguntas gold, faithfulness >= 0.80, modo CI, MLflow logging |
+| **Clasificador reestructurado** | `src/classifier/` | `feature/model-ml` | Rubén | 161 archivos, separación datasets real/artificial/fusionado, imágenes SHAP. **Rama synced con develop y pusheada.** |
+| **Nodos RAG LangGraph** | `src/rag/` | `feature/rag` | Maru | retrieve, grade_documents, transform_query, generate |
+
+### Componentes STUB (placeholder, aún no implementados)
 | **Clasificador ML (dataset real)** | `src/classifier/functions.py` (1297 líneas) + `src/classifier/classifier_dataset_real/` | **FUNCIONAL**. Pipeline end-to-end completo: `limpiar_texto()` (spaCy fallback regex), `crear_features_manuales()` (keywords AESIA + dominio), `TfidfVectorizer`, `LogisticRegression` + `XGBoost`, `GridSearchCV` con `StratifiedKFold`, evaluación (confusion matrix, ROC multiclase), SHAP (beeswarm + waterfall plots). Modelos serializados: `mejor_modelo.joblib`, `tfidf_vectorizer.joblib`, `label_encoder.joblib`. MLflow tracking activo en `configure_mlflow()`. |
 | **Clasificador ML (dataset sintético)** | `src/classifier/classifier_dataset_artificial/` | **FUNCIONAL**. Variante con dataset artificial/aumentado bajo `classifier_2/`. Misma estructura que real pero con datos augmentados (`eu_ai_act_flagged`). Modelos serializados en `model/`. |
 | **Clasificador ML (dataset fusionado)** | `src/classifier/classifier_dataset_fusionado/` | **FUNCIONAL**. Variante con dataset fusionado. Añade `svd_transformer.joblib` + `ohe_encoder.joblib` para features avanzadas. Modelos serializados en `model/`. |
@@ -84,6 +110,14 @@ Fecha: 2026-02-24 (actualizado) | Rama: feature/tools
    - **Decisión LLM para grading**: Se eligió modelo local (Ollama Qwen 2.5 3B) sobre APIs externas (Groq, Gemini, Bedrock). Razonamiento: el grading es clasificación binaria (sí/no) con output de 1 token — un modelo local de 3B es suficiente, elimina dependencia de API keys adicionales, rate limits, y latencia de red. Qwen 2.5 3B seleccionado por su superior soporte de español sobre Llama 3.2 3B y Gemma 2 2B.
    - **Requirements**: `langchain-ollama>=0.3.0` añadido a `requirements/app.txt`.
 
+1. **Clasificador ML maduro**: Pipeline completo con **tres experimentos paralelos** (artificial, fusionado, real), `functions.py` unificado, evaluación rigurosa, SHAP, MLflow con experimentos y tags separados por dataset. Punto más fuerte del proyecto.
+2. **MLflow integrado de verdad**: Servidor remoto en EC2, autenticación, soporte multi-entorno, `log_mlflow_safe()` resiliente.
+3. **Corpus legal EXISTE**: 2.4 MB de chunks en DVC/S3. No hay que crear datos desde cero.
+4. **Retriever ChromaDB funcional**: `src/retrieval/retriever.py` en develop con búsqueda por prioridad de fuentes.
+5. **Langfuse implementado**: Solo falta merge de la rama.
+6. **RAGAS pipeline completo**: 10 preguntas gold, thresholds definidos, modo CI.
+7. **IaC completa + CI/CD funcional**: Terraform, Ansible, 3 workflows, Docker, ghcr.io.
+8. **Protección anti-leakage documentada** en classifier_2.
 3. **Estado actual de ramas remotas**:
    - `origin/chore/langfuse` — Langfuse ya integrado en develop (line 135 de orchestrator/main.py)
    - `origin/feature/rag` — Nodos LangGraph (retrieve, grade, transform, generate) existen pero NO MERGEADOS
@@ -105,6 +139,13 @@ Fecha: 2026-02-24 (actualizado) | Rama: feature/tools
 8. **Fallback resiliente**: NLP sin spaCy usa regex; Langfuse falla gracefully (line 140-142 orchestrator).
 9. **Modelos serializados en disco**: 27 archivos `.joblib` listos para cargar.
 
+| Gap | Acción requerida | Responsable |
+|---|---|---|
+| **Ramas sin mergear** | Merge chore/langfuse, feature/RAGAS a develop (`feature/model-ml` synced, pendiente PR) | Nati |
+| **RAG pipeline stub** | Conectar retriever real + implementar grade + generate con LLM | Dani + Maru |
+| **Tools del orquestador hardcodeados** | Conectar a src/rag, src/classifier, src/report reales | Maru |
+| **Clasificador no expuesto como servicio** | `predict_risk(text) → dict` con SHAP | Rubén |
+| **0 tests** | Mínimo 3 smoke tests | Nati |
 ---
 
 ## 5. Gaps Críticos para la Presentación
@@ -403,6 +444,14 @@ WORK:
 1. Crear predict_risk() wrapper
 2. Integrar SHAP explicabilidad
 
+El proyecto tiene **más avance del que parece**, pero **disperso en ramas sin mergear**:
+
+- **ML/Clasificador + MLOps + Infra**: maduro y funcional. `functions.py` unificado, 3 experimentos MLflow separados, notebooks con setup robusto (sys.path + os.chdir + MLFLOW override). `feature/model-ml` synced con develop, pendiente PR.
+- **Data + Retrieval**: corpus existe en DVC, retriever ChromaDB funciona en develop.
+- **Observabilidad + Evaluación**: Langfuse y RAGAS implementados (en branches).
+- **RAG + Orquestador + Report**: stubs en develop. Es la conexión que falta.
+
+**Prioridad absoluta:** PR de `feature/model-ml` → mergear chore/langfuse + feature/RAGAS → conectar módulos reales a tools del orquestador → demo end-to-end funcional.
 **Fase 3 (Maru, bloqueada por Fases 1+2): 20 horas**
 1. Conectar tools del orquestador
 2. Mejorar UI (streaming, error handling)
