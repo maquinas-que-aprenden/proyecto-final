@@ -1060,13 +1060,17 @@ def log_mlflow_safe(run_name, params=None, metrics=None, artifacts=None, tags=No
                                  (df_test,  "test",     "fusionado_test")]
     models    : list — lista de dicts para loguear modelos sklearn con mlflow.sklearn.
                        Claves: "model" (requerido), "artifact_path" (default "model"),
-                       "signature" (opcional), "input_example" (opcional).
-                       Ejemplo: [
+                       "signature" (opcional), "input_example" (opcional),
+                       "registered_name" (opcional) — si se indica, registra el modelo
+                       en el Model Registry (pestaña Models de la UI).
+                       Ejemplo:
+                       [
                            {
                                "model": clf,
                                "artifact_path": "classifier",
                                "signature": infer_signature(X_train, clf.predict(X_train)),
                                "input_example": X_train[:3],
+                               "registered_name": "normabot-classifier",  # → aparece en Models
                            },
                            {"model": tfidf, "artifact_path": "tfidf_vectorizer"},
                        ]
@@ -1076,7 +1080,7 @@ def log_mlflow_safe(run_name, params=None, metrics=None, artifacts=None, tags=No
 
     _all_tags = {**_DATASET_TAGS, **(tags or {})}
 
-    with mlflow.start_run(run_name=run_name):
+    with mlflow.start_run(run_name=run_name) as run:
         if params:
             mlflow.log_params(params)
         if metrics:
@@ -1094,12 +1098,17 @@ def log_mlflow_safe(run_name, params=None, metrics=None, artifacts=None, tags=No
                 mlflow.log_input(dataset, context=context)
         if models:
             for model_entry in models:
+                artifact_path = model_entry.get("artifact_path", "model")
                 mlflow.sklearn.log_model(
                     sk_model=model_entry["model"],
-                    artifact_path=model_entry.get("artifact_path", "model"),
+                    artifact_path=artifact_path,
                     signature=model_entry.get("signature"),
                     input_example=model_entry.get("input_example"),
                 )
+                registered_name = model_entry.get("registered_name")
+                if registered_name:
+                    model_uri = f"runs:/{run.info.run_id}/{artifact_path}"
+                    mlflow.register_model(model_uri, registered_name)
         mlflow.set_tags(_all_tags)
 
     print(f"✓ Run '{run_name}' registrado en MLflow ({MLFLOW_TRACKING_URI})")
