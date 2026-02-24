@@ -1,6 +1,6 @@
 # NormaBot — Diagnóstico Técnico
 
-Fecha: 2026-02-23 (actualizado — incluye descubrimientos en ramas no mergeadas)
+Fecha: 2026-02-23 (actualizado sesión tarde — unificación classifier + sync develop)
 
 ---
 
@@ -10,8 +10,8 @@ Fecha: 2026-02-23 (actualizado — incluye descubrimientos en ramas no mergeadas
 
 | Componente | Ubicación | Estado |
 |---|---|---|
-| **Clasificador ML (dataset real)** | `src/classifier/functions.py` | Completo. Pipeline end-to-end: limpieza spaCy, TF-IDF, features manuales por keywords de dominio, LogisticRegression baseline, XGBoost, Grid Search con StratifiedKFold, evaluación (confusion matrix, ROC multiclase, análisis de errores), SHAP (beeswarm + waterfall), serialización joblib, MLflow tracking + Model Registry. |
-| **Clasificador ML (dataset sintético)** | `src/classifier/classifier_2/functions.py` | Completo. Variante con dataset artificial/aumentado. Añade soporte para `extra_columns` en `preparar_dataset()` con protección anti-leakage documentada, y `evaluar_modelo()` que acepta features pre-transformadas. |
+| **Clasificador ML — 3 experimentos paralelos** | `src/classifier/` | Completo. Tres carpetas: `classifier_dataset_artificial/`, `classifier_dataset_fusionado/`, `classifier_dataset_real/`. Cada una con notebooks 1–12 y subcarpetas `data/`, `model/`, `datasets/`. MLflow registra en experimentos separados. |
+| **`functions.py` unificado** | `src/classifier/functions.py` | **Un único archivo** compartido por los 3 experimentos. Base: versión fusionado (la más completa). Incluye: `KEYWORDS_DOMINIO` expandido (55+ kw), `_PALABRAS_SUPERVISION`, `crear_features_manuales()` con 5 features (incluye `kw_salvaguarda`), `crear_tfidf()` con `min_df`, pipeline completo XGBoost + Grid Search + SHAP + MLflow. Cada notebook sobreescribe `functions.MLFLOW_EXPERIMENT` y `functions._DATASET_TAGS` en su celda de setup. |
 | **NER legal** | `src/classifier/functions.py` → `extraer_entidades()`, `resumen_entidades()` | Funcional. spaCy `es_core_news_sm` con `nlp.pipe` para batch processing. |
 | **Orquestador ReAct** | `src/orchestrator/main.py` | Funcional pero con tools stub. Agente ReAct con Bedrock Nova Lite, system prompt bien diseñado con disclaimer obligatorio. |
 | **UI Streamlit** | `app.py` | Funcional. Chat conversacional mínimo conectado al orquestador. |
@@ -31,7 +31,7 @@ Fecha: 2026-02-23 (actualizado — incluye descubrimientos en ramas no mergeadas
 | **Langfuse real** | `src/observability/main.py` | `chore/langfuse` | Nati | CallbackHandler v3, session_id, user_id, tags |
 | **Orquestador + Langfuse** | `src/orchestrator/main.py` | `chore/langfuse` | Nati | Instrumentado con `get_langfuse_handler()` |
 | **RAGAS pipeline** | `eval/run_ragas.py`, `eval/helpers.py`, `eval/dataset.json` | `feature/RAGAS` | Nati | 10 preguntas gold, faithfulness >= 0.80, modo CI, MLflow logging |
-| **Clasificador reestructurado** | `src/classifier/` | `feature/model-ml` | Rubén | 161 archivos, separación datasets real/artificial, imágenes SHAP |
+| **Clasificador reestructurado** | `src/classifier/` | `feature/model-ml` | Rubén | 161 archivos, separación datasets real/artificial/fusionado, imágenes SHAP. **Rama synced con develop y pusheada.** |
 | **Nodos RAG LangGraph** | `src/rag/` | `feature/rag` | Maru | retrieve, grade_documents, transform_query, generate |
 
 ### Componentes STUB (placeholder, aún no implementados)
@@ -76,7 +76,7 @@ Fecha: 2026-02-23 (actualizado — incluye descubrimientos en ramas no mergeadas
 
 ## 3. Fortalezas Técnicas
 
-1. **Clasificador ML maduro**: Pipeline completo con dos experimentos paralelos, evaluación rigurosa, SHAP, MLflow tracking + Model Registry. Punto más fuerte del proyecto.
+1. **Clasificador ML maduro**: Pipeline completo con **tres experimentos paralelos** (artificial, fusionado, real), `functions.py` unificado, evaluación rigurosa, SHAP, MLflow con experimentos y tags separados por dataset. Punto más fuerte del proyecto.
 2. **MLflow integrado de verdad**: Servidor remoto en EC2, autenticación, soporte multi-entorno, `log_mlflow_safe()` resiliente.
 3. **Corpus legal EXISTE**: 2.4 MB de chunks en DVC/S3. No hay que crear datos desde cero.
 4. **Retriever ChromaDB funcional**: `src/retrieval/retriever.py` en develop con búsqueda por prioridad de fuentes.
@@ -93,7 +93,7 @@ Fecha: 2026-02-23 (actualizado — incluye descubrimientos en ramas no mergeadas
 
 | Gap | Acción requerida | Responsable |
 |---|---|---|
-| **Ramas sin mergear** | Merge chore/langfuse, feature/RAGAS, feature/model-ml a develop | Nati, Rubén |
+| **Ramas sin mergear** | Merge chore/langfuse, feature/RAGAS a develop (`feature/model-ml` synced, pendiente PR) | Nati |
 | **RAG pipeline stub** | Conectar retriever real + implementar grade + generate con LLM | Dani + Maru |
 | **Tools del orquestador hardcodeados** | Conectar a src/rag, src/classifier, src/report reales | Maru |
 | **Clasificador no expuesto como servicio** | `predict_risk(text) → dict` con SHAP | Rubén |
@@ -122,13 +122,13 @@ Fecha: 2026-02-23 (actualizado — incluye descubrimientos en ramas no mergeadas
 
 ## 5. Resumen Ejecutivo
 
-El proyecto tiene **más avance del que parece**, pero **disperso en 4 ramas sin mergear**:
+El proyecto tiene **más avance del que parece**, pero **disperso en ramas sin mergear**:
 
-- **ML/Clasificador + MLOps + Infra**: maduro y funcional.
+- **ML/Clasificador + MLOps + Infra**: maduro y funcional. `functions.py` unificado, 3 experimentos MLflow separados, notebooks con setup robusto (sys.path + os.chdir + MLFLOW override). `feature/model-ml` synced con develop, pendiente PR.
 - **Data + Retrieval**: corpus existe en DVC, retriever ChromaDB funciona en develop.
 - **Observabilidad + Evaluación**: Langfuse y RAGAS implementados (en branches).
 - **RAG + Orquestador + Report**: stubs en develop. Es la conexión que falta.
 
-**Prioridad absoluta:** Mergear branches → conectar módulos reales a tools del orquestador → demo end-to-end funcional.
+**Prioridad absoluta:** PR de `feature/model-ml` → mergear chore/langfuse + feature/RAGAS → conectar módulos reales a tools del orquestador → demo end-to-end funcional.
 
 **Decisión arquitectónica:** Usar el ReAct Agent existente (`create_react_agent`). No construir grafo custom.
