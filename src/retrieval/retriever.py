@@ -10,10 +10,19 @@ CHROMA_DIR = Path(__file__).resolve().parents[2] / "data" / "processed" / "vecto
 COLLECTION_NAME = "normabot_legal_chunks"
 
 
-# Inicialización Chroma
+# Inicialización Chroma (lazy)
 
-_client = chromadb.PersistentClient(path=str(CHROMA_DIR))
-_collection = _client.get_collection(COLLECTION_NAME)
+_client = None
+_collection = None
+
+
+def _get_collection():
+    """Inicializa el cliente ChromaDB y obtiene la colección de forma lazy."""
+    global _client, _collection
+    if _collection is None:
+        _client = chromadb.PersistentClient(path=str(CHROMA_DIR))
+        _collection = _client.get_collection(COLLECTION_NAME)
+    return _collection
 
 
 # Funciones internas
@@ -57,7 +66,8 @@ def _detect_priority_sources(query: str) -> Optional[List[str]]:
 # Búsqueda BASE
 
 def search_base(query: str, k: int = DEFAULT_K) -> List[Dict[str, Any]]:
-    results = _collection.query(
+    collection = _get_collection()
+    results = collection.query(
         query_texts=[query],
         n_results=k
     )
@@ -70,7 +80,8 @@ def search_base(query: str, k: int = DEFAULT_K) -> List[Dict[str, Any]]:
 def search_soft(query: str, k: int = DEFAULT_K) -> List[Dict[str, Any]]:
     priority_sources = _detect_priority_sources(query)
 
-    results = _collection.query(
+    collection = _get_collection()
+    results = collection.query(
         query_texts=[query],
         n_results=k * 2
     )

@@ -10,11 +10,13 @@ NormaBot is an Agentic RAG system for querying Spanish/EU AI regulation (BOE, EU
 
 A **ReAct agent** (LangGraph `create_react_agent`) orchestrates three tools:
 
-1. **RAG Normativo** (`src/rag/main.py`) — Corrective RAG: Retrieve → Grade → Generate with legal citations. Uses ChromaDB + `paraphrase-multilingual-MiniLM-L12-v2` embeddings. Data pipeline in `data/ingest.py` (raw→chunks) and `data/index.py` (chunks→embeddings→ChromaDB).
+1. **RAG Normativo** (`src/rag/main.py`) — Corrective RAG: Retrieve → Grade → Generate with legal citations. Uses ChromaDB + `paraphrase-multilingual-MiniLM-L12-v2` embeddings. `retrieve()` calls `src.retrieval.retriever.search()` (ChromaDB real). `grade()` uses **Ollama Qwen 2.5 3B** (local LLM) for relevance grading with score-based fallback. `generate()` is still a stub. Data pipeline in `data/ingest.py` (raw→chunks) and `data/index.py` (chunks→embeddings→ChromaDB).
 2. **Clasificador de Riesgo** (`src/classifier/`) — XGBoost classifies AI systems into 4 EU AI Act risk levels (inaceptable, alto, limitado, mínimo). Full ML pipeline in `functions.py`: spaCy text cleaning, TF-IDF + manual keyword features, Grid Search with StratifiedKFold, SHAP explainability, MLflow tracking.
 3. **Informes** (`src/report/main.py`) — Generates structured compliance reports with legal citations.
 
 **Orchestrator** (`src/orchestrator/main.py`): ReAct agent using Amazon Bedrock (Nova Lite v1) with tool calling. The LLM decides which tool(s) to invoke based on the user query. The three `@tool` functions are currently stubs returning hardcoded responses — they need to be connected to the real implementations in `src/rag`, `src/classifier`, and `src/report`.
+
+**Retriever** (`src/retrieval/retriever.py`): ChromaDB PersistentClient with lazy initialization. `search()` supports `mode="base"` (direct semantic) and `mode="soft"` (source-prioritized). `search_tool()` returns LLM-ready formatted string. Collection: `normabot_legal_chunks`.
 
 **State** (`src/agents/state.py`): `AgentState` TypedDict with `Annotated[list, operator.add]` for accumulating documents and sources across nodes.
 
@@ -71,6 +73,7 @@ pip install -r requirements/infra.txt  # AWS, DVC, Langfuse, RAGAS
 - Commits and PRs in Spanish
 - Requirements split into `base.txt` (shared pandas/numpy/dotenv), `app.txt`, `ml.txt`, `data.txt`, `dev.txt`, `infra.txt`
 - spaCy model: `es_core_news_sm` (loaded lazily via singleton `_get_nlp()` / `_get_nlp_ner()` in `functions.py`)
+- Ollama model: `qwen2.5:3b` (loaded lazily via singleton `_get_grading_llm()` in `src/rag/main.py`). Requires Ollama running locally (`brew services start ollama`)
 - MLflow: URI via `MLFLOW_TRACKING_URI` env var, password from `MLFLOW_PASSWORD` env var or `.env` in classifier dir
 
 ## Infrastructure
@@ -88,6 +91,7 @@ pip install -r requirements/infra.txt  # AWS, DVC, Langfuse, RAGAS
   - `data/eval/` — RAG evaluation results
   - `data/notebooks/` — evaluation notebooks (embeddings tuning, retrieval tests, complex queries)
 - **Container registry**: `ghcr.io/maquinas-que-aprenden/proyecto-final`
+- **Ollama**: Local LLM inference. Used for RAG document grading (Qwen 2.5 3B). Install: `brew install ollama`. Pull model: `ollama pull qwen2.5:3b`. Start: `brew services start ollama`. In Docker/EC2: needs Ollama sidecar or pre-installed.
 - **CodeRabbit**: configured in `.coderabbit.yaml` — reviews focus only on logic/security/performance bugs, all style linters disabled
 
 ## Key Domain Rules
@@ -95,7 +99,7 @@ pip install -r requirements/infra.txt  # AWS, DVC, Langfuse, RAGAS
 - Every generated response MUST include the disclaimer: *"Informe preliminar generado por IA. Consulte profesional jurídico."*
 - Legal citations must be exact (law, article, date). Hallucinated citations are unacceptable.
 - Classifier dataset is small (200-300 examples). Always use `class_weight='balanced'` and document as a known limitation.
-- LLM: Bedrock Nova Lite for orchestrator. Groq (Llama 3.3 70B) planned for RAG generation, with Gemini → Mistral fallback chain for rate limiting.
+- LLM stack: Bedrock Nova Lite for orchestrator, **Ollama Qwen 2.5 3B** (local) for RAG document grading. RAG generation LLM pending (task 1.3). Model selection rationale: grading is a binary classification task (sí/no per document, ~5 calls per query) — a local 3B model avoids API keys, rate limits, and network latency. Qwen 2.5 3B chosen over Llama 3.2 3B and Gemma 2 2B for superior Spanish language support.
 
 ## Environment Variables
 
