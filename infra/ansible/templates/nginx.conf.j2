@@ -3,14 +3,14 @@ events {}
 http {
     server {
         listen 80;
-        # Redirige todo el tráfico HTTP a HTTPS [cite: 3]
+        # Redirige todo el tráfico HTTP a HTTPS
         return 301 https://$host$request_uri;
     }
 
     server {
         listen 443 ssl;
 
-        # Configuración de certificados [cite: 5]
+        # Configuración de certificados
         ssl_certificate     /etc/nginx/certs/mlflow.crt;
         ssl_certificate_key /etc/nginx/certs/mlflow.key;
 
