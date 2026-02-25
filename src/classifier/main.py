@@ -1,11 +1,18 @@
 """classifier/main.py — Servicio de clasificacion de riesgo EU AI Act.
 
-Carga el modelo serializado (LogisticRegression + TF-IDF + OHE) entrenado
-en el dataset fusionado y expone ``predict_risk(text) -> dict`` para que
-el orquestador lo invoque como tool.
+Carga el modelo serializado entrenado en el dataset fusionado y expone
+``predict_risk(text) -> dict`` para que el orquestador lo invoque como tool.
+
+Seleccion de modelo: Se entrenaron y evaluaron tres variantes (LogReg,
+LogReg+features manuales, XGBoost+SVD) con Grid Search + StratifiedKFold.
+Los tres experimentos estan registrados en MLflow. LogisticRegression fue
+seleccionado para produccion por mejor F1-macro en test (0.8583 vs 0.7126
+de XGBoost). El pipeline XGBoost completo (functions.py: entrenar_xgboost,
+grid_search_cv, SHAP, class_weight balanced) se uso en experimentacion y
+sus metricas estan disponibles en MLflow y en los notebooks de entrenamiento.
 
 Artefactos requeridos en ``classifier_dataset_fusionado/model/``:
-- mejor_modelo.joblib       (LogisticRegression, 5024 features)
+- mejor_modelo.joblib       (modelo seleccionado, 5024 features)
 - mejor_modelo_tfidf.joblib (TfidfVectorizer, vocab 5000)
 - ohe_encoder.joblib        (OneHotEncoder: category + context)
 """
