@@ -172,6 +172,41 @@ def log_to_mlflow(metrics: dict, n_examples: int, git_sha: str) -> None:
 
     logger.info("Resultados logueados en MLflow: %s", MLFLOW_TRACKING_URI)
 
+def log_to_langfuse(metrics: dict, n_examples: int, git_sha: str) -> None:
+    """Anota los scores RAGAS en Langfuse como una traza de evaluación."""
+    from langfuse import Langfuse
+
+    public_key = os.getenv("LANGFUSE_PUBLIC_KEY")
+    secret_key = os.getenv("LANGFUSE_SECRET_KEY")
+    if not public_key or not secret_key:
+        raise ValueError("Define LANGFUSE_PUBLIC_KEY y LANGFUSE_SECRET_KEY.")
+
+    lf = Langfuse(
+        public_key=public_key,
+        secret_key=secret_key,
+        host=os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com"),
+    )
+
+    trace = lf.trace(
+        name="ragas-eval",
+        tags=["eval", "ragas"],
+        metadata={
+            "git_sha": git_sha,
+            "n_examples": n_examples,
+            "model": os.getenv("BEDROCK_MODEL_ID", "eu.amazon.nova-lite-v1:0"),
+            "dataset": "eval/dataset.json",
+        },
+    )
+
+    for metric_name, value in metrics.items():
+        threshold = THRESHOLDS.get(metric_name)
+        comment = f"umbral: {threshold}" if threshold is not None else None
+        trace.score(name=metric_name, value=value, comment=comment)
+
+    lf.flush()
+    logger.info("Scores RAGAS logueados en Langfuse (trace: %s)", trace.id)
+
+
 def check_thresholds(metrics: dict) -> list[str]:
     """Comprueba si alguna métrica está por debajo del umbral.
 
