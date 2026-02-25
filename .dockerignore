@@ -1,0 +1,41 @@
+# Entorno local
+.venv/
+__pycache__/
+**/__pycache__/
+**/*.pyc
+.env
+
+# Datos (gestionados por DVC, no van en la imagen)
+data/
+
+# Notebooks de entrenamiento
+**/*.ipynb
+
+# Infraestructura y docs
+infra/
+docs/
+eval/
+
+# Git
+.git/
+.github/
+
+# Linter cache
+src/.ruff_cache/
+
+# Experimentos del clasificador — excluir todo excepto el modelo fusionado
+src/classifier/classifier_dataset_artificial/
+src/classifier/classifier_dataset_real/
+src/classifier/classifier_2/
+
+# Del modelo fusionado: excluir entrenamiento, conservar solo artefactos de inferencia
+src/classifier/classifier_dataset_fusionado/data/
+src/classifier/classifier_dataset_fusionado/model/qlora_adapter/
+src/classifier/classifier_dataset_fusionado/model/qlora_checkpoints/
+src/classifier/classifier_dataset_fusionado/model/*.png
+
+# Modelos alternativos no seleccionados
+src/classifier/classifier_dataset_fusionado/model/modelo_baseline.joblib
+src/classifier/classifier_dataset_fusionado/model/modelo_clasificador.joblib
+src/classifier/classifier_dataset_fusionado/model/modelo_logreg_v2.joblib
+src/classifier/classifier_dataset_fusionado/model/label_encoder.joblib
