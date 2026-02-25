@@ -84,25 +84,13 @@ P1 Importantes:
 | `src/report/main.py` con LLM | Maru | Stub (Sprint 2) | Necesita LLM integration |
 | Tests mínimos | Nati | 0 tests | tests/ vacío — Tarea 4.1 |
 
-## Pendiente (próximos pasos — Plan de 3 semanas)
+## Pendiente (próximos pasos — Semana 1: INTEGRAR, 24 feb - 2 mar)
 
-### Semana 1: INTEGRAR (24 feb - 2 mar)
-1. Mergear TODAS las ramas feature a develop
-2. `predict_risk(text) → dict` en src/classifier/main.py
-3. Trasladar retriever a src/data/main.py
-4. Implementar src/rag/main.py con Corrective RAG real
-5. Conectar 3 tools del orquestador a módulos reales
-6. Implementar src/report/main.py con LLM
-7. Smoke test end-to-end
+### Hoy (24 feb) — Siguientes 2 horas
 
-### Semana 2: PULIR (3 mar - 9 mar)
-8. Tests mínimos (3+ tests en tests/)
-9. Correr RAGAS eval y documentar métricas
-10. Documentar métricas clasificador en MLflow
-11. Pulir UI Streamlit
-12. Fallback multi-proveedor LLM
-13. Docker funcional en EC2
-14. Sesión QA
+1. **Mergear PR #47** (Rubén, 5 min)
+   - Incluye: predict_risk() 174 líneas, thread safety con Lock, SHAP robustness
+   - Impacto: desbloquea integración del orquestador
 
 ### Semana 3: PRESENTAR (10 mar - 12 mar)
 
