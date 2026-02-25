@@ -5,4 +5,6 @@ services:
       - "8080:8080"
     env_file:
       - .env
+    volumes:
+      - ./data/processed/vectorstore:/app/data/processed/vectorstore:ro
     restart: unless-stopped

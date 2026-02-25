@@ -114,5 +114,6 @@ jobs:
           script: |
             echo "${{ secrets.GHCR_READ_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_READ_USER }}" --password-stdin
             cd /home/ubuntu/normabot
+            dvc pull data/processed/vectorstore/
             docker compose up -d --pull always --force-recreate
             docker logout ghcr.io
