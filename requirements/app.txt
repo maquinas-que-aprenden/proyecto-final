@@ -13,3 +13,6 @@ chromadb
 
 # LLM providers
 langchain-ollama>=0.3.0
+
+# Evaluación RAG
+ragas==0.2.0
