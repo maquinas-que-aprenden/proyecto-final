@@ -197,8 +197,8 @@ Llevar el agente ReAct un paso mas alla:
 
 | Riesgo | Prob. | Impacto | Mitigacion |
 |--------|-------|---------|-----------|
-| Bedrock rate limiting/no disponible en demo | Media | Critico | LLM primario actual (orquestador + RAG generate). Tener API key Groq como backup (Sprint 2) |
-| Ollama no disponible en EC2 | Media | Medio | Fallback a filtro por score en grade(). Necesita Ollama en Docker o modelo alternativo |
+| Bedrock rate limiting/no disponible en demo | Alta | Critico | LLM primario (orquestador + RAG generate). Fallback implementado en generate(): concatena extractos si LLM falla. Para Sprint 2: evaluar proveedor alternativo en `_get_generate_llm()` |
+| Ollama no disponible en EC2 | Media | Medio | Fallback implementado: `_grade_by_score()` filtra por umbral de similitud si Ollama no responde |
 | ChromaDB vacio en Docker | Media | Alto | DVC pull en Dockerfile o pre-built image |
 | Modelo joblib incompatible en EC2 | Baja | Medio | sklearn version pinning en requirements. Test en Docker local primero |
 | Scope creep con sugerencias | Media | Medio | Las 3 sugerencias son independientes — implementar por prioridad, descartar si no da tiempo |

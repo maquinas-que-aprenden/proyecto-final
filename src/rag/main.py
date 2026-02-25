@@ -157,13 +157,19 @@ def generate(query: str, context: list[dict]) -> dict:
         response = llm.invoke(prompt)
         answer = response.content.strip()
     except Exception as e:
-        logger.warning("LLM de generacion no disponible, usando fallback: %s", e)
+        logger.warning("LLM de generacion no disponible, usando fallback: %s", e, exc_info=True)
         # Fallback: concatenar extractos relevantes (sin citas verificadas por LLM)
-        snippets = [d["doc"][:200] for d in context[:3]]
-        answer = "Segun los documentos encontrados:\n\n" + "\n\n".join(snippets)
         grounded = False
+        snippets = [d["doc"][:200] for d in context[:3]]
+        citations = [
+            f"{m.get('source', '')} — {m.get('unit_title') or m.get('unit_id', '')}".strip(" —")
+            for m in sources if m
+        ]
+        answer = "Según los documentos encontrados:\n\n" + "\n\n".join(snippets)
+        if citations:
+            answer += "\n\nFuentes: " + "; ".join(c for c in citations if c)
 
-    answer += "\n\n_Informe preliminar generado por IA. Consulte profesional juridico._"
+    answer += "\n\n_Informe preliminar generado por IA. Consulte profesional jurídico._"
 
     return {
         "answer": answer,

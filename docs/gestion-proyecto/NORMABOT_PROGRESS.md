@@ -256,9 +256,10 @@ def grade(query: str, docs: list[dict], threshold: float = 0.7) -> list[dict]:
     return relevant
 ```
 
-**generate()** (línea 137-170):
+**generate()** (línea 137-175):
 ```python
 def generate(query: str, context: list[dict]) -> dict:
+    sources = [d.get("metadata", {}) for d in context]
     formatted_context = _format_context(context)
     prompt = GENERATE_PROMPT.format(context=formatted_context, query=query)
     grounded = True
@@ -266,14 +267,20 @@ def generate(query: str, context: list[dict]) -> dict:
         llm = _get_generate_llm()  # ChatBedrockConverse(model=BEDROCK_MODEL_ID)
         response = llm.invoke(prompt)
         answer = response.content.strip()
-    except Exception:
-        # Fallback: concatenar extractos (sin citas verificadas por LLM)
-        snippets = [d["doc"][:200] for d in context[:3]]
-        answer = "Segun los documentos encontrados:\n\n" + "\n\n".join(snippets)
+    except Exception as e:
+        logger.warning("LLM de generacion no disponible, usando fallback: %s", e, exc_info=True)
         grounded = False
-    
-    answer += "\n\n_Informe preliminar generado por IA. Consulte profesional juridico._"
-    return {"answer": answer, "sources": [d.get("metadata", {}) for d in context], "grounded": grounded}
+        snippets = [d["doc"][:200] for d in context[:3]]
+        citations = [
+            f"{m.get('source', '')} — {m.get('unit_title') or m.get('unit_id', '')}".strip(" —")
+            for m in sources if m
+        ]
+        answer = "Según los documentos encontrados:\n\n" + "\n\n".join(snippets)
+        if citations:
+            answer += "\n\nFuentes: " + "; ".join(c for c in citations if c)
+
+    answer += "\n\n_Informe preliminar generado por IA. Consulte profesional jurídico._"
+    return {"answer": answer, "sources": sources, "grounded": grounded}
 ```
 
 ### Implementación Tools en Orquestador
@@ -342,8 +349,8 @@ def generate_report(system_description: str) -> str:
         logger.warning("Retriever no disponible para informe: %s", e)
     
     if not articles:
-        articles = _DEFAULT_ARTICLES.get(risk_level, _DEFAULT_ARTICLES["alto_riesgo"])
-    
+        articles = ["No se pudieron verificar artículos específicos en el corpus legal."]
+
     # 3. Generar informe
     return _build_report(system_description, risk_level, articles)
 ```

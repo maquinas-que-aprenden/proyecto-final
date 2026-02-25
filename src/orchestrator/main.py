@@ -116,26 +116,6 @@ def classify_risk(system_description: str) -> str:
     return response
 
 
-# Artículos por defecto cuando el retriever no está disponible
-_DEFAULT_ARTICLES = {
-    "inaceptable": [
-        "Art. 5 EU AI Act — Prácticas de IA prohibidas",
-        "Art. 99 EU AI Act — Sanciones",
-    ],
-    "alto_riesgo": [
-        "Art. 6 EU AI Act — Reglas de clasificación de alto riesgo",
-        "Art. 9 EU AI Act — Sistema de gestión de riesgos",
-        "Art. 43 EU AI Act — Evaluación de conformidad",
-    ],
-    "riesgo_limitado": [
-        "Art. 50 EU AI Act — Obligaciones de transparencia",
-        "Art. 52 EU AI Act — Información a los usuarios",
-    ],
-    "riesgo_minimo": [
-        "Art. 69 EU AI Act — Códigos de conducta voluntarios",
-    ],
-}
-
 
 @tool
 def generate_report(system_description: str) -> str:
@@ -171,7 +151,12 @@ def generate_report(system_description: str) -> str:
         logger.warning("Retriever no disponible para informe: %s", e)
 
     if not articles:
-        articles = _DEFAULT_ARTICLES.get(risk_level, _DEFAULT_ARTICLES["alto_riesgo"])
+        logger.warning(
+            "Sin artículos verificados del corpus para nivel '%s'. "
+            "Informe generado sin citas verificadas.",
+            risk_level,
+        )
+        articles = ["No se pudieron verificar artículos específicos en el corpus legal."]
 
     # 3. Generar informe con template
     return _build_report(system_description, risk_level, articles)

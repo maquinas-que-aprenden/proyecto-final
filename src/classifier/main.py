@@ -42,10 +42,10 @@ _lock = threading.Lock()
 def _load_artifacts():
     """Carga lazy de modelo, TF-IDF y OHE encoder (thread-safe, double-check locking)."""
     global _modelo, _tfidf, _ohe
-    if _modelo is not None:
+    if _modelo is not None and _tfidf is not None and _ohe is not None:
         return
     with _lock:
-        if _modelo is not None:
+        if _modelo is not None and _tfidf is not None and _ohe is not None:
             return
 
         meta_path = _MODEL_DIR / "mejor_modelo_seleccion.json"
@@ -58,9 +58,13 @@ def _load_artifacts():
             model_file = _MODEL_DIR / "mejor_modelo.joblib"
             tfidf_file = _MODEL_DIR / "mejor_modelo_tfidf.joblib"
 
-        _modelo = joblib.load(model_file)
-        _tfidf = joblib.load(tfidf_file)
-        _ohe = joblib.load(_MODEL_DIR / "ohe_encoder.joblib")
+        try:
+            _modelo = joblib.load(model_file)
+            _tfidf = joblib.load(tfidf_file)
+            _ohe = joblib.load(_MODEL_DIR / "ohe_encoder.joblib")
+        except Exception:
+            _modelo = _tfidf = _ohe = None
+            raise
         logger.info(
             "Clasificador cargado: %s (%d features) desde %s",
             type(_modelo).__name__,
