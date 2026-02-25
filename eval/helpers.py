@@ -156,12 +156,24 @@ def log_to_mlflow(metrics: dict, n_examples: int, git_sha: str) -> None:
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     mlflow.set_experiment(MLFLOW_EXPERIMENT)
 
+    classifier_params = {}
+    meta_path = Path(__file__).parents[1] / "src/classifier/classifier_dataset_fusionado/model/mejor_modelo_seleccion.json"
+    if meta_path.exists():
+        with open(meta_path, encoding="utf-8") as f:
+            meta = json.load(f)
+        classifier_params = {
+            "classifier_model": meta.get("nombre", "unknown"),
+            "classifier_type": meta.get("model_type", "unknown"),
+            "classifier_f1_macro": meta.get("test_f1_macro"),
+        }
+
     with mlflow.start_run(run_name=f"ragas-{git_sha[:8]}"):
         mlflow.log_params({
             "model": os.getenv("BEDROCK_MODEL_ID", "eu.amazon.nova-lite-v1:0"),
             "commit": git_sha,
             "n_examples": n_examples,
             "dataset": "eval/dataset.json",
+            **classifier_params,
         })
         mlflow.log_metrics(metrics)
 
