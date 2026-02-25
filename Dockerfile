@@ -8,7 +8,9 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Instalar Ollama (verificar integridad del script)
+# Hash de install.sh v0.17.0 — actualizar si se sube de versión
 RUN curl -fsSL https://ollama.com/install.sh -o /tmp/ollama-install.sh && \
+    echo "25f64b810b947145095956533e1bdf56eacea2673c55a7e586be4515fc882c9f  /tmp/ollama-install.sh" | sha256sum -c - && \
     sh /tmp/ollama-install.sh && \
     rm /tmp/ollama-install.sh
 
