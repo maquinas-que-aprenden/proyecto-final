@@ -215,7 +215,7 @@ if __name__ == "__main__":
     import uuid
 
     # Generamos un ID único para agrupar estas consultas en una misma sesión de Langfuse
-    test_session = f"session-{uuid.uuid4().short if hasattr(uuid.uuid4(), 'short') else str(uuid.uuid4())[:8]}"
+    test_session = f"session-{uuid.uuid4().hex[:8]}"
 
     queries = [
         "¿Qué dice el artículo 5 del EU AI Act?",
