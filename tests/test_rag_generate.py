@@ -12,10 +12,18 @@ from unittest.mock import MagicMock, patch
 # Inyectar mock de langchain_aws antes de importar src.rag.main,
 # ya que langchain_aws puede no estar instalado en el entorno de test.
 _mock_langchain_aws = MagicMock()
-sys.modules.setdefault("langchain_aws", _mock_langchain_aws)
+_previous_langchain_aws = sys.modules.get("langchain_aws")
+sys.modules["langchain_aws"] = _mock_langchain_aws
 
 import src.rag.main as rag_module  # noqa: E402
 from src.rag.main import GENERATE_PROMPT, generate  # noqa: E402
+
+
+def teardown_module(module):
+    if _previous_langchain_aws is None:
+        sys.modules.pop("langchain_aws", None)
+    else:
+        sys.modules["langchain_aws"] = _previous_langchain_aws
 
 
 # ---------------------------------------------------------------------------
