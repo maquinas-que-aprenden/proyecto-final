@@ -16,7 +16,6 @@ services:
       --backend-store-uri sqlite:///mlflow/mlflow.db 
       --default-artifact-root s3://normabot/artifacts/
       --allowed-hosts "*"
-      --static-prefix /mlflow
 
   nginx:
     image: nginx:alpine
