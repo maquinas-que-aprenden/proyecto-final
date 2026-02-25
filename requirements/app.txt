@@ -16,3 +16,6 @@ langchain-ollama>=0.3.0
 
 # Evaluación RAG
 ragas==0.2.0
+
+# Observabilidad
+langfuse==2.50.0
