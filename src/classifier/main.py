@@ -265,13 +265,21 @@ def predict_risk(text: str) -> dict:
     except Exception as e:
         logger.warning("No se pudo calcular explicabilidad: %s", e)
 
-    langfuse_context.update_current_observation(
-        metadata={
-            "risk_level": result["risk_level"],
-            "confidence": round(result["confidence"], 4),
-            "probabilities": result.get("probabilities", {}),
-        },
-    )
+    try:
+        langfuse_context.update_current_observation(
+            metadata={
+                "risk_level": result["risk_level"],
+                "confidence": round(result["confidence"], 4),
+                "probabilities": result.get("probabilities", {}),
+            },
+        )
+    except Exception as e:
+        logger.warning(
+            "Langfuse no disponible, omitiendo observación (risk_level=%s, confidence=%.4f): %s",
+            result["risk_level"],
+            result["confidence"],
+            e,
+        )
     return result
 
 

@@ -169,7 +169,7 @@ def log_to_mlflow(metrics: dict, n_examples: int, git_sha: str) -> None:
                 "classifier_type": meta.get("model_type", "unknown"),
                 "classifier_f1_macro": meta.get("test_f1_macro"),
             }
-        except (json.JSONDecodeError, ValueError) as e:
+        except (OSError, json.JSONDecodeError, ValueError) as e:
             logger.warning("No se pudo leer mejor_modelo_seleccion.json: %s", e)
             classifier_params = {
                 "classifier_model": "unknown",
