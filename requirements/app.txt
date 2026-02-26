@@ -11,5 +11,11 @@ langchain-aws>=0.2.0
 langchain-core>=0.3.0
 chromadb
 
+# Classifier runtime (deserializar modelo + matrices TF-IDF)
+joblib>=1.4.0
+scipy>=1.13.0
+scikit-learn>=1.5.0
+xgboost>=3.0.0
+
 # LLM providers
 langchain-ollama>=0.3.0
