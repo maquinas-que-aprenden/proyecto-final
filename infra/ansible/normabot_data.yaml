@@ -1,0 +1,37 @@
+---
+- name: Configurar DVC y datos en NormaBot
+  hosts: normabot
+  become: true
+
+  vars:
+    project_path: "/home/ubuntu/normabot"
+
+  tasks:
+    - name: Instalar pipx
+      apt:
+        name: pipx
+        state: present
+
+    - name: Instalar DVC con soporte S3
+      become: false
+      shell: pipx install 'dvc[s3]'
+      args:
+        creates: /home/ubuntu/.local/bin/dvc
+
+    - name: Asegurar que pipx está en el PATH del sistema
+      lineinfile:
+        path: /home/ubuntu/.bashrc
+        line: 'export PATH="$HOME/.local/bin:$PATH"'
+        state: present
+
+    - name: Hacer pull del vectorstore desde S3
+      become: false
+      shell: dvc pull data/processed/vectorstore/
+      args:
+        chdir: "{{ project_path }}"
+      environment:
+        PATH: "/home/ubuntu/.local/bin:{{ ansible_env.PATH }}"
+
+    - name: Mensaje final
+      debug:
+        msg: "DVC configurado y vectorstore disponible en {{ project_path }}/data/processed/vectorstore"

@@ -7,6 +7,21 @@ el orquestador lo invoque como tool.
 Artefactos requeridos en ``classifier_dataset_artificial/model/``:
 - modelo_baseline.joblib  (LogisticRegression, F1-macro 0.905)
 - tfidf_vectorizer.joblib (TfidfVectorizer, vocab ~3773, bigramas)
+Carga el modelo serializado entrenado en el dataset fusionado y expone
+``predict_risk(text) -> dict`` para que el orquestador lo invoque como tool.
+
+Seleccion de modelo: Se entrenaron y evaluaron tres variantes (LogReg,
+LogReg+features manuales, XGBoost+SVD) con Grid Search + StratifiedKFold.
+Los tres experimentos estan registrados en MLflow. El modelo seleccionado
+se determina por ``mejor_modelo_seleccion.json``. Actualmente:
+Exp 2 (XGBoost + SVD + GS) con F1-macro test 0.8822.
+
+Pipeline de inferencia: texto → TF-IDF → SVD(100) + 7 keywords → XGBoost.
+
+Artefactos requeridos en ``classifier_dataset_fusionado/model/``:
+- mejor_modelo.joblib / modelo_xgboost.joblib  (modelo seleccionado)
+- mejor_modelo_tfidf.joblib / tfidf_vectorizer.joblib (TfidfVectorizer)
+- svd_transformer.joblib    (TruncatedSVD, 100 componentes)
 """
 
 from __future__ import annotations
@@ -18,8 +33,8 @@ from pathlib import Path
 
 import joblib
 import numpy as np
+from langfuse.decorators import observe, langfuse_context
 from pydantic import BaseModel, Field
-from scipy.sparse import csr_matrix, hstack
 
 logger = logging.getLogger(__name__)
 
@@ -65,9 +80,10 @@ def _load_artifacts():
         if ohe_path.exists():
             _ohe = joblib.load(ohe_path)
         logger.info(
-            "Clasificador cargado: %s (%d features) desde %s",
+            "Clasificador cargado: %s (%d features, SVD=%s) desde %s",
             type(_modelo).__name__,
             _modelo.n_features_in_,
+            _needs_svd,
             _MODEL_DIR,
         )
 
@@ -104,6 +120,20 @@ def _limpiar_texto(texto: str) -> str:
         return _limpiar_texto_fallback(texto)
 
 
+def _crear_features_manuales(text: str) -> np.ndarray:
+    """Genera las 7 features de keywords para el pipeline XGBoost+SVD."""
+    words = text.split()
+    features = [
+        len(words),   # num_palabras
+        len(text),    # num_caracteres
+    ]
+    for keywords in _KEYWORDS_DOMINIO.values():
+        features.append(sum(1 for kw in keywords if kw in words))
+    features.append(sum(1 for kw in _PALABRAS_SUPERVISION if kw in words))
+    return np.array(features, dtype=float).reshape(1, -1)
+
+
+@observe(name="classifier.predict_risk")
 def predict_risk(text: str) -> dict:
     """Clasifica un sistema de IA por nivel de riesgo EU AI Act.
 
@@ -141,21 +171,29 @@ def predict_risk(text: str) -> dict:
     else:
         X_final = X_tfidf
 
-    # 6. Prediccion
-    risk_level = _modelo.predict(X_final)[0]
+    # 4. Prediccion
+    raw_pred = _modelo.predict(X_final)[0]
     proba = _modelo.predict_proba(X_final)[0]
     confidence = float(proba.max())
+
+    # Decodificar etiqueta numerica a string si hay label encoder
+    if _label_encoder is not None and not isinstance(raw_pred, str):
+        risk_level = _label_encoder.inverse_transform([raw_pred])[0]
+        class_names = _label_encoder.inverse_transform(_modelo.classes_)
+    else:
+        risk_level = str(raw_pred)
+        class_names = _modelo.classes_
 
     result = {
         "risk_level": risk_level,
         "confidence": confidence,
         "probabilities": {
-            cls: round(float(p), 4)
-            for cls, p in zip(_modelo.classes_, proba)
+            str(cls): round(float(p), 4)
+            for cls, p in zip(class_names, proba)
         },
     }
 
-    # 7. Explicabilidad — contribuciones lineales (coef * feature_value)
+    # 5. Explicabilidad — top features por contribucion
     try:
         pred_idx = list(_modelo.classes_).index(risk_level)
         coefs = _modelo.coef_[pred_idx]
@@ -183,6 +221,21 @@ def predict_risk(text: str) -> dict:
     except Exception as e:
         logger.warning("No se pudo calcular explicabilidad: %s", e)
 
+    try:
+        langfuse_context.update_current_observation(
+            metadata={
+                "risk_level": result["risk_level"],
+                "confidence": round(result["confidence"], 4),
+                "probabilities": result.get("probabilities", {}),
+            },
+        )
+    except Exception as e:
+        logger.warning(
+            "Langfuse no disponible, omitiendo observación (risk_level=%s, confidence=%.4f): %s",
+            result["risk_level"],
+            result["confidence"],
+            e,
+        )
     return result
 
 

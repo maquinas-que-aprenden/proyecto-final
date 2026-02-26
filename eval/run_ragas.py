@@ -26,6 +26,7 @@ from helpers import (
     build_ragas_dataset,
     run_ragas,
     log_to_mlflow,
+    log_to_langfuse,
     check_thresholds,
     THRESHOLDS,
 )
@@ -80,7 +81,13 @@ def main(ci_mode: bool = False) -> int:
         if ci_mode:
             logger.warning("Continuando sin MLflow en CI...")
 
-    # 7. Comprobar umbrales (solo bloquea en CI)
+    # 7. Anotar scores en Langfuse
+    try:
+        log_to_langfuse(metrics, n_examples=len(rows), git_sha=git_sha)
+    except Exception as e:
+        logger.warning("No se pudo conectar con Langfuse: %s", e)
+
+    # 8. Comprobar umbrales (falla con exit code 1 si --ci)
     failures = check_thresholds(metrics)
     if failures:
         logger.error("Métricas por debajo del umbral:")
