@@ -326,8 +326,18 @@ def predict_risk(text: str) -> dict:
             X_dense = X_final.toarray().flatten() if hasattr(X_final, "toarray") else X_final.flatten()
             contributions = coefs * X_dense
         elif hasattr(_modelo, "feature_importances_"):
-            # XGBoost: feature importances globales
-            contributions = _modelo.feature_importances_
+            # XGBoost: TreeExplainer da SHAP values locales por instancia
+            import shap
+            explainer = shap.TreeExplainer(_modelo)
+            shap_vals = explainer.shap_values(X_final)
+            pred_idx = list(_modelo.classes_).index(raw_pred)
+            # shap_vals: lista (API <0.46) o ndarray 3D (API >=0.46, multiclase)
+            if isinstance(shap_vals, list):
+                contributions = shap_vals[pred_idx][0]
+            elif isinstance(shap_vals, np.ndarray) and shap_vals.ndim == 3:
+                contributions = shap_vals[0, :, pred_idx]
+            else:
+                contributions = shap_vals[0]
         else:
             contributions = None
 
