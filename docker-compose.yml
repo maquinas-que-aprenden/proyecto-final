@@ -7,4 +7,8 @@ services:
       - .env
     volumes:
       - ./data/processed/vectorstore:/app/data/processed/vectorstore:ro
+      - ollama_models:/home/appuser/.ollama
     restart: unless-stopped
+
+volumes:
+  ollama_models:
