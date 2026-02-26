@@ -6,7 +6,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./data/processed/vectorstore:/app/data/processed/vectorstore:ro
+      - ./data/processed/vectorstore:/app/data/processed/vectorstore
       - ollama_models:/home/appuser/.ollama
     restart: unless-stopped
 
