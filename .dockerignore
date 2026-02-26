@@ -13,6 +13,7 @@ data/
 
 # Infraestructura y docs
 infra/
+!infra/ollama-entrypoint.sh
 docs/
 
 # Git
