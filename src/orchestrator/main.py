@@ -83,13 +83,19 @@ def search_legal_docs(query: str) -> str:
 
     docs = retrieve(query)
     if not docs:
-        langfuse_context.update_current_observation(metadata={"n_docs": 0, "n_relevant": 0})
+        try:
+            langfuse_context.update_current_observation(metadata={"n_docs": 0, "n_relevant": 0})
+        except Exception:
+            pass
         return "No se encontraron documentos relevantes para esta consulta."
 
     relevant = grade(query, docs)
-    langfuse_context.update_current_observation(
-        metadata={"n_docs": len(docs), "n_relevant": len(relevant)}
-    )
+    try:
+        langfuse_context.update_current_observation(
+            metadata={"n_docs": len(docs), "n_relevant": len(relevant)}
+        )
+    except Exception:
+        pass
     if not relevant:
         return "Se encontraron documentos pero ninguno fue relevante para la consulta."
 

@@ -99,10 +99,13 @@ def generate_report(system_desc: str, risk_level: str, articles: list[str]) -> s
         report = response.content.strip()
     except Exception as e:
         logger.warning("LLM de informes no disponible, usando fallback: %s", e)
-        langfuse_context.update_current_observation(
-            level="WARNING",
-            status_message=f"Bedrock no disponible — informe con template estático: {e}",
-        )
+        try:
+            langfuse_context.update_current_observation(
+                level="WARNING",
+                status_message=f"Bedrock no disponible — informe con template estático: {e}",
+            )
+        except Exception:
+            pass
         report = _fallback_report(system_desc, risk_level, citations)
         grounded = False
 
