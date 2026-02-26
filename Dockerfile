@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Dependencias del sistema para Ollama
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl ca-certificates && \
+    apt-get install -y --no-install-recommends curl ca-certificates zstd && \
     rm -rf /var/lib/apt/lists/*
 
 # Instalar Ollama (verificar integridad del script)
@@ -16,7 +16,8 @@ RUN curl -fsSL https://ollama.com/install.sh -o /tmp/ollama-install.sh && \
 
 # Crear usuario no-root para runtime
 RUN useradd -m -u 1000 appuser && \
-    chown -R appuser:appuser /app /usr/local/bin/ollama
+    mkdir -p /home/appuser/.ollama && \
+    chown -R appuser:appuser /app /usr/local/bin/ollama /home/appuser/.ollama
 
 COPY requirements/ requirements/
 RUN pip install --no-cache-dir -r requirements/app.txt
