@@ -273,6 +273,11 @@ def predict_risk(text: str) -> dict:
                 "probabilities": result.get("probabilities", {}),
             },
         )
+        langfuse_context.score_current_trace(
+            name="classifier_confidence",
+            value=result["confidence"],
+            comment=result["risk_level"],
+        )
     except Exception as e:
         logger.warning(
             "Langfuse no disponible, omitiendo observación (risk_level=%s, confidence=%.4f): %s",
