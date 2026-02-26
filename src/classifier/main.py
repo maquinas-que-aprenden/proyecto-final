@@ -19,9 +19,11 @@ Exp 2 (XGBoost + SVD + GS) con F1-macro test 0.8822.
 Pipeline de inferencia: texto → TF-IDF → SVD(100) + 7 keywords → XGBoost.
 
 Artefactos requeridos en ``classifier_dataset_fusionado/model/``:
-- mejor_modelo.joblib / modelo_xgboost.joblib  (modelo seleccionado)
-- mejor_modelo_tfidf.joblib / tfidf_vectorizer.joblib (TfidfVectorizer)
-- svd_transformer.joblib    (TruncatedSVD, 100 componentes)
+- mejor_modelo_seleccion.json  (metadatos del experimento ganador)
+- modelo_xgboost.joblib        (XGBClassifier seleccionado)
+- tfidf_vectorizer.joblib      (TfidfVectorizer, vocab ~3773, bigramas)
+- svd_transformer.joblib       (TruncatedSVD, 100 componentes)
+- label_encoder.joblib         (LabelEncoder, opcional)
 """
 
 from __future__ import annotations
