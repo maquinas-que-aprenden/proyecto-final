@@ -1,6 +1,6 @@
 resource "aws_instance" "normabot_server" {
   ami                         = var.ami_id
-  instance_type               = "t3.micro"
+  instance_type               = "t3.medium"
   key_name                    = var.key_name
   associate_public_ip_address = true
 
