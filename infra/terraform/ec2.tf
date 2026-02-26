@@ -25,7 +25,7 @@ resource "aws_instance" "normabot_server" {
 
 resource "aws_ebs_volume" "normabot_data" {
   availability_zone = "eu-west-1a"
-  size              = 8
+  size              = 20
   type              = "gp3"
 
   lifecycle {
