@@ -21,7 +21,10 @@ aws s3 ls s3://normabot
 ### Datos
 Esta sección explica cómo manejar archivos pesados (PDFs, JSONs de datos) para que se guarden en S3 y no saturen GitHub. Vamos a usar [DVC](https://dvc.org/) que funciona muy parecido a git.
 
-**Prerequisitos**: tienen que estar instaladas las dependencias: `awscli`, `dvc`, `dvc-s3` que deberían estar en `requirements.txt`.
+**Prerequisitos**: AWS CLI (instalación manual, ver sección anterior) y DVC con soporte S3:
+```bash
+pipx install 'dvc[s3]'
+```
 
 #### Configuración de DVC (hecha ya)
 Esto **se hace solo una vez y ya está hecho**.
@@ -102,6 +105,7 @@ Para eliminar toda la infraestructura:
 ```bash
 terraform destroy
 ```
+**Nota**: los volúmenes EBS tienen `prevent_destroy = true` y Terraform se negará a eliminarlos. Si se quieren eliminar definitivamente (con la consiguiente pérdida de datos), hay que borrarlos manualmente desde la consola de AWS después.
 
 Para desplegar o destruir hay que tener permisos para crear los recursos en AWS, requiere un key pair de EC2.
 

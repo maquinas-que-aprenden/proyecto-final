@@ -72,8 +72,9 @@ De momento solo hay una para MLflow. Es preferible usar SQLite dentro de la prop
 ## Integración y despliegue continuo (CI/CD)
 * Se usa GitHub Actions por estar integrado con el repositorio.
 * Las imágenes Docker se publican en GitHub Container Registry (ghcr.io) porque es gratuito para repositorios públicos, a diferencia de ECR de AWS que tiene coste por almacenamiento.
-* Hay tres workflows separados:
-    * `ci-develop.yml`: lint con ruff + construye y publica la imagen con tag `:develop` en cada push a `develop`, para poder probarla manualmente.
+* Hay cuatro workflows separados:
+    * `pr_lint.yml`: lint con ruff solo sobre los ficheros `.py`/`.ipynb` modificados, en cada PR a `main` o `develop`.
+    * `ci-develop.yml`: lint completo + construye y publica la imagen con tag `:develop` en cada push a `develop`, para poder probarla manualmente.
     * `cicd-main.yml`: lint + construye, publica con tag `:latest` y despliega automáticamente en el servidor en cada push a `main`.
     * `eval.yml`: ejecuta la evaluación RAGAS en EC2 contra la imagen `:latest` desplegada. Se lanza manualmente (`workflow_dispatch`).
 * El despliegue se hace vía SSH a la EC2. El script de deploy hace login en GHCR, `dvc pull` del vectorstore y levanta el contenedor con `docker compose up -d --pull always --force-recreate`. Pendiente: valorar si simplificar a `docker run` directo.
