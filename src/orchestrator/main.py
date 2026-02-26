@@ -208,6 +208,11 @@ def run(query: str, session_id: str | None = None, user_id: str | None = None) -
         {"messages": [("user", query)]},
         config={"callbacks": callbacks},
     )
+    # Exponer el trace_id de Langfuse para que la UI pueda añadir scores de feedback
+    if callbacks:
+        trace_id = getattr(callbacks[0], "trace_id", None)
+        if trace_id:
+            result["_langfuse_trace_id"] = trace_id
     return result
 
 
