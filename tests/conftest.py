@@ -7,6 +7,7 @@ de instalar el paquete en modo editable.
 pytest carga este archivo automáticamente antes de ejecutar cualquier test.
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -14,3 +15,7 @@ from pathlib import Path
 # Path(__file__).parent  →  tests/
 # .parent                →  proyecto-final/  (raíz del repo)
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Desactiva Langfuse en tests: los @observe en predict_risk, retrieve, etc.
+# no envían trazas durante pytest (evita dependencia de keys en CI).
+os.environ.setdefault("LANGFUSE_ENABLED", "false")
