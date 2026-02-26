@@ -1,12 +1,5 @@
 """classifier/main.py — Servicio de clasificacion de riesgo EU AI Act.
 
-Carga el modelo serializado (LogisticRegression + TF-IDF) entrenado
-en el dataset artificial y expone ``predict_risk(text) -> dict`` para que
-el orquestador lo invoque como tool.
-
-Artefactos requeridos en ``classifier_dataset_artificial/model/``:
-- modelo_baseline.joblib  (LogisticRegression, F1-macro 0.905)
-- tfidf_vectorizer.joblib (TfidfVectorizer, vocab ~3773, bigramas)
 Carga el modelo serializado entrenado en el dataset fusionado y expone
 ``predict_risk(text) -> dict`` para que el orquestador lo invoque como tool.
 
@@ -19,11 +12,9 @@ Exp 2 (XGBoost + SVD + GS) con F1-macro test 0.8822.
 Pipeline de inferencia: texto → TF-IDF → SVD(100) + 7 keywords → XGBoost.
 
 Artefactos requeridos en ``classifier_dataset_fusionado/model/``:
-- mejor_modelo_seleccion.json  (metadatos del experimento ganador)
-- modelo_xgboost.joblib        (XGBClassifier seleccionado)
-- tfidf_vectorizer.joblib      (TfidfVectorizer, vocab ~3773, bigramas)
-- svd_transformer.joblib       (TruncatedSVD, 100 componentes)
-- label_encoder.joblib         (LabelEncoder, opcional)
+- mejor_modelo.joblib / modelo_xgboost.joblib  (modelo seleccionado)
+- mejor_modelo_tfidf.joblib / tfidf_vectorizer.joblib (TfidfVectorizer)
+- svd_transformer.joblib    (TruncatedSVD, 100 componentes)
 """
 
 from __future__ import annotations
@@ -45,24 +36,58 @@ class _TextInput(BaseModel):
     text: str = Field(min_length=1, max_length=5000)
 
 
-# Ruta al mejor modelo (dataset artificial, F1-macro test: 0.9053, LogisticRegression + TF-IDF puro)
-_MODEL_DIR = Path(__file__).parent / "classifier_dataset_artificial" / "model"
+# Keywords de dominio (replica de functions.py para inferencia sin spaCy)
+_KEYWORDS_DOMINIO = {
+    "inaceptable": [
+        "inferir", "vender", "manipular", "subconsciente", "biométrico",
+        "facial", "vigilancia", "sindical", "racial", "etnia",
+        "religioso", "discriminar", "coerción", "prohibido",
+    ],
+    "alto_riesgo": [
+        "penitenciario", "juez", "reincidencia", "crediticio",
+        "diagnóstico", "sanitario", "migración", "asilo",
+        "policial", "empleabilidad", "infraestructura", "vinculante",
+        "medicación", "autónomamente",
+        "reclamación", "subsidio", "escolar", "triage",
+        "urgencia", "aeronave", "piloto", "laboral",
+    ],
+    "riesgo_limitado": [
+        "chatbot", "revelar", "transparencia", "deepfake",
+        "sintético", "notificar", "asesoramiento", "asistente",
+        "informar", "advertir", "indicar",
+    ],
+    "riesgo_minimo": [
+        "sugerir", "borrador", "juego", "spam", "entretenimiento",
+        "filtro", "aficionado", "hobby", "receta",
+        "avería", "maquinaria", "logística", "mantenimiento",
+        "sensor", "industrial", "gestión",
+    ],
+}
+_PALABRAS_SUPERVISION = [
+    "supervisión", "supervisar", "revisar", "revisión", "garantía",
+    "confirmación", "criterio", "auditoría", "humano",
+    "pediatra", "médico", "piloto", "pedagógico",
+]
+
+# Ruta al mejor modelo (dataset fusionado)
+_MODEL_DIR = Path(__file__).parent / "classifier_dataset_fusionado" / "model"
 
 # Singletons — se cargan en el primer uso (thread-safe)
 _modelo = None
 _tfidf = None
-_ohe = None
-_needs_manual_features = False  # leido desde mejor_modelo_seleccion.json
+_svd = None
+_label_encoder = None
+_needs_svd = False
 _lock = threading.Lock()
 
 
 def _load_artifacts():
-    """Carga lazy de modelo, TF-IDF y OHE encoder (thread-safe, double-check locking)."""
-    global _modelo, _tfidf, _ohe, _needs_manual_features
-    if _modelo is not None:
+    """Carga lazy de modelo, TF-IDF y SVD (thread-safe, double-check locking)."""
+    global _modelo, _tfidf, _svd, _label_encoder, _needs_svd
+    if _modelo is not None and _tfidf is not None:
         return
     with _lock:
-        if _modelo is not None:
+        if _modelo is not None and _tfidf is not None:
             return
 
         meta_path = _MODEL_DIR / "mejor_modelo_seleccion.json"
@@ -70,17 +95,27 @@ def _load_artifacts():
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
             model_file = _MODEL_DIR.parent / meta["model_file"]
             tfidf_file = _MODEL_DIR.parent / meta["tfidf_file"]
-            _needs_manual_features = meta.get("needs_manual_features", False)
             logger.info("Cargando modelo desde metadata: %s", meta.get("nombre", ""))
         else:
             model_file = _MODEL_DIR / "mejor_modelo.joblib"
             tfidf_file = _MODEL_DIR / "mejor_modelo_tfidf.joblib"
 
-        _modelo = joblib.load(model_file)
-        _tfidf = joblib.load(tfidf_file)
-        ohe_path = _MODEL_DIR / "ohe_encoder.joblib"
-        if ohe_path.exists():
-            _ohe = joblib.load(ohe_path)
+        try:
+            _modelo = joblib.load(model_file)
+            _tfidf = joblib.load(tfidf_file)
+            # SVD solo se necesita para el pipeline XGBoost
+            svd_path = _MODEL_DIR / "svd_transformer.joblib"
+            if svd_path.exists():
+                _svd = joblib.load(svd_path)
+                _needs_svd = True
+            # Label encoder para decodificar predicciones numericas
+            le_path = _MODEL_DIR / "label_encoder.joblib"
+            if le_path.exists():
+                _label_encoder = joblib.load(le_path)
+        except Exception:
+            _modelo = _tfidf = _svd = _label_encoder = None
+            _needs_svd = False
+            raise
         logger.info(
             "Clasificador cargado: %s (%d features, SVD=%s) desde %s",
             type(_modelo).__name__,
@@ -161,17 +196,22 @@ def predict_risk(text: str) -> dict:
     # 2. TF-IDF
     X_tfidf = _tfidf.transform([cleaned])
 
-    # 3. Combinar features: TF-IDF + OHE (ceros) + numericas (ceros).
-    #    En inferencia libre no tenemos category/context estructurados,
-    #    asi que pasamos vectores zero para OHE y numericas.
-    #    El TF-IDF (5000 features) lleva la mayor parte de la senal.
-    if _ohe is not None:
-        n_ohe = sum(len(c) for c in _ohe.categories_)
-        X_ohe = csr_matrix((1, n_ohe))
-        X_num = csr_matrix((1, 2), dtype=float)
-        X_final = hstack([X_tfidf, X_ohe, X_num])
+    # 3. Construir features segun pipeline del modelo
+    if _needs_svd:
+        # Pipeline XGBoost: TF-IDF → SVD(100) + 7 keyword features = 107
+        X_svd = _svd.transform(X_tfidf)
+        X_manual = _crear_features_manuales(cleaned)
+        X_final = np.hstack([X_svd, X_manual])
+        feature_names = (
+            [f"svd_{i}" for i in range(_svd.n_components)]
+            + ["num_palabras", "num_caracteres"]
+            + [f"kw_{c}" for c in _KEYWORDS_DOMINIO]
+            + ["kw_salvaguarda"]
+        )
     else:
+        # Pipeline LogReg: TF-IDF directo (sparse)
         X_final = X_tfidf
+        feature_names = _tfidf.get_feature_names_out().tolist()
 
     # 4. Prediccion
     raw_pred = _modelo.predict(X_final)[0]
@@ -197,29 +237,31 @@ def predict_risk(text: str) -> dict:
 
     # 5. Explicabilidad — top features por contribucion
     try:
-        pred_idx = list(_modelo.classes_).index(risk_level)
-        coefs = _modelo.coef_[pred_idx]
-        X_dense = X_final.toarray().flatten()
-        contributions = coefs * X_dense
+        if hasattr(_modelo, "coef_"):
+            # LogReg: contribuciones lineales
+            pred_idx = list(_modelo.classes_).index(risk_level)
+            coefs = _modelo.coef_[pred_idx]
+            X_dense = X_final.toarray().flatten() if hasattr(X_final, "toarray") else X_final.flatten()
+            contributions = coefs * X_dense
+        elif hasattr(_modelo, "feature_importances_"):
+            # XGBoost: feature importances globales
+            contributions = _modelo.feature_importances_
+        else:
+            contributions = None
 
-        tfidf_names = _tfidf.get_feature_names_out().tolist()
-        ohe_names = _ohe.get_feature_names_out().tolist() if _ohe is not None else []
-        num_names = ["longitud", "num_articles"] if _ohe is not None else []
-        feature_names = tfidf_names + ohe_names + num_names
-
-        top_idx = np.argsort(np.abs(contributions))[::-1][:5]
-        shap_top = [
-            {"feature": feature_names[i], "contribution": float(contributions[i])}
-            for i in top_idx
-            if contributions[i] != 0
-        ]
-
-        if shap_top:
-            result["shap_top_features"] = shap_top
-            top_words = ", ".join(f["feature"] for f in shap_top[:3])
-            result["shap_explanation"] = (
-                f"Factores principales para '{risk_level}': {top_words}."
-            )
+        if contributions is not None:
+            top_idx = np.argsort(np.abs(contributions))[::-1][:5]
+            shap_top = [
+                {"feature": feature_names[i], "contribution": float(contributions[i])}
+                for i in top_idx
+                if i < len(feature_names) and contributions[i] != 0
+            ]
+            if shap_top:
+                result["shap_top_features"] = shap_top
+                top_words = ", ".join(f["feature"] for f in shap_top[:3])
+                result["shap_explanation"] = (
+                    f"Factores principales para '{risk_level}': {top_words}."
+                )
     except Exception as e:
         logger.warning("No se pudo calcular explicabilidad: %s", e)
 
@@ -230,6 +272,11 @@ def predict_risk(text: str) -> dict:
                 "confidence": round(result["confidence"], 4),
                 "probabilities": result.get("probabilities", {}),
             },
+        )
+        langfuse_context.score_current_trace(
+            name="classifier_confidence",
+            value=result["confidence"],
+            comment=result["risk_level"],
         )
     except Exception as e:
         logger.warning(
