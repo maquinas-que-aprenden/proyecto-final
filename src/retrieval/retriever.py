@@ -8,12 +8,15 @@ DEFAULT_K = 5
 
 CHROMA_DIR = Path(__file__).resolve().parents[2] / "data" / "processed" / "vectorstore" / "chroma"
 COLLECTION_NAME = "normabot_legal_chunks"
+# Mismo modelo usado en data/index.py para generar los embeddings del vectorstore
+EMBED_MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
 
 # Inicialización Chroma (lazy)
 
 _client = None
 _collection = None
+_embed_model = None
 
 
 def _get_collection():
@@ -23,6 +26,20 @@ def _get_collection():
         _client = chromadb.PersistentClient(path=str(CHROMA_DIR))
         _collection = _client.get_collection(COLLECTION_NAME)
     return _collection
+
+
+def _get_embed_model():
+    """Singleton del modelo de embeddings (mismo que en data/index.py)."""
+    global _embed_model
+    if _embed_model is None:
+        from sentence_transformers import SentenceTransformer
+        _embed_model = SentenceTransformer(EMBED_MODEL_NAME)
+    return _embed_model
+
+
+def _embed_query(query: str) -> list:
+    """Genera el embedding de la query con el mismo modelo usado en indexación."""
+    return _get_embed_model().encode(query).tolist()
 
 
 # Funciones internas
@@ -68,7 +85,7 @@ def _detect_priority_sources(query: str) -> Optional[List[str]]:
 def search_base(query: str, k: int = DEFAULT_K) -> List[Dict[str, Any]]:
     collection = _get_collection()
     results = collection.query(
-        query_texts=[query],
+        query_embeddings=[_embed_query(query)],
         n_results=k
     )
 
@@ -82,7 +99,7 @@ def search_soft(query: str, k: int = DEFAULT_K) -> List[Dict[str, Any]]:
 
     collection = _get_collection()
     results = collection.query(
-        query_texts=[query],
+        query_embeddings=[_embed_query(query)],
         n_results=k * 2
     )
 
