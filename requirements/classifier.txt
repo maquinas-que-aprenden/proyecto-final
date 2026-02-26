@@ -1,0 +1,10 @@
+# Dependencias runtime del clasificador de riesgo (inferencia en producción)
+# Solo lo necesario para predict_risk() — sin entrenamiento ni visualización
+-r base.txt
+
+scikit-learn==1.5.2
+xgboost==3.2.0
+joblib==1.4.2
+scipy==1.14.1
+spacy==3.8.2
+packaging==24.2

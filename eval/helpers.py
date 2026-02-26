@@ -156,12 +156,34 @@ def log_to_mlflow(metrics: dict, n_examples: int, git_sha: str) -> None:
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     mlflow.set_experiment(MLFLOW_EXPERIMENT)
 
+    classifier_params = {}
+    meta_path = Path(__file__).parents[1] / "src/classifier/classifier_dataset_fusionado/model/mejor_modelo_seleccion.json"
+    if meta_path.exists():
+        try:
+            with open(meta_path, encoding="utf-8") as f:
+                meta = json.load(f)
+            if not isinstance(meta, dict):
+                raise ValueError(f"Se esperaba dict, se obtuvo {type(meta).__name__}")
+            classifier_params = {
+                "classifier_model": meta.get("nombre", "unknown"),
+                "classifier_type": meta.get("model_type", "unknown"),
+                "classifier_f1_macro": meta.get("test_f1_macro"),
+            }
+        except (OSError, json.JSONDecodeError, ValueError) as e:
+            logger.warning("No se pudo leer mejor_modelo_seleccion.json: %s", e)
+            classifier_params = {
+                "classifier_model": "unknown",
+                "classifier_type": "unknown",
+                "classifier_f1_macro": None,
+            }
+
     with mlflow.start_run(run_name=f"ragas-{git_sha[:8]}"):
         mlflow.log_params({
             "model": os.getenv("BEDROCK_MODEL_ID", "eu.amazon.nova-lite-v1:0"),
             "commit": git_sha,
             "n_examples": n_examples,
             "dataset": "eval/dataset.json",
+            **classifier_params,
         })
         mlflow.log_metrics(metrics)
 
@@ -171,6 +193,41 @@ def log_to_mlflow(metrics: dict, n_examples: int, git_sha: str) -> None:
         })
 
     logger.info("Resultados logueados en MLflow: %s", MLFLOW_TRACKING_URI)
+
+def log_to_langfuse(metrics: dict, n_examples: int, git_sha: str) -> None:
+    """Anota los scores RAGAS en Langfuse como una traza de evaluación."""
+    from langfuse import Langfuse
+
+    public_key = os.getenv("LANGFUSE_PUBLIC_KEY")
+    secret_key = os.getenv("LANGFUSE_SECRET_KEY")
+    if not public_key or not secret_key:
+        raise ValueError("Define LANGFUSE_PUBLIC_KEY y LANGFUSE_SECRET_KEY.")
+
+    lf = Langfuse(
+        public_key=public_key,
+        secret_key=secret_key,
+        host=os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com"),
+    )
+
+    trace = lf.trace(
+        name="ragas-eval",
+        tags=["eval", "ragas"],
+        metadata={
+            "git_sha": git_sha,
+            "n_examples": n_examples,
+            "model": os.getenv("BEDROCK_MODEL_ID", "eu.amazon.nova-lite-v1:0"),
+            "dataset": "eval/dataset.json",
+        },
+    )
+
+    for metric_name, value in metrics.items():
+        threshold = THRESHOLDS.get(metric_name)
+        comment = f"umbral: {threshold}" if threshold is not None else None
+        trace.score(name=metric_name, value=value, comment=comment)
+
+    lf.flush()
+    logger.info("Scores RAGAS logueados en Langfuse (trace: %s)", trace.id)
+
 
 def check_thresholds(metrics: dict) -> list[str]:
     """Comprueba si alguna métrica está por debajo del umbral.

@@ -8,6 +8,7 @@ import logging
 import os
 
 from langchain_ollama import ChatOllama
+from langfuse.decorators import observe, langfuse_context
 
 from src.retrieval.retriever import search
 
@@ -39,15 +40,17 @@ def _get_grading_llm():
     return _grading_llm
 
 
+@observe(name="rag.retrieve")
 def retrieve(query: str, k: int = 5) -> list[dict]:
     """Recupera documentos de ChromaDB y los formatea para grade()."""
     try:
         results = search(query, k=k, mode="soft")
     except Exception:
         logger.exception("Error al buscar en ChromaDB")
+        langfuse_context.update_current_observation(metadata={"error": "ChromaDB unavailable", "k": k})
         return []
 
-    return [
+    docs = [
         {
             "doc": r["text"],
             "metadata": r.get("metadata", {}),
@@ -55,6 +58,10 @@ def retrieve(query: str, k: int = 5) -> list[dict]:
         }
         for r in results
     ]
+    langfuse_context.update_current_observation(
+        metadata={"k": k, "n_docs_retrieved": len(docs)},
+    )
+    return docs
 
 
 def _grade_by_score(docs: list[dict], threshold: float = 0.7) -> list[dict]:
@@ -62,6 +69,7 @@ def _grade_by_score(docs: list[dict], threshold: float = 0.7) -> list[dict]:
     return [d for d in docs if d["score"] >= threshold]
 
 
+@observe(name="rag.grade")
 def grade(query: str, docs: list[dict], threshold: float = 0.7) -> list[dict]:
     """Evalúa relevancia de cada documento con LLM local (Ollama).
 
@@ -74,7 +82,11 @@ def grade(query: str, docs: list[dict], threshold: float = 0.7) -> list[dict]:
         llm = _get_grading_llm()
     except Exception:
         logger.warning("Ollama no disponible, usando fallback por score")
-        return _grade_by_score(docs, threshold)
+        relevant = _grade_by_score(docs, threshold)
+        langfuse_context.update_current_observation(
+            metadata={"n_docs_in": len(docs), "n_relevant": len(relevant), "method": "score_fallback"},
+        )
+        return relevant
 
     relevant = []
     for doc in docs:
@@ -89,6 +101,9 @@ def grade(query: str, docs: list[dict], threshold: float = 0.7) -> list[dict]:
             if doc["score"] >= threshold:
                 relevant.append(doc)
 
+    langfuse_context.update_current_observation(
+        metadata={"n_docs_in": len(docs), "n_relevant": len(relevant), "method": "llm"},
+    )
     return relevant
 
 
@@ -134,6 +149,7 @@ def _format_context(docs: list[dict]) -> str:
     return "\n\n".join(blocks)
 
 
+@observe(name="rag.generate")
 def generate(query: str, context: list[dict]) -> dict:
     """Genera una respuesta con citas legales usando Bedrock Nova Lite.
 
@@ -142,6 +158,9 @@ def generate(query: str, context: list[dict]) -> dict:
     sources = [d.get("metadata", {}) for d in context]
 
     if not context:
+        langfuse_context.update_current_observation(
+            metadata={"n_context_docs": 0, "grounded": False},
+        )
         return {
             "answer": "No se encontraron documentos relevantes para esta consulta.",
             "sources": [],
@@ -171,6 +190,9 @@ def generate(query: str, context: list[dict]) -> dict:
 
     answer += "\n\n_Informe preliminar generado por IA. Consulte profesional jurídico._"
 
+    langfuse_context.update_current_observation(
+        metadata={"n_context_docs": len(context), "grounded": grounded},
+    )
     return {
         "answer": answer,
         "sources": sources,

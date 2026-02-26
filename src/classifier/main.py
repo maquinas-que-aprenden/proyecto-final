@@ -26,6 +26,7 @@ from pathlib import Path
 
 import joblib
 import numpy as np
+from langfuse.decorators import observe, langfuse_context
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -169,6 +170,7 @@ def _crear_features_manuales(text: str) -> np.ndarray:
     return np.array(features, dtype=float).reshape(1, -1)
 
 
+@observe(name="classifier.predict_risk")
 def predict_risk(text: str) -> dict:
     """Clasifica un sistema de IA por nivel de riesgo EU AI Act.
 
@@ -263,6 +265,21 @@ def predict_risk(text: str) -> dict:
     except Exception as e:
         logger.warning("No se pudo calcular explicabilidad: %s", e)
 
+    try:
+        langfuse_context.update_current_observation(
+            metadata={
+                "risk_level": result["risk_level"],
+                "confidence": round(result["confidence"], 4),
+                "probabilities": result.get("probabilities", {}),
+            },
+        )
+    except Exception as e:
+        logger.warning(
+            "Langfuse no disponible, omitiendo observación (risk_level=%s, confidence=%.4f): %s",
+            result["risk_level"],
+            result["confidence"],
+            e,
+        )
     return result
 
 
