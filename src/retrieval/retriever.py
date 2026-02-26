@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+import threading
 import chromadb
 
 # Configuración
@@ -17,6 +18,7 @@ EMBED_MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 _client = None
 _collection = None
 _embed_model = None
+_lock = threading.Lock()
 
 
 def _get_collection():
@@ -29,11 +31,13 @@ def _get_collection():
 
 
 def _get_embed_model():
-    """Singleton del modelo de embeddings (mismo que en data/index.py)."""
+    """Singleton del modelo de embeddings (mismo que en data/index.py), thread-safe."""
     global _embed_model
     if _embed_model is None:
-        from sentence_transformers import SentenceTransformer
-        _embed_model = SentenceTransformer(EMBED_MODEL_NAME)
+        with _lock:
+            if _embed_model is None:
+                from sentence_transformers import SentenceTransformer
+                _embed_model = SentenceTransformer(EMBED_MODEL_NAME)
     return _embed_model
 
 
