@@ -1224,6 +1224,7 @@ def plot_shap_summary(shap_values, X_explain, feature_names, class_names, output
 
     os.makedirs(output_dir, exist_ok=True)
     X_dense = X_explain.toarray() if hasattr(X_explain, "toarray") else X_explain
+    feature_names = np.array(feature_names)  # SHAP indexa con arrays numpy
     saved_paths = []
 
     # Normalizar shap_values a lista de arrays 2D (n_samples, n_features), uno por clase.
