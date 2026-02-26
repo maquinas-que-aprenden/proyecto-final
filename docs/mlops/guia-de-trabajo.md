@@ -65,9 +65,9 @@ dvc pull
 
 #### Gestionar índice de vectores con DVC
 Como con el corpus, para hacer versionado de los embeddings hay que:
-1. Añadir la ruta con el índice: 
+1. Añadir la ruta con el índice:
 ```bash
-dvc add models/vector_db
+dvc add data/processed/vectorstore/
 ```
 2. Hacer `push` para subirla a S3:
 ```bash
@@ -75,27 +75,13 @@ dvc push
 ```
 3. Para sincronizar con GitHub:
 ```bash
-git add models/vector_db.dvc .gitignore
+git add data/processed/vectorstore.dvc .gitignore
 git commit -m "Actualizar VectorDB version X"
 git push origin <tu-rama>
 ```
 
 #### Gestionar binarios de modelos
-El modelo de clasificación generará archivos cada vez que se termine de entrenar que pueden ser versionados.
-1. Añadir la ruta con el binario: 
-```bash
-dvc add models/classifier/classifier_v1.joblib
-```
-2. Hacer `push` para subirlo a S3:
-```bash
-dvc push
-```
-3. Para sincronizar con GitHub:
-```bash
-git add models/classifier/classifier_v1.joblib.dvc .gitignore
-git commit -m "Actualizar modelo de clasificación version X"
-git push origin <tu-rama>
-```
+Los modelos del clasificador (archivos `.joblib`) **no están gestionados con DVC** — se versionan directamente en git bajo `src/classifier/classifier_dataset_fusionado/model/`. Esto es así porque su tamaño es manejable y tenerlos en git facilita el despliegue sin pasos adicionales de `dvc pull`.
 
 ## Infraestructura como Código
 Usamos IaC para garantizar entornos reproducibles, escalables y que se desplieguen rápido con control de versiones.
@@ -127,7 +113,8 @@ Para desplegar o destruir hay que tener permisos para crear los recursos en AWS,
 ├── inventory.ini           # inventario de servidores, generado automáticamente por terraform (no se sube a github)
 ├── mlflow_deploy.yaml      # configuración de mlflow
 ├── mlflow_ebs.yaml         # configuración de ebs de mlflow
-├── normabot_ebs.yaml       # configuración de ebs de normabot
+├── normabot_ebs.yaml       # monta el EBS de normabot y mueve el data-root de Docker al EBS
+├── normabot_data.yaml      # instala DVC, clona el repo y descarga el vectorstore desde S3
 ├── playbook.yaml           # configuración general de ambos servidores
 └── templates
     ├── docker-compose.yml.j2   # necesario para despliegue de mlflow
@@ -155,10 +142,34 @@ ansible-playbook -i inventory.ini mlflow_deploy.yaml -e "mlflow_password=<passwo
 
 # Para normabot (solo la primera vez o si se recrea desde cero la instancia):
 ansible-playbook -i inventory.ini normabot_ebs.yaml
+ansible-playbook -i inventory.ini normabot_data.yaml
 ```
 En el caso de `mlflow_deploy` es necesario pasar la contraseña para que nginx impida acceder a cualquiera. La contraseña está en nuestro gestor de contraseñas compartido.
 
 ## Integración y despliegue continuo (CI/CD)
+
+### Workflows disponibles
+
+| Workflow | Disparador | Qué hace |
+|---|---|---|
+| `pr_lint.yml` | PR a `main` o `develop` | Lint (ruff) solo sobre los ficheros `.py`/`.ipynb` modificados en la PR |
+| `ci-develop.yml` | Push a `develop` | Lint completo + build y publicación de imagen `:develop` |
+| `cicd-main.yml` | Push a `main` | Lint completo + build imagen `:latest` + despliegue automático en EC2 |
+| `eval.yml` | Manual (`workflow_dispatch`) | Evaluación RAGAS sobre la imagen desplegada en EC2 |
+
+El `pr_lint.yml` usa `tj-actions/changed-files` para obtener solo los archivos modificados en la PR y pasarlos a `ruff check`, en vez de escanear el repositorio entero. Esto hace el check más rápido y evita fallos por ficheros que no se han tocado.
+
+### Secretos en GitHub
+
+Para que los workflows funcionen hay que configurar los siguientes secretos en _Settings → Secrets and variables → Actions_ del repositorio:
+
+| Secreto | Dónde se usa | Descripción |
+|---|---|---|
+| `EC2_HOST` | `cicd-main.yml`, `eval.yml` | IP pública del servidor NormaBot |
+| `EC2_USER` | `cicd-main.yml`, `eval.yml` | Usuario SSH (ubuntu) |
+| `EC2_SSH_KEY` | `cicd-main.yml`, `eval.yml` | Clave privada SSH (contenido del `.pem`) |
+| `GHCR_READ_TOKEN` | `cicd-main.yml` | Token con permiso `read:packages` para hacer login en GHCR desde EC2 |
+| `GHCR_READ_USER` | `cicd-main.yml` | Usuario de GitHub asociado al token anterior |
 
 ### Probar una imagen de develop
 Para probar manualmente una imagen publicada desde la rama `develop`:
@@ -174,7 +185,41 @@ La app estará disponible en `http://<ip-normabot>:8080`.
 ### Langfuse Cloud
 Tenemos una cuenta común para [Langfuse Cloud](https://cloud.langfuse.com/) y una API key para mandar trazas que se puede consultar en la web.
 
+Usamos Langfuse SDK v3 (`langfuse>=3.0.0,<4.0.0`) con dos mecanismos de instrumentación:
+* **`@observe` (decoradores de función)**: captura llamadas individuales a las funciones del pipeline (retrieve, grade, generate, predict_risk, generate_report, search, search_tool y las 3 herramientas del orquestador) con sus inputs, outputs y metadatos específicos de cada paso.
+* **CallbackHandler de LangChain**: captura el ciclo completo del agente ReAct, incluyendo el razonamiento y la selección de herramientas.
+
+#### Qué se puede ver en Langfuse
+Para cada petición al sistema:
+* Traza del agente ReAct: qué herramienta seleccionó el agente y por qué.
+* Span `rag.retrieve`: cuántos documentos recuperó ChromaDB y con qué distancias de similitud.
+* Span `rag.grade`: cuántos documentos superaron el filtro de relevancia, y si Ollama estuvo disponible o se usó el fallback por score (se distingue con `level=WARNING`).
+* Span `rag.generate`: si la respuesta está fundamentada en documentos reales (`grounded: true`) o es un fallback por concatenación.
+* Span `classifier.predict_risk`: nivel de riesgo predicho, confianza, y distribución de probabilidades por clase.
+* Span `report.generate`: si el informe lo generó Bedrock o el template estático, con la longitud del texto producido.
+* Los spans con `level=ERROR` (ChromaDB caído) o `level=WARNING` (Ollama o Bedrock en fallback) se distinguen visualmente para detectar degradaciones rápidamente.
+* Feedback de usuario (👍/👎) registrado como score en cada traza desde la UI.
+
+#### Tests
+En pytest, Langfuse se desactiva automáticamente mediante `LANGFUSE_ENABLED=false` en `tests/conftest.py`. No es necesario configurar credenciales para ejecutar los tests localmente ni en CI.
+
 Para más información, consultar la documentación oficial: [Langfuse: get started](https://langfuse.com/docs/observability/get-started)
+
+### Evaluación RAGAS (pendiente de implementación y tests)
+
+El workflow `eval.yml` ejecuta una evaluación RAGAS sobre NormaBot. Se lanza manualmente desde _Actions → NormaBot RAGAS Eval → Run workflow_.
+
+Lo que hace: se conecta por SSH al servidor EC2, levanta un contenedor con la imagen `:latest` ya desplegada y ejecuta `python eval/run_ragas.py --ci`. El script:
+
+1. Carga el dataset de evaluación (`eval/`).
+2. Obtiene respuestas del agente para cada pregunta.
+3. Calcula las métricas RAGAS. Los umbrales actuales son:
+   - `faithfulness` ≥ 0.80
+   - `answer_relevancy` ≥ 0.85
+4. Registra los resultados en MLflow (experimento `ragas_eval`) y anota scores en Langfuse.
+5. Si alguna métrica no supera el umbral, sale con código 1 (en local solo avisa, no bloquea).
+
+Para ver los resultados, consultar el experimento en MLflow o las trazas en Langfuse etiquetadas con el SHA del commit.
 
 ### MLflow
 Tenemos levantado un servidor para MLflow.
@@ -211,3 +256,57 @@ source ~/.bashrc  # o source ~/.zshrc para aplicarlo sin reiniciar
 La UI también está levantada en: https://<ip-mlflow>/mlflow/.
 
 Para más información, consultar la documentación oficial: [Logging to a tracking server](https://mlflow.org/docs/latest/self-hosting/architecture/tracking-server/#logging_to_a_tracking_server)
+
+## Desarrollo local
+
+### Ollama (RAG grading)
+NormaBot usa Ollama con el modelo `qwen2.5:3b` para el grading de documentos en el pipeline RAG. Sin Ollama corriendo, el grading cae silenciosamente al fallback por score de similitud (visible en Langfuse como `level=WARNING`).
+
+```bash
+# Instalar (macOS)
+brew install ollama
+
+# Descargar el modelo
+ollama pull qwen2.5:3b
+
+# Arrancar el servidor
+brew services start ollama
+```
+
+Verificar que funciona:
+```bash
+ollama list  # debe aparecer qwen2.5:3b
+```
+
+### Pipeline de datos
+Si se necesita regenerar el vectorstore desde cero (por ejemplo, tras añadir documentos nuevos al corpus):
+```bash
+# 1. Descargar datos crudos de S3
+dvc pull data/raw/
+
+# 2. Convertir documentos a chunks JSONL
+python data/ingest.py
+
+# 3. Generar embeddings y cargar en ChromaDB
+python data/index.py
+
+# 4. Versionar el nuevo vectorstore
+dvc add data/processed/vectorstore/
+dvc push
+git add data/processed/vectorstore.dvc
+git commit -m "Actualizar vectorstore con nuevos documentos"
+```
+
+### Tests
+```bash
+# Instalar dependencias de desarrollo
+pip install -r requirements/dev.txt
+
+# Ejecutar todos los tests
+pytest tests/ -v
+
+# Con output de logs (útil para ver la carga del modelo)
+pytest tests/ -v -s
+```
+
+Los tests del clasificador son smoke tests: verifican que `predict_risk` devuelve la estructura correcta sin lanzar excepciones. Langfuse se desactiva automáticamente durante la ejecución de pytest.
