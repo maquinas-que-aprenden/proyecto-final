@@ -3,9 +3,6 @@ name: NormaBot RAGAS Eval
 on:
   workflow_dispatch:
 
-env:
-  AWS_REGION: eu-west-1
-
 jobs:
   ragas-eval:
     name: RAGAS Eval (on EC2)
@@ -25,7 +22,7 @@ jobs:
               -v "$(pwd)/eval:/app/eval" \
               -v "$(pwd)/data/processed/vectorstore:/app/data/processed/vectorstore:ro" \
               --env-file .env \
-              -e GITHUB_SHA="${GITHUB_SHA}" \
+              -e GITHUB_SHA="${{ github.sha }}" \
               -e PYTHONPATH=/app/eval \
               -w /app \
               ghcr.io/maquinas-que-aprenden/proyecto-final:latest \
