@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 import threading
 import chromadb
+from langfuse.decorators import observe, langfuse_context
 
 # Configuración
 
@@ -130,14 +131,31 @@ def search_soft(query: str, k: int = DEFAULT_K) -> List[Dict[str, Any]]:
 
 # API principal
 
+@observe(name="retriever.search")
 def search(query: str, mode: str = "soft", k: int = DEFAULT_K) -> List[Dict[str, Any]]:
     if mode == "base":
-        return search_base(query, k)
-    return search_soft(query, k)
+        results = search_base(query, k)
+    else:
+        results = search_soft(query, k)
+    try:
+        distances = [r["distance"] for r in results]
+        langfuse_context.update_current_observation(
+            metadata={
+                "mode": mode,
+                "k": k,
+                "n_results": len(results),
+                "min_distance": round(min(distances), 4) if distances else None,
+                "max_distance": round(max(distances), 4) if distances else None,
+            }
+        )
+    except Exception:
+        pass
+    return results
 
 
 
     # --- Tool output for Agents / LangGraph ---
+@observe(name="retriever.search_tool")
 def search_tool(query: str, k: int = DEFAULT_K, mode: str = "soft", max_chars: int = 3500) -> str:
     """
     Devuelve contexto listo para LLM (string), basado en la búsqueda del vectorstore.
@@ -169,8 +187,22 @@ def search_tool(query: str, k: int = DEFAULT_K, mode: str = "soft", max_chars: i
     out = "CONTEXT:\n" + "\n\n".join(blocks)
     out += "\n\nSOURCES:\n" + "\n".join(sorted(set(sources)))
 
+    truncated = len(out) > max_chars
     # Recorte por seguridad
-    if len(out) > max_chars:
+    if truncated:
         out = out[:max_chars] + "\n\n[TRUNCATED]"
+
+    try:
+        langfuse_context.update_current_observation(
+            metadata={
+                "n_hits": len(hits),
+                "n_blocks": len(blocks),
+                "n_sources": len(set(sources)),
+                "output_chars": len(out),
+                "truncated": truncated,
+            }
+        )
+    except Exception:
+        pass
 
     return out

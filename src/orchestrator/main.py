@@ -16,6 +16,8 @@ from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 from pydantic import BaseModel, Field
 
+from langfuse.decorators import observe, langfuse_context
+
 from src.observability.main import get_langfuse_handler
 from src.classifier.main import predict_risk
 
@@ -64,6 +66,7 @@ class _SystemDescriptionInput(BaseModel):
 
 
 @tool
+@observe(name="tool.search_legal_docs")
 def search_legal_docs(query: str) -> str:
     """Busca normativa, artículos, definiciones y conceptos legales en el
     EU AI Act y legislación española de IA.
@@ -80,9 +83,13 @@ def search_legal_docs(query: str) -> str:
 
     docs = retrieve(query)
     if not docs:
+        langfuse_context.update_current_observation(metadata={"n_docs": 0, "n_relevant": 0})
         return "No se encontraron documentos relevantes para esta consulta."
 
     relevant = grade(query, docs)
+    langfuse_context.update_current_observation(
+        metadata={"n_docs": len(docs), "n_relevant": len(relevant)}
+    )
     if not relevant:
         return "Se encontraron documentos pero ninguno fue relevante para la consulta."
 
@@ -91,6 +98,7 @@ def search_legal_docs(query: str) -> str:
 
 
 @tool
+@observe(name="tool.classify_risk")
 def classify_risk(system_description: str) -> str:
     """Clasifica un sistema de IA según su nivel de riesgo
     (inaceptable, alto, limitado, mínimo).
@@ -104,6 +112,15 @@ def classify_risk(system_description: str) -> str:
         return f"Error de validacion: {e}"
 
     result = predict_risk(system_description)
+    try:
+        langfuse_context.update_current_observation(
+            metadata={
+                "risk_level": result.get("risk_level"),
+                "confidence": result.get("confidence"),
+            }
+        )
+    except Exception:
+        pass
     response = (
         f"Clasificacion: {result['risk_level'].upper()}\n"
         f"Confianza: {result['confidence']:.0%}\n"
@@ -118,6 +135,7 @@ def classify_risk(system_description: str) -> str:
 
 
 @tool
+@observe(name="tool.generate_report")
 def generate_report(system_description: str) -> str:
     """Genera un informe de cumplimiento normativo para un sistema de IA.
 
@@ -157,6 +175,17 @@ def generate_report(system_description: str) -> str:
             risk_level,
         )
         articles = ["No se pudieron verificar artículos específicos en el corpus legal."]
+
+    try:
+        langfuse_context.update_current_observation(
+            metadata={
+                "risk_level": risk_level,
+                "n_articles": len(articles),
+                "articles_verified": articles[0] != "No se pudieron verificar artículos específicos en el corpus legal.",
+            }
+        )
+    except Exception:
+        pass
 
     # 3. Generar informe con template
     return _build_report(system_description, risk_level, articles)

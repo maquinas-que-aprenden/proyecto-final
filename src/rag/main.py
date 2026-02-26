@@ -47,7 +47,11 @@ def retrieve(query: str, k: int = 5) -> list[dict]:
         results = search(query, k=k, mode="soft")
     except Exception:
         logger.exception("Error al buscar en ChromaDB")
-        langfuse_context.update_current_observation(metadata={"error": "ChromaDB unavailable", "k": k})
+        langfuse_context.update_current_observation(
+            level="ERROR",
+            status_message="ChromaDB no disponible — retrieve devuelve vacío",
+            metadata={"error": "ChromaDB unavailable", "k": k},
+        )
         return []
 
     docs = [
@@ -84,6 +88,8 @@ def grade(query: str, docs: list[dict], threshold: float = 0.7) -> list[dict]:
         logger.warning("Ollama no disponible, usando fallback por score")
         relevant = _grade_by_score(docs, threshold)
         langfuse_context.update_current_observation(
+            level="WARNING",
+            status_message="Ollama no disponible — grading por score (degradación)",
             metadata={"n_docs_in": len(docs), "n_relevant": len(relevant), "method": "score_fallback"},
         )
         return relevant
@@ -177,6 +183,10 @@ def generate(query: str, context: list[dict]) -> dict:
         answer = response.content.strip()
     except Exception as e:
         logger.warning("LLM de generacion no disponible, usando fallback: %s", e, exc_info=True)
+        langfuse_context.update_current_observation(
+            level="WARNING",
+            status_message=f"Bedrock no disponible — generate con extractos (degradación): {e}",
+        )
         # Fallback: concatenar extractos relevantes (sin citas verificadas por LLM)
         grounded = False
         snippets = [d["doc"][:200] for d in context[:3]]
