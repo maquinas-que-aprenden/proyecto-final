@@ -1,5 +1,55 @@
 # Pipeline ML — Clasificador de riesgo IA
 
+## API de inferencia — `predict_risk()`
+
+El clasificador se expone como servicio en `src/classifier/main.py`. Es la función que el orquestador ReAct invoca como tool.
+
+```python
+from src.classifier.main import predict_risk
+
+resultado = predict_risk("Sistema de reconocimiento facial en aeropuertos")
+# {
+#   "risk_level": "alto_riesgo",
+#   "confidence": 0.87,
+#   "probabilities": {
+#       "alto_riesgo": 0.87,
+#       "inaceptable": 0.08,
+#       "riesgo_limitado": 0.03,
+#       "riesgo_minimo": 0.02
+#   },
+#   "shap_top_features": [
+#       {"feature": "reconocimiento facial", "contribution": 0.42},
+#       {"feature": "biométrico", "contribution": 0.31},
+#       ...
+#   ],
+#   "shap_explanation": "Factores principales para 'alto_riesgo': reconocimiento facial, biométrico, aeropuerto."
+# }
+```
+
+**Características del servicio:**
+- Lazy loading thread-safe con double-check locking — el modelo se carga en el primer uso y se reutiliza
+- Validación de input con Pydantic (`min_length=1`, `max_length=5000`)
+- Fallback NLP: usa spaCy si está disponible, si no aplica regex
+- Explicabilidad integrada: contribuciones lineales (`coef_ * feature_value`), top-5 features por clase predicha
+
+**Modelo en producción:** LogisticRegression + TF-IDF (dataset artificial, F1-macro 0.9053). Ver [metricas.md](metricas.md) para la justificación de esta elección.
+
+---
+
+## Tres datasets, tres pipelines paralelos
+
+El módulo `src/classifier/` contiene tres experimentos independientes para comparar el impacto del origen de los datos:
+
+| Dataset | Carpeta | Muestras | Mejor modelo | F1-macro test |
+|---------|---------|----------|--------------|:-------------:|
+| **Artificial** (elaboración propia) | `classifier_dataset_artificial/` | 300 | LogReg + TF-IDF | **0.9053** |
+| Real (EU AI Act oficial) | `classifier_dataset_real/` | ~90 | LogReg + TF-IDF + OHE | 0.8583 |
+| Fusionado (artificial + real) | `classifier_dataset_fusionado/` | ~390 | XGBoost + SVD | 0.8822 |
+
+El dataset artificial se usa en producción por tener las mejores métricas y por ser el más adecuado para inferencia libre (sin columnas estructuradas). Ver [metricas.md](metricas.md) para el análisis completo.
+
+---
+
 ## Visión general
 
 El clasificador asigna a un sistema de IA uno de los cuatro niveles de riesgo definidos por el EU AI Act:
