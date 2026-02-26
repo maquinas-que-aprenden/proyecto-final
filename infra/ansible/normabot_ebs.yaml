@@ -34,6 +34,20 @@
         mode: "0755"
         state: directory
 
+    - name: Configurar Docker data-root en el EBS de datos
+      ansible.builtin.copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {"data-root": "{{ project_path }}/docker-data"}
+        mode: "0644"
+      notify: Restart Docker
+
     - name: Mensaje final
       ansible.builtin.debug:
         msg: "EBS montado correctamente en {{ project_path }}."
+
+  handlers:
+    - name: Restart Docker
+      ansible.builtin.systemd:
+        name: docker
+        state: restarted

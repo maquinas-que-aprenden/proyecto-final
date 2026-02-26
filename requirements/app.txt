@@ -9,7 +9,7 @@ langgraph>=0.2.0
 langchain>=0.3.0
 langchain-aws>=0.2.0
 langchain-core>=0.3.0
-chromadb
+chromadb==1.5.1
 
 # Classifier runtime (deserializar modelo + matrices TF-IDF)
 joblib>=1.4.0
@@ -24,4 +24,4 @@ langchain-ollama>=0.3.0
 ragas==0.2.0
 
 # Observabilidad
-langfuse==2.50.0
+langfuse>=3.0.0,<4.0.0
