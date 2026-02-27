@@ -11,9 +11,9 @@ def get_langfuse_handler(
     user_id: str | None = None,
     tags: list[str] | None = None,
 ) -> Any:
-    """Devuelve un CallbackHandler de Langfuse v3 compatible con LangChain."""
+    """Devuelve un CallbackHandler de Langfuse compatible con LangChain."""
     try:
-        from langfuse.langchain import CallbackHandler
+        from langfuse.callback import CallbackHandler
     except ImportError as exc:
         raise ImportError("Instala langfuse: pip install langfuse") from exc
 
