@@ -12,9 +12,11 @@ Exp 2 (XGBoost + SVD + GS) con F1-macro test 0.8822.
 Pipeline de inferencia: texto → TF-IDF → SVD(100) + 7 keywords → XGBoost.
 
 Artefactos requeridos en ``classifier_dataset_fusionado/model/``:
-- mejor_modelo.joblib / modelo_xgboost.joblib  (modelo seleccionado)
-- mejor_modelo_tfidf.joblib / tfidf_vectorizer.joblib (TfidfVectorizer)
-- svd_transformer.joblib    (TruncatedSVD, 100 componentes)
+- mejor_modelo_seleccion.json  (metadatos del experimento ganador)
+- modelo_xgboost.joblib        (XGBClassifier seleccionado)
+- tfidf_vectorizer.joblib      (TfidfVectorizer, vocab ~3773, bigramas)
+- svd_transformer.joblib       (TruncatedSVD, 100 componentes)
+- label_encoder.joblib         (LabelEncoder, opcional)
 """
 
 from __future__ import annotations
@@ -26,7 +28,20 @@ from pathlib import Path
 
 import joblib
 import numpy as np
-from langfuse.decorators import observe, langfuse_context
+try:
+    from langfuse.decorators import observe, langfuse_context
+except ImportError:
+    # langfuse opcional: el clasificador funciona sin observabilidad instalada
+    def observe(name=None):  # type: ignore[misc]
+        def decorator(func):
+            return func
+        return decorator
+
+    class _NoOpLangfuse:
+        def update_current_observation(self, **kwargs): pass
+        def score_current_trace(self, **kwargs): pass
+
+    langfuse_context = _NoOpLangfuse()  # type: ignore[assignment]
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -77,24 +92,53 @@ _modelo = None
 _tfidf = None
 _svd = None
 _label_encoder = None
-_needs_svd = False
+_pipeline_type: str = "tfidf_only"  # auto-detectado en _load_artifacts()
 _lock = threading.Lock()
 
 
+def _validate_pipeline(pipeline_type: str, n_features: int) -> None:
+    """Valida que los artefactos cargados son coherentes con n_features_in_ del modelo.
+
+    Emite un warning si hay discrepancia — indica que el modelo y los
+    artefactos de transformacion provienen de experimentos distintos.
+    """
+    if pipeline_type == "tfidf_svd_manual":
+        n_manual = 2 + len(_KEYWORDS_DOMINIO) + 1  # num_palabras, num_chars, kw por clase, kw_salvaguarda
+        expected = _svd.n_components + n_manual
+    elif pipeline_type == "tfidf_svd":
+        expected = _svd.n_components
+    else:  # "tfidf_only"
+        expected = len(_tfidf.get_feature_names_out())
+
+    if n_features != expected:
+        logger.warning(
+            "Pipeline '%s': n_features_in_=%d pero calculado=%d. "
+            "El modelo se cargo con artefactos distintos a los actuales.",
+            pipeline_type, n_features, expected,
+        )
+
+
 def _load_artifacts():
-    """Carga lazy de modelo, TF-IDF y SVD (thread-safe, double-check locking)."""
-    global _modelo, _tfidf, _svd, _label_encoder, _needs_svd
+    """Carga lazy de modelo, TF-IDF y SVD (thread-safe, double-check locking).
+
+    Auto-detecta el tipo de pipeline segun los artefactos presentes en disco
+    y la metadata de mejor_modelo_seleccion.json, sin necesidad de configuracion
+    manual al cambiar de modelo.
+    """
+    global _modelo, _tfidf, _svd, _label_encoder, _pipeline_type
     if _modelo is not None and _tfidf is not None:
         return
     with _lock:
         if _modelo is not None and _tfidf is not None:
             return
 
+        needs_manual_features = False
         meta_path = _MODEL_DIR / "mejor_modelo_seleccion.json"
         if meta_path.exists():
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
             model_file = _MODEL_DIR.parent / meta["model_file"]
             tfidf_file = _MODEL_DIR.parent / meta["tfidf_file"]
+            needs_manual_features = meta.get("needs_manual_features", False)
             logger.info("Cargando modelo desde metadata: %s", meta.get("nombre", ""))
         else:
             model_file = _MODEL_DIR / "mejor_modelo.joblib"
@@ -103,24 +147,34 @@ def _load_artifacts():
         try:
             _modelo = joblib.load(model_file)
             _tfidf = joblib.load(tfidf_file)
-            # SVD solo se necesita para el pipeline XGBoost
+
             svd_path = _MODEL_DIR / "svd_transformer.joblib"
             if svd_path.exists():
                 _svd = joblib.load(svd_path)
-                _needs_svd = True
-            # Label encoder para decodificar predicciones numericas
+
             le_path = _MODEL_DIR / "label_encoder.joblib"
             if le_path.exists():
                 _label_encoder = joblib.load(le_path)
+
+            # Auto-detectar tipo de pipeline segun artefactos disponibles y metadata
+            if _svd is not None and needs_manual_features:
+                _pipeline_type = "tfidf_svd_manual"
+            elif _svd is not None:
+                _pipeline_type = "tfidf_svd"
+            else:
+                _pipeline_type = "tfidf_only"
+
         except Exception:
             _modelo = _tfidf = _svd = _label_encoder = None
-            _needs_svd = False
+            _pipeline_type = "tfidf_only"
             raise
+
+        _validate_pipeline(_pipeline_type, _modelo.n_features_in_)
         logger.info(
-            "Clasificador cargado: %s (%d features, SVD=%s) desde %s",
+            "Clasificador cargado: %s (%d features, pipeline=%s) desde %s",
             type(_modelo).__name__,
             _modelo.n_features_in_,
-            _needs_svd,
+            _pipeline_type,
             _MODEL_DIR,
         )
 
@@ -158,7 +212,12 @@ def _limpiar_texto(texto: str) -> str:
 
 
 def _crear_features_manuales(text: str) -> np.ndarray:
-    """Genera las 7 features de keywords para el pipeline XGBoost+SVD."""
+    """Genera las features de keywords para el pipeline XGBoost+SVD.
+
+    El numero de features es dinamico: 2 generales + len(_KEYWORDS_DOMINIO)
+    categorias + 1 supervision. Si se añaden categorias al dict, el conteo
+    se actualiza automaticamente sin cambiar este codigo.
+    """
     words = text.split()
     features = [
         len(words),   # num_palabras
@@ -168,6 +227,59 @@ def _crear_features_manuales(text: str) -> np.ndarray:
         features.append(sum(1 for kw in keywords if kw in words))
     features.append(sum(1 for kw in _PALABRAS_SUPERVISION if kw in words))
     return np.array(features, dtype=float).reshape(1, -1)
+
+
+def _build_features(cleaned_text: str) -> tuple[object, list[str]]:
+    """Construye el vector de features para inferencia segun el pipeline cargado.
+
+    No requiere mantenimiento manual al cambiar de modelo: lee el numero de
+    features directamente de los artefactos cargados (_tfidf, _svd).
+    Si el modelo reentrenado tiene mas vocabulario o mas componentes SVD,
+    esta funcion se adapta automaticamente.
+
+    Returns
+    -------
+    X_final : sparse matrix o np.ndarray con shape (1, n_features_in_)
+    feature_names : list[str] con los nombres de cada feature (para explicabilidad)
+
+    Raises
+    ------
+    ValueError
+        Si los artefactos en disco son inconsistentes con el modelo cargado.
+        Indica que modelo y transformadores provienen de experimentos distintos.
+    """
+    X_tfidf = _tfidf.transform([cleaned_text])
+
+    if _pipeline_type == "tfidf_svd_manual":
+        X_svd = _svd.transform(X_tfidf)
+        X_manual = _crear_features_manuales(cleaned_text)
+        X_final = np.hstack([X_svd, X_manual])
+        feature_names = (
+            [f"svd_{i}" for i in range(_svd.n_components)]
+            + ["num_palabras", "num_caracteres"]
+            + [f"kw_{c}" for c in _KEYWORDS_DOMINIO]
+            + ["kw_salvaguarda"]
+        )
+    elif _pipeline_type == "tfidf_svd":
+        X_final = _svd.transform(X_tfidf)
+        feature_names = [f"svd_{i}" for i in range(_svd.n_components)]
+    else:  # "tfidf_only"
+        X_final = X_tfidf
+        feature_names = _tfidf.get_feature_names_out().tolist()
+
+    # Validacion defensiva: artefactos inconsistentes deben fallar rapido,
+    # no dar predicciones silenciosamente incorrectas.
+    n_expected = _modelo.n_features_in_
+    n_actual = X_final.shape[1]
+    if n_actual != n_expected:
+        raise ValueError(
+            f"Feature mismatch para pipeline '{_pipeline_type}': "
+            f"modelo espera {n_expected} features, construidas {n_actual}. "
+            f"Los artefactos en disco son inconsistentes con el modelo cargado. "
+            f"Solucion: re-exportar todos los artefactos del mismo experimento."
+        )
+
+    return X_final, feature_names
 
 
 @observe(name="classifier.predict_risk")
@@ -193,27 +305,10 @@ def predict_risk(text: str) -> dict:
     # 1. Limpiar texto (mismo preprocesado que en entrenamiento)
     cleaned = _limpiar_texto(text)
 
-    # 2. TF-IDF
-    X_tfidf = _tfidf.transform([cleaned])
+    # 2. Construir features segun el pipeline auto-detectado al cargar
+    X_final, feature_names = _build_features(cleaned)
 
-    # 3. Construir features segun pipeline del modelo
-    if _needs_svd:
-        # Pipeline XGBoost: TF-IDF → SVD(100) + 7 keyword features = 107
-        X_svd = _svd.transform(X_tfidf)
-        X_manual = _crear_features_manuales(cleaned)
-        X_final = np.hstack([X_svd, X_manual])
-        feature_names = (
-            [f"svd_{i}" for i in range(_svd.n_components)]
-            + ["num_palabras", "num_caracteres"]
-            + [f"kw_{c}" for c in _KEYWORDS_DOMINIO]
-            + ["kw_salvaguarda"]
-        )
-    else:
-        # Pipeline LogReg: TF-IDF directo (sparse)
-        X_final = X_tfidf
-        feature_names = _tfidf.get_feature_names_out().tolist()
-
-    # 4. Prediccion
+    # 3. Prediccion
     raw_pred = _modelo.predict(X_final)[0]
     proba = _modelo.predict_proba(X_final)[0]
     confidence = float(proba.max())
@@ -235,7 +330,7 @@ def predict_risk(text: str) -> dict:
         },
     }
 
-    # 5. Explicabilidad — top features por contribucion
+    # 4. Explicabilidad — top features por contribucion
     try:
         if hasattr(_modelo, "coef_"):
             # LogReg: contribuciones lineales
@@ -244,8 +339,18 @@ def predict_risk(text: str) -> dict:
             X_dense = X_final.toarray().flatten() if hasattr(X_final, "toarray") else X_final.flatten()
             contributions = coefs * X_dense
         elif hasattr(_modelo, "feature_importances_"):
-            # XGBoost: feature importances globales
-            contributions = _modelo.feature_importances_
+            # XGBoost: TreeExplainer da SHAP values locales por instancia
+            import shap
+            explainer = shap.TreeExplainer(_modelo)
+            shap_vals = explainer.shap_values(X_final)
+            pred_idx = list(_modelo.classes_).index(raw_pred)
+            # shap_vals: lista (API <0.46) o ndarray 3D (API >=0.46, multiclase)
+            if isinstance(shap_vals, list):
+                contributions = shap_vals[pred_idx][0]
+            elif isinstance(shap_vals, np.ndarray) and shap_vals.ndim == 3:
+                contributions = shap_vals[0, :, pred_idx]
+            else:
+                contributions = shap_vals[0]
         else:
             contributions = None
 
