@@ -28,5 +28,15 @@ Las tareas se cierran cuando el compañero que se encargue de ella ha comprobado
     * Asegurar que el código pasa los tests locales.
     * Indicar si el cambio afecta a otros módulos (ML, RAG, UI u MLOps).
 
+### Checks automáticos en PRs
+Al abrir o actualizar una PR se lanzan automáticamente dos revisiones:
+
+* **Lint (ruff)** — el workflow `pr_lint.yml` ejecuta `ruff check` sobre los ficheros `.py` e `.ipynb` modificados en la PR. Si falla, el merge queda bloqueado. Antes de abrir una PR, puede comprobarse localmente con `ruff check .`.
+* **CodeRabbit** — revisión automática de código en español. Lee los cambios y deja comentarios sobre lógica, seguridad (bandit), rendimiento y errores de runtime. No revisa estilo ni formato (eso lo hace ruff). Configurado en `.coderabbit.yaml` con perfil `assertive`. Se puede responder directamente a sus comentarios en el PR o pedirle que revise algo concreto mencionándolo.
+
 ## 4. Documentación de Decisiones
 * Si durante una reunión o por Discord acordamos un cambio debe quedar documentado.
+* Dónde documentar según el tipo de decisión:
+    * **Acuerdos de equipo y reuniones**: `docs/gestion-proyecto/decisiones.md` y `docs/gestion-proyecto/reuniones.md`.
+    * **Decisiones técnicas e infraestructura**: `docs/mlops/decisiones.md`.
+    * **Decisiones de arquitectura ML/RAG**: en el documento o notebook correspondiente, o en `docs/gestion-proyecto/` si afectan a todo el equipo.
