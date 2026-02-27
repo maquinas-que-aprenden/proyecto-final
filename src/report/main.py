@@ -8,6 +8,8 @@ from __future__ import annotations
 import logging
 import os
 
+from langfuse.decorators import observe, langfuse_context
+
 logger = logging.getLogger(__name__)
 
 BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "eu.amazon.nova-lite-v1:0")
@@ -77,6 +79,7 @@ Justificación: El sistema procesa datos sensibles en un contexto regulado.
 3. Implementar supervisión humana (Art. 14)"""
 
 
+@observe(name="report.generate")
 def generate_report(system_desc: str, risk_level: str, articles: list[str]) -> str:
     """Genera un informe de cumplimiento usando Bedrock Nova Lite.
 
@@ -84,6 +87,7 @@ def generate_report(system_desc: str, risk_level: str, articles: list[str]) -> s
     """
     citations = "\n".join(f"  - {a}" for a in articles) if articles else "  (sin citas disponibles)"
 
+    grounded = True
     try:
         llm = _get_report_llm()
         prompt = REPORT_PROMPT.format(
@@ -95,9 +99,31 @@ def generate_report(system_desc: str, risk_level: str, articles: list[str]) -> s
         report = response.content.strip()
     except Exception as e:
         logger.warning("LLM de informes no disponible, usando fallback: %s", e)
+        try:
+            langfuse_context.update_current_observation(
+                level="WARNING",
+                status_message=f"Bedrock no disponible — informe con template estático: {e}",
+            )
+        except Exception:
+            pass
         report = _fallback_report(system_desc, risk_level, citations)
+        grounded = False
 
     report += "\n\n---\n*Informe preliminar generado por IA. Consulte profesional jurídico.*"
+
+    try:
+        langfuse_context.update_current_observation(
+            metadata={
+                "risk_level": risk_level,
+                "n_articles": len(articles),
+                "grounded": grounded,
+                "model": BEDROCK_MODEL_ID,
+                "report_length": len(report),
+            }
+        )
+    except Exception:
+        pass
+
     return report
 
 
