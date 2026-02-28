@@ -26,7 +26,6 @@ from __future__ import annotations
 import sys
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 # ---------------------------------------------------------------------------
 # Inyección de mocks de módulos no instalados en venv_proyecto
