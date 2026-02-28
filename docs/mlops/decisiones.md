@@ -82,15 +82,16 @@ De momento solo hay una para MLflow. Es preferible usar SQLite dentro de la prop
 
 ## Observabilidad y trazabilidad
 * Usamos [MLflow](https://mlflow.org/) para los modelos de clasificación: métricas de entrenamiento y registro del modelo.
-* Usamos [Langfuse](https://langfuse.com/) v3 para el orquestador (LangGraph) y sus agentes:
+* Usamos [Langfuse](https://langfuse.com/) v2 (`>=2.7.3,<3.0.0`) para el orquestador (LangGraph) y sus agentes:
     * Podemos auditar el flujo paso a paso y entender su respuesta. Si falla el agente podemos ver si fue en el Retrieve, en el Grade de relevancia o en la generación final del LLM provider (Amazon Nova Lite vía Bedrock).
     * Permite monitorizar usos en tiempo real del consumo de tokens, latencias y alucinaciones mediante métricas.
     * Gestiona versiones de prompts.
-    * Cobertura de instrumentación por módulo con `@observe` de Langfuse v3:
+    * Cobertura de instrumentación por módulo con `@observe` de Langfuse v2:
         * `rag/main.py` — retrieve, grade, generate: con `level=ERROR` si ChromaDB no está disponible, y `level=WARNING` si Ollama o Bedrock caen al fallback.
         * `classifier/main.py` — predict_risk: registra nivel de riesgo, confianza y distribución de probabilidades; `score_current_trace` guarda la confianza del modelo como métrica numérica.
         * `report/main.py` — generate_report: registra si el informe lo generó Bedrock o el template estático (`grounded`), con `level=WARNING` en el caso de fallback.
         * `retriever.py` — search y search_tool: registra distancias min/max, número de resultados, fuentes únicas y si el contexto fue truncado.
-        * `orchestrator/main.py` — las 3 herramientas del agente (search_legal_docs, classify_risk, generate_report) con `@observe`; el agente ReAct completo se captura con el CallbackHandler de LangChain.
-    * Feedback de usuario (👍/👎) registrado como score en Langfuse directamente desde la UI de Streamlit.
+        * `orchestrator/main.py` — las 3 herramientas del agente (search_legal_docs, classify_risk, generate_report) con `@observe`.
+    * **Limitación conocida**: la traza raíz del agente LangGraph vía `CallbackHandler` no está disponible. `langfuse.callback` en v2.60.x requiere `langchain.callbacks.base` que fue eliminado en langchain 0.3. Las trazas individuales de cada herramienta sí llegan a Langfuse vía `@observe`.
+    * Feedback de usuario (👍/👎): eliminado — dependía del `trace_id` del `CallbackHandler` raíz, que no está disponible por incompatibilidad entre `langfuse.callback` v2 y `langchain` 0.3.
     * En tests, Langfuse se desactiva con `LANGFUSE_ENABLED=false` en `tests/conftest.py` para evitar dependencias de credenciales en CI.
