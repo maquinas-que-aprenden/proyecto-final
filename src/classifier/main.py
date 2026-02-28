@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re as _re
 import threading
 from pathlib import Path
 
@@ -51,6 +52,78 @@ class _TextInput(BaseModel):
     text: str = Field(min_length=1, max_length=5000)
 
 
+# Patrones del Anexo III para override determinista post-predicción ML.
+# Se compilan una sola vez y se aplican sobre el texto ORIGINAL (sin limpiar).
+_ANNEX3_PATTERNS: list | None = None
+
+
+def _build_annex3_patterns() -> list:
+    """Compila los patrones del Anexo III EU AI Act (llamada lazy, una sola vez)."""
+    raw = [
+        # ALTO RIESGO — Anexo III
+        (r"(cv|curr[ií]culum|curricular).{0,60}(screening|selecci[oó]n|filtr|evaluaci[oó]n|clasificaci[oó]n)",
+         "alto_riesgo", "Anexo III cat. 4.a"),
+        (r"(selecci[oó]n|reclutamiento|contrataci[oó]n).{0,50}(personal|candidat|empleo|trabajador)",
+         "alto_riesgo", "Anexo III cat. 4.a"),
+        (r"(scoring|puntuaci[oó]n|calificaci[oó]n).{0,40}(creditici|cr[eé]dit|solvencia|pr[eé]stamo|hipoteca)",
+         "alto_riesgo", "Anexo III cat. 5.b"),
+        (r"concesi[oó]n.{0,40}(pr[eé]stamo|cr[eé]dit|hipoteca)",
+         "alto_riesgo", "Anexo III cat. 5.b"),
+        (r"(recidiv|reincidenci|reincidente)",
+         "alto_riesgo", "Anexo III cat. 6"),
+        (r"predicci[oó]n.{0,40}(delito|crimen|criminalidad|peligrosidad)",
+         "alto_riesgo", "Anexo III cat. 6"),
+        (r"(solicitud|evaluaci[oó]n|decisi[oó]n).{0,40}(asilo|visa|migraci[oó]n|refugiado)",
+         "alto_riesgo", "Anexo III cat. 7"),
+        (r"admisi[oó]n.{0,40}(universitari|educativ|escolar|academi)",
+         "alto_riesgo", "Anexo III cat. 3"),
+        (r"(apoyo|asistencia).{0,40}(juez|tribunal|sentencia|resoluc.{0,10}judicial)",
+         "alto_riesgo", "Anexo III cat. 8"),
+        # INACEPTABLE — Art. 5 EU AI Act
+        (r"puntuaci[oó]n.{0,30}social.{0,30}ciudadano",
+         "inaceptable", "Art. 5.1.c"),
+        (r"(manipulaci[oó]n|t[eé]cnica).{0,20}subliminal",
+         "inaceptable", "Art. 5.1.a"),
+        (r"(reconocimiento|identificaci[oó]n).{0,30}(facial|biom[eé]tric).{0,50}(espacio.{0,10}p[uú]blic|tiempo.{0,10}real|calle|multitud)",
+         "inaceptable", "Art. 5.1.d"),
+    ]
+    return [(_re.compile(p, _re.IGNORECASE | _re.DOTALL), lvl, ref) for p, lvl, ref in raw]
+
+
+def _annex3_override(text: str, result: dict) -> dict:
+    """Post-procesa la predicción ML aplicando reglas deterministas del Anexo III.
+
+    Si el texto encaja con un patrón canónico del Anexo III y la predicción
+    difiere, sobrescribe risk_level para garantizar clasificación correcta en
+    los casos explícitamente enumerados en la ley, independientemente de la
+    confianza del modelo.
+    """
+    global _ANNEX3_PATTERNS
+    if _ANNEX3_PATTERNS is None:
+        _ANNEX3_PATTERNS = _build_annex3_patterns()
+
+    for pattern, expected_level, legal_ref in _ANNEX3_PATTERNS:
+        if pattern.search(text):
+            if result["risk_level"] != expected_level:
+                logger.info(
+                    "Anexo III override: ML='%s' (%.0f%%) → '%s' [%s]",
+                    result["risk_level"], result["confidence"] * 100,
+                    expected_level, legal_ref,
+                )
+                overridden = result.copy()
+                overridden["risk_level"] = expected_level
+                overridden["confidence"] = 0.85
+                overridden["annex3_override"] = True
+                overridden["annex3_ref"] = legal_ref
+                overridden["ml_prediction"] = {
+                    "risk_level": result["risk_level"],
+                    "confidence": result["confidence"],
+                }
+                return overridden
+            break  # patrón coincide, predicción ya correcta
+    return result
+
+
 # Keywords de dominio (replica de functions.py para inferencia sin spaCy)
 _KEYWORDS_DOMINIO = {
     "inaceptable": [
@@ -65,6 +138,18 @@ _KEYWORDS_DOMINIO = {
         "medicación", "autónomamente",
         "reclamación", "subsidio", "escolar", "triage",
         "urgencia", "aeronave", "piloto", "laboral",
+        # Anexo III cat. 4 — selección de personal (CV screening)
+        "curricular", "candidato", "reclutamiento", "curriculum",
+        # Anexo III cat. 5 — servicios financieros esenciales
+        "solvencia", "préstamo", "crédito", "hipoteca",
+        # Anexo III cat. 6 — justicia penal
+        "recidiva", "reincidente",
+        # Anexo III cat. 7 — migración
+        "frontera", "visado", "refugiado",
+        # Anexo III cat. 8 — administración de justicia
+        "sentencia", "judicial",
+        # Anexo III cat. 3 — educación
+        "admisión", "matriculación",
     ],
     "riesgo_limitado": [
         "chatbot", "revelar", "transparencia", "deepfake",
@@ -377,6 +462,9 @@ def predict_risk(text: str) -> dict:
                 )
     except Exception as e:
         logger.warning("No se pudo calcular explicabilidad: %s", e)
+
+    # Capa de override: patrones deterministas del Anexo III tienen precedencia sobre ML
+    result = _annex3_override(text, result)
 
     try:
         langfuse_context.update_current_observation(
