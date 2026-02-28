@@ -18,20 +18,25 @@ BEDROCK_REGION = os.environ.get("BEDROCK_REGION") or os.environ.get("AWS_REGION"
 REPORT_PROMPT = """\
 Eres un asistente juridico especializado en el EU AI Act y normativa española de IA.
 Genera un informe de cumplimiento estructurado en markdown para el sistema descrito.
-Usa SOLO las citas legales proporcionadas. No inventes articulos ni referencias.
+Usa SOLO las citas legales proporcionadas y su contenido textual. No inventes articulos,
+referencias ni contenido de articulos. Si no dispones de texto suficiente para una seccion,
+indica "No se dispone de informacion suficiente en el corpus consultado".
 
 Sistema: {system_desc}
 Nivel de riesgo asignado: {risk_level}
 
-Citas legales disponibles:
+Fragmentos legales recuperados (referencia + contenido textual):
 {citations}
 
 El informe debe incluir las siguientes secciones:
 1. **Resumen Ejecutivo**: descripcion breve del sistema y su contexto regulatorio.
 2. **Clasificacion de Riesgo**: nivel asignado con justificacion basada en las citas.
-3. **Obligaciones Aplicables**: segun el nivel de riesgo, citando articulos concretos.
+3. **Obligaciones Aplicables**: segun el nivel de riesgo, citando articulos concretos. Describe cada obligacion usando SOLO el contenido textual proporcionado arriba.
 4. **Citas Legales**: listado de las referencias normativas utilizadas.
 5. **Recomendaciones**: acciones concretas para cumplir con la normativa.
+
+IMPORTANTE: No atribuyas contenido inventado a los articulos. Cada afirmacion sobre un
+articulo debe basarse en el texto proporcionado en los fragmentos legales.
 
 Responde en español. Se conciso y preciso."""
 
