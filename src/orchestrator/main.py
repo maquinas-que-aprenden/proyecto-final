@@ -163,7 +163,9 @@ def generate_report(system_description: str) -> str:
     articles = []
     try:
         from src.retrieval.retriever import search as search_docs
-        hits = search_docs(f"obligaciones {risk_level} EU AI Act", k=3)
+        hits = search_docs(
+            f"obligaciones sistemas de riesgo {risk_level} EU AI Act", k=3,
+        )
         for h in hits:
             meta = h.get("metadata", {}) or {}
             source = meta.get("source", "")

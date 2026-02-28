@@ -87,6 +87,15 @@ _PALABRAS_SUPERVISION = [
 # Ruta al mejor modelo (dataset fusionado)
 _MODEL_DIR = Path(__file__).parent / "classifier_dataset_fusionado" / "model"
 
+# Mapping canónico de etiquetas numéricas → textuales (EU AI Act)
+# Fallback cuando el modelo no incluye label_encoder.joblib
+_RISK_LABELS = {
+    "0": "inaceptable",
+    "1": "alto",
+    "2": "limitado",
+    "3": "mínimo",
+}
+
 # Singletons — se cargan en el primer uso (thread-safe)
 _modelo = None
 _tfidf = None
@@ -318,8 +327,8 @@ def predict_risk(text: str) -> dict:
         risk_level = _label_encoder.inverse_transform([raw_pred])[0]
         class_names = _label_encoder.inverse_transform(_modelo.classes_)
     else:
-        risk_level = str(raw_pred)
-        class_names = _modelo.classes_
+        risk_level = _RISK_LABELS.get(str(raw_pred), str(raw_pred))
+        class_names = [_RISK_LABELS.get(str(c), str(c)) for c in _modelo.classes_]
 
     result = {
         "risk_level": risk_level,
