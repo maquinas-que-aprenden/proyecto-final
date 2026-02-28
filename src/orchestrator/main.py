@@ -236,7 +236,7 @@ def run(query: str, session_id: str | None = None, user_id: str | None = None) -
             )
         ]
     except (ImportError, ValueError) as e:
-        logger.warning("Langfuse no disponible: %s — continuando sin trazas", e)
+        logger.debug("Langfuse no disponible: %s — continuando sin trazas", e)
         callbacks = []
 
     result = agent.invoke(
