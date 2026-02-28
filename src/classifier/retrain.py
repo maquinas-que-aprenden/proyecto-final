@@ -27,7 +27,10 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import classification_report, f1_score
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils.class_weight import compute_sample_weight
-from xgboost import XGBClassifier
+try:
+    from xgboost import XGBClassifier
+except ImportError:  # pragma: no cover
+    XGBClassifier = None  # type: ignore[assignment,misc]
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -159,7 +162,10 @@ def _crear_features_manuales(texts: pd.Series) -> np.ndarray:
 
 # ── Pipeline principal ─────────────────────────────────────────────────────────
 
-def main() -> None:
+_PROMOTE_DELTA = 0.005  # margen mínimo de mejora sobre F1 anterior para promover artefactos
+
+
+def main(*, force_promote: bool = False) -> None:
     logger.info("=== Reentrenamiento clasificador EU AI Act (Anexo III augmented) ===")
 
     # 1. Leer train.jsonl
@@ -226,6 +232,9 @@ def main() -> None:
     logger.info("Features totales: %d", X_train_final.shape[1])
 
     # 8. Label encoder + XGBoost
+    if XGBClassifier is None:
+        raise ImportError("xgboost no está instalado. Ejecuta: pip install xgboost")
+
     le = LabelEncoder()
     y_train_enc = le.fit_transform(y_train)
 
@@ -244,38 +253,42 @@ def main() -> None:
     f1_macro = f1_score(y_test, y_pred, average="macro")
     logger.info("F1-macro test: %.4f", f1_macro)
 
-    # 10. Guardar artefactos (sobreescribe model/)
+    # 10. Guardar artefactos solo si mejora el score anterior
     _MODEL_DIR.mkdir(parents=True, exist_ok=True)
-
-    joblib.dump(modelo, _MODEL_DIR / "modelo_xgboost.joblib")
-    joblib.dump(tfidf, _MODEL_DIR / "tfidf_vectorizer.joblib")
-    joblib.dump(svd, _MODEL_DIR / "svd_transformer.joblib")
-    joblib.dump(le, _MODEL_DIR / "label_encoder.joblib")
-
-    logger.info("Artefactos guardados en %s", _MODEL_DIR)
-
-    # 11. Actualizar mejor_modelo_seleccion.json
     seleccion_path = _MODEL_DIR / "mejor_modelo_seleccion.json"
     meta: dict = {}
     if seleccion_path.exists():
         meta = json.loads(seleccion_path.read_text(encoding="utf-8"))
+    prev_f1 = meta.get("test_f1_macro", 0.0)
 
-    meta.update({
-        "nombre": "Exp 2: XGBoost + SVD + GS (augmented Anexo III)",
-        "model_file": "model/modelo_xgboost.joblib",
-        "tfidf_file": "model/tfidf_vectorizer.joblib",
-        "model_type": "XGBClassifier",
-        "experimento": "2",
-        "needs_manual_features": True,
-        "test_f1_macro": round(f1_macro, 4),
-        "augmented": True,
-        "augmented_examples": len(df_aug),
-        "fecha_reentrenamiento": datetime.now().isoformat(),
-    })
-    seleccion_path.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
-    logger.info("mejor_modelo_seleccion.json actualizado")
+    if f1_macro > prev_f1 + _PROMOTE_DELTA or force_promote:
+        joblib.dump(modelo, _MODEL_DIR / "modelo_xgboost.joblib")
+        joblib.dump(tfidf, _MODEL_DIR / "tfidf_vectorizer.joblib")
+        joblib.dump(svd, _MODEL_DIR / "svd_transformer.joblib")
+        joblib.dump(le, _MODEL_DIR / "label_encoder.joblib")
+        logger.info("Artefactos guardados en %s (F1: %.4f → %.4f)", _MODEL_DIR, prev_f1, f1_macro)
 
-    print("\n✓ Reentrenamiento completado. F1-macro test:", round(f1_macro, 4))
+        meta.update({
+            "nombre": "Exp 2: XGBoost + SVD + GS (augmented Anexo III)",
+            "model_file": "model/modelo_xgboost.joblib",
+            "tfidf_file": "model/tfidf_vectorizer.joblib",
+            "model_type": "XGBClassifier",
+            "experimento": "2",
+            "needs_manual_features": True,
+            "test_f1_macro": round(f1_macro, 4),
+            "augmented": True,
+            "augmented_examples": len(df_aug),
+            "fecha_reentrenamiento": datetime.now().isoformat(),
+        })
+        seleccion_path.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
+        logger.info("mejor_modelo_seleccion.json actualizado")
+        print("\n✓ Reentrenamiento completado. F1-macro test:", round(f1_macro, 4))
+    else:
+        logger.warning(
+            "Promoción abortada: nuevo F1 (%.4f) no supera anterior (%.4f) + delta (%.3f)",
+            f1_macro, prev_f1, _PROMOTE_DELTA,
+        )
+        print(f"\n⚠ Modelo NO promovido. F1 nuevo ({f1_macro:.4f}) ≤ F1 anterior ({prev_f1:.4f})")
 
 
 if __name__ == "__main__":

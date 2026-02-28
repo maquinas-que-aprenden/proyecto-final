@@ -55,6 +55,12 @@ class _TextInput(BaseModel):
 # Patrones del Anexo III para override determinista post-predicción ML.
 # Se compilan una sola vez y se aplican sobre el texto ORIGINAL (sin limpiar).
 _ANNEX3_PATTERNS: list | None = None
+_SEVERITY: dict[str, int] = {
+    "inaceptable": 3,
+    "alto_riesgo": 2,
+    "riesgo_limitado": 1,
+    "riesgo_minimo": 0,
+}
 
 
 def _build_annex3_patterns() -> list:
@@ -102,25 +108,30 @@ def _annex3_override(text: str, result: dict) -> dict:
     if _ANNEX3_PATTERNS is None:
         _ANNEX3_PATTERNS = _build_annex3_patterns()
 
+    best_level: str | None = None
+    best_ref: str | None = None
     for pattern, expected_level, legal_ref in _ANNEX3_PATTERNS:
         if pattern.search(text):
-            if result["risk_level"] != expected_level:
-                logger.info(
-                    "Anexo III override: ML='%s' (%.0f%%) → '%s' [%s]",
-                    result["risk_level"], result["confidence"] * 100,
-                    expected_level, legal_ref,
-                )
-                overridden = result.copy()
-                overridden["risk_level"] = expected_level
-                overridden["confidence"] = 0.85
-                overridden["annex3_override"] = True
-                overridden["annex3_ref"] = legal_ref
-                overridden["ml_prediction"] = {
-                    "risk_level": result["risk_level"],
-                    "confidence": result["confidence"],
-                }
-                return overridden
-            break  # patrón coincide, predicción ya correcta
+            if best_level is None or _SEVERITY[expected_level] > _SEVERITY[best_level]:
+                best_level = expected_level
+                best_ref = legal_ref
+
+    if best_level is not None and result["risk_level"] != best_level:
+        logger.info(
+            "Anexo III override: ML='%s' (%.0f%%) → '%s' [%s]",
+            result["risk_level"], result["confidence"] * 100,
+            best_level, best_ref,
+        )
+        overridden = result.copy()
+        overridden["risk_level"] = best_level
+        overridden["confidence"] = 0.85
+        overridden["annex3_override"] = True
+        overridden["annex3_ref"] = best_ref
+        overridden["ml_prediction"] = {
+            "risk_level": result["risk_level"],
+            "confidence": result["confidence"],
+        }
+        return overridden
     return result
 
 
