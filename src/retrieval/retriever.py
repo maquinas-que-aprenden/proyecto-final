@@ -2,7 +2,19 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 import threading
 import chromadb
-from langfuse.decorators import observe, langfuse_context
+try:
+    from langfuse.decorators import observe, langfuse_context
+except ImportError:
+    def observe(name=None):  # type: ignore[misc]
+        def decorator(func):
+            return func
+        return decorator
+
+    class _NoOpLangfuse:
+        def update_current_observation(self, **kwargs): pass
+        def score_current_trace(self, **kwargs): pass
+
+    langfuse_context = _NoOpLangfuse()  # type: ignore[assignment]
 
 # Configuración
 
