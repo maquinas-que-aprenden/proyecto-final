@@ -9,11 +9,15 @@ from __future__ import annotations
 import sys
 from unittest.mock import MagicMock, patch
 
-# Inyectar mock de langchain_aws antes de importar src.rag.main,
-# ya que langchain_aws puede no estar instalado en el entorno de test.
+# Inyectar mocks antes de importar src.rag.main,
+# ya que langchain_aws y langchain_ollama pueden no estar instalados en el entorno de test.
 _mock_langchain_aws = MagicMock()
 _previous_langchain_aws = sys.modules.get("langchain_aws")
 sys.modules["langchain_aws"] = _mock_langchain_aws
+
+_mock_langchain_ollama = MagicMock()
+_previous_langchain_ollama = sys.modules.get("langchain_ollama")
+sys.modules["langchain_ollama"] = _mock_langchain_ollama
 
 import src.rag.main as rag_module  # noqa: E402
 from src.rag.main import GENERATE_PROMPT, generate  # noqa: E402
@@ -24,6 +28,11 @@ def teardown_module(module):
         sys.modules.pop("langchain_aws", None)
     else:
         sys.modules["langchain_aws"] = _previous_langchain_aws
+
+    if _previous_langchain_ollama is None:
+        sys.modules.pop("langchain_ollama", None)
+    else:
+        sys.modules["langchain_ollama"] = _previous_langchain_ollama
 
 
 # ---------------------------------------------------------------------------
