@@ -43,7 +43,7 @@ Inicialmente se plantea:
 A fecha de 20/02 se decide la separación en dos instancias: una para MLflow y otra para Normabot, cada una con su correspondiente security group.
 Actualmente:
     * MLflow necesita un t3.small, porque la memoria RAM de t3.micro del free-tier no es suficiente para su ejecución.
-    * NormaBot está desplegado en una t3.medium. Se amplió el EBS asociado por las necesidades de almacenamiento del vectorstore, la imagen Docker y Ollama.
+    * NormaBot está desplegado en una t3.large (8GB RAM). Se necesita t3.large porque Ollama/Qwen 2.5 3B requiere ~1.9GB de RAM y el t3.medium (4GB) no dejaba margen suficiente tras el arranque de la app.
     * Ambas instancias tienen IMDSv2 forzado (`http_tokens = "required"`) para impedir ataques SSRF que podrían robar credenciales del instance profile.
     * En el caso del servidor de normabot es necesario añadir manualmente un .env entrando en la instancia que incluya las variables de entorno que usa:
     ```
@@ -66,7 +66,7 @@ De momento solo hay una para MLflow. Es preferible usar SQLite dentro de la prop
 ### Almacenamiento en bloque (EBS)
 * Enlazadas a las instancias de EC2, tienen `prevent_destroy = true` en Terraform: ni siquiera un `terraform destroy` puede eliminarlas. Hay que borrarlas manualmente desde la consola de AWS si fuera necesario.
 * Se usa gp3, porque es más barato que gp2 y rinde mejor.
-* Se usan dos volúmenes separados: 10GB para MLflow y 20GB para NormaBot. En total los 30GB gratuitos del free-tier. Están desacoplados de las instancias para que los datos persistan aunque se elimine el servidor.
+* Se usan dos volúmenes separados: 10GB para MLflow y 30GB para NormaBot. El volumen de NormaBot se amplió de 20GB a 30GB porque la imagen Docker (~12GB comprimida) más los snapshots de containerd superaban el espacio disponible en 20GB. Están desacoplados de las instancias para que los datos persistan aunque se elimine el servidor. La infraestructura actual está fuera del free-tier de AWS.
 * Los volúmenes root de cada instancia tienen `delete_on_termination = true` porque solo contienen el SO y Docker — nada que no se pueda recrear con Ansible. Los datos que importan están en los volúmenes separados.
 
 ## Integración y despliegue continuo (CI/CD)

@@ -1,6 +1,6 @@
 resource "aws_instance" "normabot_server" {
   ami                         = var.ami_id
-  instance_type               = "t3.medium"
+  instance_type               = "t3.large"
   key_name                    = var.key_name
   associate_public_ip_address = true
 
@@ -25,7 +25,7 @@ resource "aws_instance" "normabot_server" {
 
 resource "aws_ebs_volume" "normabot_data" {
   availability_zone = "eu-west-1a"
-  size              = 20
+  size              = 30
   type              = "gp3"
 
   lifecycle {
