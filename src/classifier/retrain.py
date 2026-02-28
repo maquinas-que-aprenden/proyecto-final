@@ -228,7 +228,6 @@ def main() -> None:
     # 8. Label encoder + XGBoost
     le = LabelEncoder()
     y_train_enc = le.fit_transform(y_train)
-    y_test_enc = le.transform(y_test)
 
     sample_weight = compute_sample_weight(class_weight="balanced", y=y_train_enc)
 
