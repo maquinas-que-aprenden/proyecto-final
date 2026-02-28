@@ -66,8 +66,9 @@ class TestGeneratePrompt:
 
 class TestGetGenerateLlmSingleton:
     def setup_method(self):
-        """Resetea el singleton antes de cada test."""
+        """Resetea el singleton y garantiza que el mock está activo."""
         rag_module._generate_llm = None
+        sys.modules["langchain_aws"] = _mock_langchain_aws
 
     def teardown_method(self):
         """Limpia el singleton despues de cada test."""
@@ -109,6 +110,7 @@ class TestGetGenerateLlmSingleton:
 class TestGenerateFlow:
     def setup_method(self):
         rag_module._generate_llm = None
+        sys.modules["langchain_aws"] = _mock_langchain_aws
 
     def teardown_method(self):
         rag_module._generate_llm = None
