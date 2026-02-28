@@ -433,17 +433,18 @@ def predict_risk(text: str) -> dict:
             X_dense = X_final.toarray().flatten() if hasattr(X_final, "toarray") else X_final.flatten()
             contributions = coefs * X_dense
         elif hasattr(_modelo, "feature_importances_"):
-            # XGBoost: TreeExplainer con API moderna (Explanation object)
-            import shap
-            X_shap = X_final.toarray() if hasattr(X_final, "toarray") else X_final
-            explainer = shap.TreeExplainer(_modelo)
-            explanation = explainer(X_shap)
+            # XGBoost: contribuciones nativas via pred_contribs (sin dependencia shap)
+            import xgboost as xgb
             pred_idx = list(_modelo.classes_).index(raw_pred)
-            vals = explanation.values  # (n_samples, n_features) o (n_samples, n_features, n_classes)
-            if vals.ndim == 3:
-                contributions = vals[0, :, pred_idx].astype(float)
+            X_dense = X_final.toarray() if hasattr(X_final, "toarray") else X_final
+            dm = xgb.DMatrix(X_dense)
+            raw_contribs = _modelo.get_booster().predict(dm, pred_contribs=True)
+            # Forma: (n_samples, n_features+1) binario
+            #        (n_samples, n_classes, n_features+1) multiclase — ultimo col es bias
+            if raw_contribs.ndim == 3:
+                contributions = raw_contribs[0, pred_idx, :-1].astype(float)
             else:
-                contributions = vals[0].astype(float)
+                contributions = raw_contribs[0, :-1].astype(float)
         else:
             contributions = None
 
