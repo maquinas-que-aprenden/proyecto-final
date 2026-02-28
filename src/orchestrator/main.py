@@ -171,8 +171,10 @@ def generate_report(system_description: str) -> str:
             source = meta.get("source", "")
             unit = meta.get("unit_title") or meta.get("unit_id", "")
             label = f"{source} — {unit}".strip(" —")
+            text = h.get("text", "").strip()
             if label:
-                articles.append(label)
+                entry = f"{label}\n{text}" if text else label
+                articles.append(entry)
     except Exception as e:
         logger.warning("Retriever no disponible para informe: %s", e)
 
