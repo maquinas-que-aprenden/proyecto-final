@@ -7,8 +7,27 @@ from __future__ import annotations
 import logging
 import os
 
-from langchain_ollama import ChatOllama
-from langfuse.decorators import observe, langfuse_context
+try:
+    from langchain_ollama import ChatOllama
+except ImportError:
+    ChatOllama = None  # type: ignore[assignment,misc]
+try:
+    from langchain_aws import ChatBedrockConverse as _ChatBedrockConverse
+except ImportError:
+    _ChatBedrockConverse = None  # type: ignore[assignment,misc]
+try:
+    from langfuse.decorators import observe, langfuse_context
+except ImportError:
+    def observe(name=None):  # type: ignore[misc]
+        def decorator(func):
+            return func
+        return decorator
+
+    class _NoOpLangfuse:
+        def update_current_observation(self, **kwargs): pass
+        def score_current_trace(self, **kwargs): pass
+
+    langfuse_context = _NoOpLangfuse()  # type: ignore[assignment]
 
 from src.retrieval.retriever import search
 
@@ -30,6 +49,8 @@ _grading_llm = None
 
 def _get_grading_llm():
     """Devuelve el LLM local para grading (Qwen 2.5 3B via Ollama)."""
+    if ChatOllama is None:
+        raise ImportError("langchain_ollama no instalado. Ejecuta: pip install langchain-ollama")
     global _grading_llm
     if _grading_llm is None:
         _grading_llm = ChatOllama(
@@ -143,10 +164,11 @@ _generate_llm = None
 
 def _get_generate_llm():
     """Devuelve el LLM para generacion (Bedrock Nova Lite, singleton)."""
+    if _ChatBedrockConverse is None:
+        raise ImportError("langchain_aws no instalado. Ejecuta: pip install langchain-aws")
     global _generate_llm
     if _generate_llm is None:
-        from langchain_aws import ChatBedrockConverse
-        _generate_llm = ChatBedrockConverse(
+        _generate_llm = _ChatBedrockConverse(
             model=BEDROCK_MODEL_ID,
             region_name=BEDROCK_REGION,
             temperature=0.1,
