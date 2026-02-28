@@ -93,5 +93,5 @@ De momento solo hay una para MLflow. Es preferible usar SQLite dentro de la prop
         * `retriever.py` — search y search_tool: registra distancias min/max, número de resultados, fuentes únicas y si el contexto fue truncado.
         * `orchestrator/main.py` — las 3 herramientas del agente (search_legal_docs, classify_risk, generate_report) con `@observe`.
     * **Limitación conocida**: la traza raíz del agente LangGraph vía `CallbackHandler` no está disponible. `langfuse.callback` en v2.60.x requiere `langchain.callbacks.base` que fue eliminado en langchain 0.3. Las trazas individuales de cada herramienta sí llegan a Langfuse vía `@observe`.
-    * Feedback de usuario (👍/👎) registrado como score en Langfuse directamente desde la UI de Streamlit.
+    * Feedback de usuario (👍/👎): eliminado — dependía del `trace_id` del `CallbackHandler` raíz, que no está disponible por incompatibilidad entre `langfuse.callback` v2 y `langchain` 0.3.
     * En tests, Langfuse se desactiva con `LANGFUSE_ENABLED=false` en `tests/conftest.py` para evitar dependencias de credenciales en CI.

@@ -50,22 +50,5 @@ if prompt := st.chat_input("Escribe tu consulta legal..."):
         response = messages[-1].content if messages else "Sin respuesta."
         st.markdown(response)
 
-        trace_id = result.get("_langfuse_trace_id")
-        if trace_id:
-            col1, col2, _ = st.columns([1, 1, 8])
-            with col1:
-                if st.button("👍", key=f"up_{len(st.session_state.messages)}"):
-                    try:
-                        from langfuse import Langfuse
-                        Langfuse().score(trace_id=trace_id, name="user_feedback", value=1)
-                    except Exception:
-                        pass
-            with col2:
-                if st.button("👎", key=f"down_{len(st.session_state.messages)}"):
-                    try:
-                        from langfuse import Langfuse
-                        Langfuse().score(trace_id=trace_id, name="user_feedback", value=0)
-                    except Exception:
-                        pass
 
     st.session_state.messages.append({"role": "assistant", "content": response})
