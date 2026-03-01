@@ -4,6 +4,7 @@ Chat conversacional con el orquestador LangGraph.
 Ejecutar: streamlit run app.py --server.port=8080
 """
 
+import re
 import uuid
 
 import streamlit as st
@@ -47,7 +48,8 @@ if prompt := st.chat_input("Escribe tu consulta legal..."):
             result = run(prompt, session_id=st.session_state.session_id)
 
         messages = result.get("messages", [])
-        response = messages[-1].content if messages else "Sin respuesta."
+        raw = messages[-1].content if messages else "Sin respuesta."
+        response = re.sub(r"<thinking>.*?</thinking>", "", raw, flags=re.DOTALL).strip()
         st.markdown(response)
 
 
