@@ -3,3 +3,4 @@ tf-keras==2.16.0
 chromadb==1.5.1
 beautifulsoup4==4.14.3
 pypdf==6.7.1
+langchain-text-splitters>=0.3.0

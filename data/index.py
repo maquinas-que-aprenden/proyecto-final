@@ -23,7 +23,7 @@ EMB_PATH = VSTORE_DIR / "embeddings.npy"
 META_PATH = VSTORE_DIR / "chunks_meta.jsonl"
 CHROMA_DIR = VSTORE_DIR / "chroma"
 
-MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+MODEL_NAME = "intfloat/multilingual-e5-base"
 COLLECTION_NAME = "normabot_legal_chunks"
 BATCH_SIZE = 200
 
@@ -43,12 +43,14 @@ def load_chunks(path: Path) -> tuple[list[str], list[dict]]:
 
 
 def generate_embeddings(texts: list[str], model: SentenceTransformer) -> np.ndarray:
-    """Genera embeddings para todos los textos."""
+    """Genera embeddings para todos los textos (con prefijo 'passage: ' para e5)."""
+    prefixed = [f"passage: {t}" for t in texts]
     return model.encode(
-        texts,
-        batch_size=32,
+        prefixed,
+        batch_size=16,
         show_progress_bar=True,
         convert_to_numpy=True,
+        device="cpu",
     )
 
 
@@ -69,7 +71,12 @@ def populate_chroma(
     """Puebla ChromaDB con upsert en batches."""
     CHROMA_DIR.mkdir(parents=True, exist_ok=True)
     client = chromadb.PersistentClient(path=str(CHROMA_DIR))
-    col = client.get_or_create_collection(name=COLLECTION_NAME)
+    # Recrear colección para reflejar nueva dimensión de embeddings
+    try:
+        client.delete_collection(name=COLLECTION_NAME)
+    except Exception:
+        pass
+    col = client.create_collection(name=COLLECTION_NAME)
 
     ids = []
     metas = []

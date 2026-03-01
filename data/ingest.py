@@ -14,6 +14,7 @@ import re
 import hashlib
 
 from bs4 import BeautifulSoup
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pypdf import PdfReader
 
 # ── Rutas ───────────────────────────────────────────────────────────
@@ -27,6 +28,11 @@ BOE_DIR = "boe"
 EU_DIR = "EU AI Act completo (Reglamento UE 2024-1689)"
 AESIA_DIR = "Guías AESIA + sandbox regulatorio"
 LOPD_DIR = "Normativa LOPD-GDD, RGPD"
+
+# ── Límites de chunk ───────────────────────────────────────────────
+MAX_CHUNK_CHARS = 2000   # ~500 tokens para e5-base (512 token limit)
+MIN_CHUNK_CHARS = 80     # Mínimo viable
+CHUNK_OVERLAP = 200      # Overlap para secondary splitter
 
 # ── Utilidades ──────────────────────────────────────────────────────
 
@@ -173,6 +179,40 @@ def _unit_meta(header: str) -> tuple[str, str | None, str]:
     return "section", unit_title.strip() or None, unit_title
 
 
+def _unit_meta_aesia(header: str) -> tuple[str, str | None, str]:
+    """Clasifica unidad AESIA por numeración decimal: 1. → chapter, 1.1 → section, 1.1.1 → subsection."""
+    h = header.strip()
+    unit_title = h[:200]
+
+    m = re.match(r"^\s*(\d{1,2})\.(\d{1,2})\.(\d{1,2})", h)
+    if m:
+        return "subsection", f"{m.group(1)}.{m.group(2)}.{m.group(3)}", unit_title
+
+    m = re.match(r"^\s*(\d{1,2})\.(\d{1,2})", h)
+    if m:
+        return "section", f"{m.group(1)}.{m.group(2)}", unit_title
+
+    m = re.match(r"^\s*(\d{1,2})\.\s+", h)
+    if m:
+        return "chapter", m.group(1), unit_title
+
+    return "section", unit_title.strip() or None, unit_title
+
+
+_resplitter = RecursiveCharacterTextSplitter(
+    chunk_size=MAX_CHUNK_CHARS,
+    chunk_overlap=CHUNK_OVERLAP,
+    separators=["\n\n", "\n", ". ", " "],
+)
+
+
+def _resplit_if_needed(text: str) -> list[str]:
+    """Si el texto excede MAX_CHUNK_CHARS, lo divide con RecursiveCharacterTextSplitter."""
+    if len(text) <= MAX_CHUNK_CHARS:
+        return [text]
+    return _resplitter.split_text(text)
+
+
 # Patrones regex por fuente
 BOE_PATTERNS = [
     r"(?m)^\s*Art[íi]culo\s+\d+.*$",
@@ -189,15 +229,22 @@ EU_PATTERNS = [
     r"(?m)^\s*Secci[oó]n\s+[IVXLC0-9]+\b.*$",
 ]
 AESIA_PATTERNS = [
-    r"(?m)^\s*T[íi]TULO\s+[IVXLC0-9]+\b.*$",
-    r"(?m)^\s*CAP[ÍI]TULO\s+[IVXLC0-9]+\b.*$",
-    r"(?m)^\s*Secci[oó]n\s+[IVXLC0-9]+\b.*$",
-    r"(?m)^\s*Art[íi]culo\s+\d+.*$",
+    r"(?m)^\s*(\d{1,2})\.\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñA-ZÁÉÍÓÚÑ\s]{5,}$",
+    r"(?m)^\s*\d{1,2}\.\d{1,2}\.?\s+[A-ZÁÉÍÓÚÑ].*$",
+    r"(?m)^\s*\d{1,2}\.\d{1,2}\.\d{1,2}\.?\s+[A-ZÁÉÍÓÚÑ].*$",
 ]
 
 
-def chunk_docs(source: str, docs: list[dict], patterns: list[str]) -> list[dict]:
+def chunk_docs(
+    source: str,
+    docs: list[dict],
+    patterns: list[str],
+    unit_meta_fn=None,
+) -> list[dict]:
     """Genera chunks estructurados a partir de documentos ya leidos."""
+    if unit_meta_fn is None:
+        unit_meta_fn = _unit_meta
+
     chunks = []
     for doc in docs:
         file = doc["file"]
@@ -207,27 +254,35 @@ def chunk_docs(source: str, docs: list[dict], patterns: list[str]) -> list[dict]
 
         for u_idx, (header, body) in enumerate(units):
             body = _norm_spaces(body)
-            if len(body) < 80:
+            if len(body) < MIN_CHUNK_CHARS:
                 continue
 
-            unit_type, unit_id, unit_title = _unit_meta(header)
-            chunk = {
-                "source": source,
-                "file": file,
-                "doc_title": dmeta["doc_title"],
-                "doc_date": dmeta["doc_date"],
-                "boe_year": dmeta["boe_year"],
-                "boe_id": dmeta["boe_id"],
-                "unit_type": unit_type,
-                "unit_id": unit_id,
-                "unit_title": unit_title,
-                "unit_index": u_idx,
-                "text": body,
-            }
-            chunk["id"] = _md5(
-                f"{source}|{file}|{unit_type}|{unit_id}|{u_idx}|{body[:200]}"
-            )
-            chunks.append(chunk)
+            unit_type, unit_id, unit_title = unit_meta_fn(header)
+
+            sub_parts = _resplit_if_needed(body)
+            for sub_i, sub_text in enumerate(sub_parts):
+                sub_text = sub_text.strip()
+                if len(sub_text) < MIN_CHUNK_CHARS:
+                    continue
+
+                chunk = {
+                    "source": source,
+                    "file": file,
+                    "doc_title": dmeta["doc_title"],
+                    "doc_date": dmeta["doc_date"],
+                    "boe_year": dmeta["boe_year"],
+                    "boe_id": dmeta["boe_id"],
+                    "unit_type": unit_type,
+                    "unit_id": unit_id,
+                    "unit_title": unit_title,
+                    "unit_index": u_idx,
+                    "sub_index": sub_i,
+                    "text": sub_text,
+                }
+                chunk["id"] = _md5(
+                    f"{source}|{file}|{unit_type}|{unit_id}|{u_idx}|{sub_i}|{sub_text[:200]}"
+                )
+                chunks.append(chunk)
 
     return chunks
 
@@ -302,7 +357,7 @@ def chunk_lopd(docs: list[dict]) -> list[dict]:
 
         for i, ch in enumerate(raw_chunks):
             txt = ch["text"].strip()
-            if not txt:
+            if len(txt) < MIN_CHUNK_CHARS:
                 continue
 
             meta = ch["meta"]
@@ -328,22 +383,29 @@ def chunk_lopd(docs: list[dict]) -> list[dict]:
             else:
                 unit_title = unit_id or "DOCUMENT"
 
-            chunk = {
-                "id": None,
-                "source": "lopd_rgpd",
-                "file": file,
-                "doc_title": file,
-                "doc_date": None,
-                "boe_id": None,
-                "boe_year": None,
-                "unit_type": unit_type,
-                "unit_id": unit_id,
-                "unit_title": unit_title,
-                "unit_index": i,
-                "text": txt,
-            }
-            chunk["id"] = _md5(json.dumps(chunk, ensure_ascii=False, sort_keys=True))
-            chunks.append(chunk)
+            sub_parts = _resplit_if_needed(txt)
+            for sub_i, sub_text in enumerate(sub_parts):
+                sub_text = sub_text.strip()
+                if len(sub_text) < MIN_CHUNK_CHARS:
+                    continue
+
+                chunk = {
+                    "id": None,
+                    "source": "lopd_rgpd",
+                    "file": file,
+                    "doc_title": file,
+                    "doc_date": None,
+                    "boe_id": None,
+                    "boe_year": None,
+                    "unit_type": unit_type,
+                    "unit_id": unit_id,
+                    "unit_title": unit_title,
+                    "unit_index": i,
+                    "sub_index": sub_i,
+                    "text": sub_text,
+                }
+                chunk["id"] = _md5(json.dumps(chunk, ensure_ascii=False, sort_keys=True))
+                chunks.append(chunk)
 
     return chunks
 
@@ -371,7 +433,7 @@ def main() -> None:
     print("\n-- Chunking --")
     boe_chunks = chunk_docs("boe", boe_docs, BOE_PATTERNS)
     eu_chunks = chunk_docs("eu_ai_act", eu_docs, EU_PATTERNS)
-    aesia_chunks = chunk_docs("aesia", aesia_docs, AESIA_PATTERNS)
+    aesia_chunks = chunk_docs("aesia", aesia_docs, AESIA_PATTERNS, unit_meta_fn=_unit_meta_aesia)
     lopd_chunks = chunk_lopd(lopd_docs)
 
     main_chunks = boe_chunks + eu_chunks + aesia_chunks
@@ -393,6 +455,16 @@ def main() -> None:
 
     _write_jsonl(out_all, all_chunks)
     print(f"  {out_all.name}: {len(all_chunks)} chunks")
+
+    # 4) Verificación
+    sizes = [len(c["text"]) for c in all_chunks]
+    over = sum(1 for s in sizes if s > MAX_CHUNK_CHARS)
+    under = sum(1 for s in sizes if s < MIN_CHUNK_CHARS)
+    print("\n-- Verificación --")
+    print(f"  Max chunk: {max(sizes)} chars (límite: {MAX_CHUNK_CHARS})")
+    print(f"  Min chunk: {min(sizes)} chars (límite: {MIN_CHUNK_CHARS})")
+    print(f"  >MAX: {over} (debe ser 0)")
+    print(f"  <MIN: {under} (debe ser 0)")
 
     print("\n=== Ingesta completada ===")
 
