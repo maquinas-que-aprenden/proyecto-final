@@ -83,8 +83,9 @@ def configure_mlflow():
 
     password = get_mlflow_password()
 
-    # Activar TLS permisivo solo si ENVIRONMENT está explícitamente definida como "local".
-    if os.getenv("ENVIRONMENT") == "local":
+    # TLS inseguro solo si se opta explícitamente (MLFLOW_ALLOW_INSECURE=true en .env).
+    # Nunca se activa automáticamente para evitar exposición sin consentimiento.
+    if os.getenv("MLFLOW_ALLOW_INSECURE") == "true":
         os.environ.setdefault("MLFLOW_TRACKING_INSECURE_TLS", "true")
     os.environ["MLFLOW_TRACKING_USERNAME"] = os.getenv("MLFLOW_TRACKING_USERNAME", "tracker")
     os.environ["MLFLOW_TRACKING_PASSWORD"] = password
@@ -240,6 +241,18 @@ KEYWORDS_DOMINIO = {
         "medicación", "autónomamente",
         "reclamación", "subsidio", "escolar", "triage",
         "urgencia", "aeronave", "piloto", "laboral",
+        # Anexo III cat. 4 — selección de personal (CV screening)
+        "curricular", "candidato", "reclutamiento", "curriculum",
+        # Anexo III cat. 5 — servicios financieros esenciales
+        "solvencia", "préstamo", "crédito", "hipoteca",
+        # Anexo III cat. 6 — justicia penal
+        "recidiva", "reincidente",
+        # Anexo III cat. 7 — migración
+        "frontera", "visado", "refugiado",
+        # Anexo III cat. 8 — administración de justicia
+        "sentencia", "judicial",
+        # Anexo III cat. 3 — educación
+        "admisión", "matriculación",
     ],
     # Obligaciones de transparencia: chatbots, deepfakes, contenido sintético
     # deben identificarse como IA.
