@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from pathlib import Path
 from typing import Any
 
 from typing_extensions import Annotated
 
 from langchain_aws import ChatBedrockConverse
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent, InjectedStore
 from langgraph.store.memory import InMemoryStore
@@ -236,11 +238,23 @@ def generate_report(system_description: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _user_namespace(config: RunnableConfig) -> tuple[str, str]:
+    """Namespace aislado por usuario para el store de preferencias.
+
+    Usa ``user_id`` si está disponible (preferencias persisten entre sesiones),
+    sino ``thread_id`` como fallback (preferencias aisladas por sesión).
+    """
+    cfg = config.get("configurable", {})
+    scope = cfg.get("user_id") or cfg.get("thread_id", "default")
+    return ("user_preferences", scope)
+
+
 @tool
 def save_user_preference(
     key: str,
     value: str,
     store: Annotated[Any, InjectedStore()],
+    config: RunnableConfig,
 ) -> str:
     """Guarda una preferencia o dato del usuario para recordarlo en futuras
     conversaciones.
@@ -249,20 +263,21 @@ def save_user_preference(
     recuerdes algo sobre él o su organización (sector, tipo de sistema,
     preferencias, contexto).
     """
-    store.put(("user_preferences",), key, {"value": value})
+    store.put(_user_namespace(config), key, {"value": value})
     return f"Preferencia guardada: {key} = {value}"
 
 
 @tool
 def get_user_preferences(
     store: Annotated[Any, InjectedStore()],
+    config: RunnableConfig,
 ) -> str:
     """Recupera las preferencias guardadas del usuario.
 
     Usa esta herramienta al inicio de la conversación o cuando necesites
     contexto sobre el usuario.
     """
-    items = store.search(("user_preferences",))
+    items = store.search(_user_namespace(config))
     if not items:
         return "No hay preferencias guardadas."
     return "\n".join(f"- {item.key}: {item.value['value']}" for item in items)
@@ -275,34 +290,58 @@ def get_user_preferences(
 _agent = None
 _checkpointer = None
 _store = None
+_lock = threading.Lock()
 
 
 def _get_checkpointer():
-    """Singleton del checkpointer — SQLite si disponible, sino en memoria."""
+    """Singleton thread-safe del checkpointer (double-checked locking).
+
+    Intenta SQLite si está disponible; degrada a InMemorySaver si falla
+    la creación del directorio o la inicialización de la base de datos.
+    """
     global _checkpointer
     if _checkpointer is not None:
         return _checkpointer
 
-    if _SQLITE_AVAILABLE:
-        memory_dir = Path(MEMORY_DIR)
-        memory_dir.mkdir(parents=True, exist_ok=True)
-        db_path = str(memory_dir / "conversations.db")
-        _checkpointer = SqliteSaver.from_conn_string(db_path)
-        _checkpointer.setup()
-        logger.info("Checkpointer SQLite inicializado: %s", db_path)
-    else:
-        _checkpointer = InMemorySaver()
-        logger.info("Checkpointer en memoria (langgraph-checkpoint-sqlite no instalado)")
+    with _lock:
+        if _checkpointer is not None:
+            return _checkpointer
+
+        if _SQLITE_AVAILABLE:
+            try:
+                memory_dir = Path(MEMORY_DIR)
+                memory_dir.mkdir(parents=True, exist_ok=True)
+                db_path = str(memory_dir / "conversations.db")
+                saver = SqliteSaver.from_conn_string(db_path)
+                saver.setup()
+                _checkpointer = saver
+                logger.info("Checkpointer SQLite inicializado: %s", db_path)
+            except Exception:
+                logger.warning(
+                    "SQLite checkpointer falló, degradando a memoria",
+                    exc_info=True,
+                )
+                _checkpointer = InMemorySaver()
+        else:
+            _checkpointer = InMemorySaver()
+            logger.info(
+                "Checkpointer en memoria (langgraph-checkpoint-sqlite no instalado)"
+            )
 
     return _checkpointer
 
 
 def _get_store() -> InMemoryStore:
-    """Singleton del store para memoria cross-thread."""
+    """Singleton thread-safe del store para memoria cross-thread."""
     global _store
-    if _store is None:
-        _store = InMemoryStore()
-        logger.info("InMemoryStore inicializado para preferencias de usuario")
+    if _store is not None:
+        return _store
+
+    with _lock:
+        if _store is None:
+            _store = InMemoryStore()
+            logger.info("InMemoryStore inicializado para preferencias de usuario")
+
     return _store
 
 
@@ -362,6 +401,7 @@ def run(query: str, session_id: str | None = None, user_id: str | None = None) -
         "callbacks": callbacks,
         "configurable": {
             "thread_id": session_id or "default",
+            "user_id": user_id,
         },
     }
 
