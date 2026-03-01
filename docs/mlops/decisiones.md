@@ -74,11 +74,11 @@ De momento solo hay una para MLflow. Es preferible usar SQLite dentro de la prop
 * Las imágenes Docker se publican en GitHub Container Registry (ghcr.io) porque es gratuito para repositorios públicos, a diferencia de ECR de AWS que tiene coste por almacenamiento.
 * Hay cuatro workflows separados:
     * `pr_lint.yml`: lint con ruff solo sobre los ficheros `.py`/`.ipynb` modificados, en cada PR a `main` o `develop`.
-    * `ci-develop.yml`: lint completo + construye y publica la imagen con tag `:develop` en cada push a `develop`, para poder probarla manualmente.
-    * `cicd-main.yml`: lint + construye, publica con tag `:latest` y despliega automáticamente en el servidor en cada push a `main`.
+    * `ci-develop.yml`: lint completo + smoke tests (pytest) + construye y publica la imagen con tag `:develop` en cada push a `develop`.
+    * `cicd-main.yml`: lint completo + smoke tests (pytest) + construye, publica con tag `:latest` y despliega automáticamente en el servidor en cada push a `main`. Los tests también corren en PRs a `main` como gate antes del merge.
     * `eval.yml`: ejecuta la evaluación RAGAS en EC2 contra la imagen `:latest` desplegada. Se lanza manualmente (`workflow_dispatch`).
 * El despliegue se hace vía SSH a la EC2. El script de deploy hace login en GHCR, `dvc pull` del vectorstore y levanta el contenedor con `docker compose up -d --pull always --force-recreate`. Pendiente: valorar si simplificar a `docker run` directo.
-* Los tests del clasificador se ejecutan con `pytest` (definidos en `tests/`, dependencias en `requirements/dev.txt`).
+* Los smoke tests (69 tests, 4 suites: clasificador, RAG generate, orquestador, reentrenamiento) se ejecutan con `pytest tests/ -v`. Los servicios externos (Bedrock, Ollama) están mockeados y el reentrenamiento usa un stub `_FakeXGB`, por lo que no requieren credenciales ni entrenamiento real en CI.
 
 ## Observabilidad y trazabilidad
 * Usamos [MLflow](https://mlflow.org/) para los modelos de clasificación: métricas de entrenamiento y registro del modelo.

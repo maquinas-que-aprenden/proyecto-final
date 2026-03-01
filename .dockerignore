@@ -23,6 +23,9 @@ docs/
 # Linter cache
 src/.ruff_cache/
 
+# Script de reentrenamiento — solo para uso local/CI, no para inferencia en producción
+src/classifier/retrain.py
+
 # Experimentos del clasificador — excluir todo excepto el modelo fusionado
 src/classifier/classifier_dataset_artificial/
 src/classifier/classifier_dataset_real/

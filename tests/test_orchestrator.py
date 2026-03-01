@@ -1,7 +1,6 @@
 """test_orchestrator.py — Tests del agente ReAct orquestador y sus herramientas.
 
 ¿Qué se prueba?
-===============
 1. Estructura de las tools: tienen nombre, descripción y son invocables.
 2. Validación Pydantic de entrada: textos vacíos devuelven "Error de validacion".
 3. Comportamiento de classify_risk: formatea correctamente la salida de predict_risk.
@@ -10,14 +9,12 @@
 6. run(): devuelve dict con "messages" usando un agente mockeado.
 
 Estrategia de mocking
-======================
 langchain_aws, langchain_core y langgraph no están instalados en venv_proyecto
 (son dependencias de producción/app, no de ML). Se inyectan como MagicMock en
 sys.modules antes de importar src.orchestrator.main, igual que hace
 test_rag_generate.py con langchain_aws. El teardown_module restaura el estado.
 
 ¿Cómo ejecutar?
-===============
     pytest tests/test_orchestrator.py -v
 """
 
@@ -71,6 +68,7 @@ _mock_langgraph.prebuilt = _mock_langgraph_prebuilt
 # Importar el módulo DESPUÉS de los mocks
 import src.orchestrator.main as orch_module  # noqa: E402
 from src.orchestrator.main import (  # noqa: E402
+    SYSTEM_PROMPT,
     search_legal_docs,
     classify_risk,
     generate_report,
@@ -85,6 +83,30 @@ def teardown_module(module):
             sys.modules.pop(name, None)
         else:
             sys.modules[name] = original
+
+
+# ---------------------------------------------------------------------------
+# Grupo 0: SYSTEM_PROMPT contiene las instrucciones legales obligatorias
+# ---------------------------------------------------------------------------
+
+class TestSystemPrompt:
+    """El prompt del agente incluye los requisitos de dominio no negociables."""
+
+    def test_contiene_disclaimer_legal(self):
+        """Requisito de dominio: toda respuesta debe indicar que es un informe preliminar."""
+        assert "Informe preliminar generado por IA. Consulte profesional jurídico." in SYSTEM_PROMPT
+
+    def test_menciona_eu_ai_act(self):
+        """El agente debe saber que su dominio es el EU AI Act y el BOE."""
+        assert "EU AI Act" in SYSTEM_PROMPT
+
+    def test_instruye_citar_fuentes(self):
+        """El agente debe citar fuentes legales exactas, no responder de memoria."""
+        assert "fuentes" in SYSTEM_PROMPT.lower() or "cita" in SYSTEM_PROMPT.lower()
+
+    def test_instruye_usar_herramientas(self):
+        """El agente debe usar las herramientas disponibles antes de responder."""
+        assert "herramienta" in SYSTEM_PROMPT.lower()
 
 
 # ---------------------------------------------------------------------------

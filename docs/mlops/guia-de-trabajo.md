@@ -157,8 +157,8 @@ En el caso de `mlflow_deploy` es necesario pasar la contraseña para que nginx i
 | Workflow | Disparador | Qué hace |
 |---|---|---|
 | `pr_lint.yml` | PR a `main` o `develop` | Lint (ruff) solo sobre los ficheros `.py`/`.ipynb` modificados en la PR |
-| `ci-develop.yml` | Push a `develop` | Lint completo + build y publicación de imagen `:develop` |
-| `cicd-main.yml` | Push a `main` | Lint completo + build imagen `:latest` + despliegue automático en EC2 |
+| `ci-develop.yml` | Push a `develop` | Lint completo + smoke tests (pytest) + build y publicación de imagen `:develop` |
+| `cicd-main.yml` | Push a `main` o PR a `main` | Lint completo + smoke tests (pytest) + build imagen `:latest` + despliegue automático en EC2 |
 | `eval.yml` | Manual (`workflow_dispatch`) | Evaluación RAGAS sobre la imagen desplegada en EC2 |
 
 El `pr_lint.yml` usa `tj-actions/changed-files` para obtener solo los archivos modificados en la PR y pasarlos a `ruff check`, en vez de escanear el repositorio entero. Esto hace el check más rápido y evita fallos por ficheros que no se han tocado.
@@ -313,4 +313,10 @@ pytest tests/ -v
 pytest tests/ -v -s
 ```
 
-Los tests del clasificador son smoke tests: verifican que `predict_risk` devuelve la estructura correcta sin lanzar excepciones. Langfuse se desactiva automáticamente durante la ejecución de pytest.
+Hay cuatro suites de smoke tests (69 tests en total):
+- `test_classifier.py` — 19 tests: estructura de `predict_risk()`, robustez, explicabilidad SHAP, validación de entrada.
+- `test_rag_generate.py` — 13 tests: prompt, singleton `_get_generate_llm()`, flujo `generate()` con fallback.
+- `test_orchestrator.py` — 23 tests: SYSTEM_PROMPT con requisitos legales, nombres y descripciones de las 3 tools, validación de entrada, comportamiento de `classify_risk`, `search_legal_docs` y `generate_report`, contrato de `run()`.
+- `test_retrain.py` — 14 tests: limpieza de texto, carga de JSONL, features manuales e integración de `main()` con `monkeypatch` de rutas y stub `_FakeXGB` (sin entrenamiento real).
+
+Los tests de orchestrator y RAG mockean `langchain_aws` (Bedrock), `langchain_core` y `langchain_ollama` (Ollama) a nivel de módulo para no depender de servicios externos. Langfuse se desactiva automáticamente durante la ejecución de pytest.
