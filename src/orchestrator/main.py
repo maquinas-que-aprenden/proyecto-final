@@ -10,11 +10,28 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
+from typing import Any
+
+from typing_extensions import Annotated
 
 from langchain_aws import ChatBedrockConverse
 from langchain_core.tools import tool
-from langgraph.prebuilt import create_react_agent
+from langgraph.prebuilt import create_react_agent, InjectedStore
+from langgraph.store.memory import InMemoryStore
 from pydantic import BaseModel, Field
+
+from src.memory.hooks import pre_model_hook
+
+# Checkpointer: SQLite persistente si está disponible, sino en memoria
+try:
+    from langgraph.checkpoint.sqlite import SqliteSaver
+
+    _SQLITE_AVAILABLE = True
+except ImportError:
+    from langgraph.checkpoint.memory import InMemorySaver
+
+    _SQLITE_AVAILABLE = False
 
 try:
     from langfuse.decorators import observe, langfuse_context
@@ -41,6 +58,7 @@ logger = logging.getLogger(__name__)
 
 BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "eu.amazon.nova-lite-v1:0")
 BEDROCK_REGION = os.environ.get("BEDROCK_REGION") or os.environ.get("AWS_REGION", "eu-west-1")
+MEMORY_DIR = os.environ.get("NORMABOT_MEMORY_DIR", "data/memory")
 
 SYSTEM_PROMPT = """\
 Eres NormaBot, un asistente jurídico especializado en el EU AI Act \
@@ -214,21 +232,102 @@ def generate_report(system_description: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Agente ReAct
+# Herramienta de memoria de usuario
+# ---------------------------------------------------------------------------
+
+
+@tool
+def save_user_preference(
+    key: str,
+    value: str,
+    store: Annotated[Any, InjectedStore()],
+) -> str:
+    """Guarda una preferencia o dato del usuario para recordarlo en futuras
+    conversaciones.
+
+    Usa esta herramienta cuando el usuario te pida explícitamente que
+    recuerdes algo sobre él o su organización (sector, tipo de sistema,
+    preferencias, contexto).
+    """
+    store.put(("user_preferences",), key, {"value": value})
+    return f"Preferencia guardada: {key} = {value}"
+
+
+@tool
+def get_user_preferences(
+    store: Annotated[Any, InjectedStore()],
+) -> str:
+    """Recupera las preferencias guardadas del usuario.
+
+    Usa esta herramienta al inicio de la conversación o cuando necesites
+    contexto sobre el usuario.
+    """
+    items = store.search(("user_preferences",))
+    if not items:
+        return "No hay preferencias guardadas."
+    return "\n".join(f"- {item.key}: {item.value['value']}" for item in items)
+
+
+# ---------------------------------------------------------------------------
+# Agente ReAct con memoria
 # ---------------------------------------------------------------------------
 
 _agent = None
+_checkpointer = None
+_store = None
+
+
+def _get_checkpointer():
+    """Singleton del checkpointer — SQLite si disponible, sino en memoria."""
+    global _checkpointer
+    if _checkpointer is not None:
+        return _checkpointer
+
+    if _SQLITE_AVAILABLE:
+        memory_dir = Path(MEMORY_DIR)
+        memory_dir.mkdir(parents=True, exist_ok=True)
+        db_path = str(memory_dir / "conversations.db")
+        _checkpointer = SqliteSaver.from_conn_string(db_path)
+        _checkpointer.setup()
+        logger.info("Checkpointer SQLite inicializado: %s", db_path)
+    else:
+        _checkpointer = InMemorySaver()
+        logger.info("Checkpointer en memoria (langgraph-checkpoint-sqlite no instalado)")
+
+    return _checkpointer
+
+
+def _get_store() -> InMemoryStore:
+    """Singleton del store para memoria cross-thread."""
+    global _store
+    if _store is None:
+        _store = InMemoryStore()
+        logger.info("InMemoryStore inicializado para preferencias de usuario")
+    return _store
 
 
 def _build_agent():
-    """Construye el agente ReAct con Bedrock Nova Lite y las herramientas."""
+    """Construye el agente ReAct con Bedrock Nova Lite, herramientas y memoria."""
     llm = ChatBedrockConverse(
         model=BEDROCK_MODEL_ID,
         region_name=BEDROCK_REGION,
         temperature=0.0,
     )
-    tools = [search_legal_docs, classify_risk, generate_report]
-    return create_react_agent(llm, tools, prompt=SYSTEM_PROMPT)
+    tools = [
+        search_legal_docs,
+        classify_risk,
+        generate_report,
+        save_user_preference,
+        get_user_preferences,
+    ]
+    return create_react_agent(
+        llm,
+        tools,
+        prompt=SYSTEM_PROMPT,
+        checkpointer=_get_checkpointer(),
+        store=_get_store(),
+        pre_model_hook=pre_model_hook,
+    )
 
 
 def _get_agent():
@@ -240,7 +339,11 @@ def _get_agent():
 
 
 def run(query: str, session_id: str | None = None, user_id: str | None = None) -> dict:
-    """Ejecuta el agente ReAct con una consulta del usuario."""
+    """Ejecuta el agente ReAct con memoria conversacional.
+
+    Con el checkpointer, solo se envía el mensaje nuevo. El checkpointer
+    carga automáticamente el historial previo para el ``thread_id``.
+    """
     agent = _get_agent()
 
     try:
@@ -255,9 +358,16 @@ def run(query: str, session_id: str | None = None, user_id: str | None = None) -
         logger.debug("Langfuse no disponible: %s — continuando sin trazas", e)
         callbacks = []
 
+    config = {
+        "callbacks": callbacks,
+        "configurable": {
+            "thread_id": session_id or "default",
+        },
+    }
+
     result = agent.invoke(
         {"messages": [("user", query)]},
-        config={"callbacks": callbacks},
+        config=config,
     )
     return result
 
@@ -265,19 +375,19 @@ def run(query: str, session_id: str | None = None, user_id: str | None = None) -
 if __name__ == "__main__":
     import uuid
 
-    # Generamos un ID único para agrupar estas consultas en una misma sesión de Langfuse
+    # Generamos un ID único para agrupar estas consultas en una misma sesión
     test_session = f"session-{uuid.uuid4().hex[:8]}"
 
+    # Demo de memoria multi-turn: las queries usan la misma sesión
     queries = [
         "¿Qué dice el artículo 5 del EU AI Act?",
         "Clasifica mi sistema de reconocimiento facial",
-        "Genera un informe de cumplimiento para mi chatbot",
-        "Clasifica un sistema de scoring crediticio y dime que articulos aplican",
+        # Esta query depende del contexto previo (multi-turn):
+        "Genera un informe de cumplimiento para ese sistema",
     ]
 
     for q in queries:
         print(f"{'=' * 60}")
-        # Pasamos el session_id para que Langfuse v3 lo capture mediante el CallbackHandler
         result = run(q, session_id=test_session)
 
         final_message = result["messages"][-1]
@@ -285,4 +395,4 @@ if __name__ == "__main__":
         print(f"  Response: {final_message.content[:200]}...")
         print()
 
-    print(f"✓ orchestrator/main.py OK — Agente funcional (Sesión: {test_session})")
+    print(f"✓ orchestrator/main.py OK — Agente con memoria (Sesión: {test_session})")

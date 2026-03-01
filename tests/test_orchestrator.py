@@ -41,10 +41,8 @@ def _inject_module_mock(name: str) -> MagicMock:
 _mock_langchain_aws = _inject_module_mock("langchain_aws")
 _mock_langchain_aws.ChatBedrockConverse = MagicMock()
 
-# langchain_core y subpaquetes
-_mock_langchain_core = _inject_module_mock("langchain_core")
-_mock_langchain_core_tools = _inject_module_mock("langchain_core.tools")
-
+# langchain_core.tools — solo mockeamos el submodulo tools (no el parent
+# langchain_core) para no romper imports de langchain_core.messages, .tracers, etc.
 # El decorador @tool debe devolver la función sin modificarla para que los tests
 # puedan llamarla directamente. Usamos un wrapper real (no MagicMock).
 def _passthrough_tool(func=None, **kwargs):
@@ -56,14 +54,27 @@ def _passthrough_tool(func=None, **kwargs):
     func.invoke = lambda input_dict: func(**input_dict)
     return func
 
+_mock_langchain_core_tools = _inject_module_mock("langchain_core.tools")
 _mock_langchain_core_tools.tool = _passthrough_tool
-_mock_langchain_core.tools = _mock_langchain_core_tools
 
 # langgraph y subpaquetes
 _mock_langgraph = _inject_module_mock("langgraph")
 _mock_langgraph_prebuilt = _inject_module_mock("langgraph.prebuilt")
 _mock_langgraph_prebuilt.create_react_agent = MagicMock(return_value=MagicMock())
+_mock_langgraph_prebuilt.InjectedStore = MagicMock()
 _mock_langgraph.prebuilt = _mock_langgraph_prebuilt
+
+# langgraph.checkpoint (SQLite y memoria)
+_mock_lg_checkpoint = _inject_module_mock("langgraph.checkpoint")
+_mock_lg_checkpoint_sqlite = _inject_module_mock("langgraph.checkpoint.sqlite")
+_mock_lg_checkpoint_sqlite.SqliteSaver = MagicMock()
+_mock_lg_checkpoint_memory = _inject_module_mock("langgraph.checkpoint.memory")
+_mock_lg_checkpoint_memory.InMemorySaver = MagicMock()
+
+# langgraph.store (memoria cross-thread)
+_mock_lg_store = _inject_module_mock("langgraph.store")
+_mock_lg_store_memory = _inject_module_mock("langgraph.store.memory")
+_mock_lg_store_memory.InMemoryStore = MagicMock(return_value=MagicMock())
 
 # Importar el módulo DESPUÉS de los mocks
 import src.orchestrator.main as orch_module  # noqa: E402
@@ -297,3 +308,54 @@ class TestRun:
 
         call_args = mock_agent.invoke.call_args[0][0]
         assert "pregunta concreta sobre el Art. 9" in call_args["messages"][0][1]
+
+
+# ---------------------------------------------------------------------------
+# Grupo 7: Memoria conversacional — run() pasa thread_id en config
+# ---------------------------------------------------------------------------
+
+class TestMemoriaConversacional:
+    """run() pasa thread_id y solo envía el mensaje nuevo (con checkpointer)."""
+
+    def setup_method(self):
+        orch_module._agent = None
+
+    def teardown_method(self):
+        orch_module._agent = None
+
+    @patch.object(orch_module, "_build_agent")
+    def test_run_pasa_thread_id(self, mock_build):
+        mock_agent = MagicMock()
+        mock_agent.invoke.return_value = {"messages": [MagicMock(content="respuesta")]}
+        mock_build.return_value = mock_agent
+
+        run("hola", session_id="test-session-123")
+
+        call_args = mock_agent.invoke.call_args
+        config = call_args[1].get("config") or call_args[0][1]
+        assert config["configurable"]["thread_id"] == "test-session-123"
+
+    @patch.object(orch_module, "_build_agent")
+    def test_run_usa_default_sin_session_id(self, mock_build):
+        mock_agent = MagicMock()
+        mock_agent.invoke.return_value = {"messages": [MagicMock(content="respuesta")]}
+        mock_build.return_value = mock_agent
+
+        run("hola")
+
+        call_args = mock_agent.invoke.call_args
+        config = call_args[1].get("config") or call_args[0][1]
+        assert config["configurable"]["thread_id"] == "default"
+
+    @patch.object(orch_module, "_build_agent")
+    def test_run_solo_envia_mensaje_nuevo(self, mock_build):
+        mock_agent = MagicMock()
+        mock_agent.invoke.return_value = {"messages": [MagicMock(content="respuesta")]}
+        mock_build.return_value = mock_agent
+
+        run("segunda pregunta", session_id="session-1")
+
+        call_args = mock_agent.invoke.call_args
+        input_data = call_args[0][0]
+        assert len(input_data["messages"]) == 1
+        assert input_data["messages"][0] == ("user", "segunda pregunta")
