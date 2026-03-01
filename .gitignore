@@ -46,4 +46,3 @@ mlruns/
 # ── Archivos locales / personales ──────────────
 src/classifier/tareas/
 .venv_rag/
-/raw
