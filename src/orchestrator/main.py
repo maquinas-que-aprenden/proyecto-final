@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+from functools import lru_cache
 
 from langchain_aws import ChatBedrockConverse
 from langchain_core.tools import tool
@@ -35,15 +36,10 @@ from src.classifier.main import predict_risk
 
 logger = logging.getLogger(__name__)
 
-# Caché de clasificaciones por sesión: evita llamar al clasificador dos veces
-# cuando el agente usa classify_risk y generate_report sobre la misma descripción.
-_risk_cache: dict[str, dict] = {}
-
-
+@lru_cache(maxsize=256)
 def _cached_predict_risk(system_description: str) -> dict:
-    if system_description not in _risk_cache:
-        _risk_cache[system_description] = predict_risk(system_description)
-    return _risk_cache[system_description]
+    """Evita clasificar dos veces la misma descripción en una misma sesión."""
+    return predict_risk(system_description)
 
 # ---------------------------------------------------------------------------
 # Configuración
