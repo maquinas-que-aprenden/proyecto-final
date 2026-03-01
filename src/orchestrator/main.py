@@ -35,6 +35,16 @@ from src.classifier.main import predict_risk
 
 logger = logging.getLogger(__name__)
 
+# Caché de clasificaciones por sesión: evita llamar al clasificador dos veces
+# cuando el agente usa classify_risk y generate_report sobre la misma descripción.
+_risk_cache: dict[str, dict] = {}
+
+
+def _cached_predict_risk(system_description: str) -> dict:
+    if system_description not in _risk_cache:
+        _risk_cache[system_description] = predict_risk(system_description)
+    return _risk_cache[system_description]
+
 # ---------------------------------------------------------------------------
 # Configuración
 # ---------------------------------------------------------------------------
@@ -131,7 +141,7 @@ def classify_risk(system_description: str) -> str:
     except Exception as e:
         return f"Error de validacion: {e}"
 
-    result = predict_risk(system_description)
+    result = _cached_predict_risk(system_description)
     try:
         langfuse_context.update_current_observation(
             metadata={
@@ -192,8 +202,8 @@ def generate_report(system_description: str) -> str:
 
     from src.report.main import generate_report as _build_report
 
-    # 1. Clasificar riesgo del sistema
-    risk_result = predict_risk(system_description)
+    # 1. Clasificar riesgo del sistema (usa caché si classify_risk ya lo computó)
+    risk_result = _cached_predict_risk(system_description)
     risk_level = risk_result["risk_level"]
 
     # 2. Buscar artículos relevantes en el corpus legal
