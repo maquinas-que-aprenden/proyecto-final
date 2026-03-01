@@ -1,6 +1,6 @@
 outs:
-- md5: 18fbef8c85575cc06471483c3e2eae37.dir
-  size: 26880219
-  nfiles: 7
+- md5: 8a4cfe773bb7c2c41836c0ff3404f383.dir
+  size: 51251993
+  nfiles: 12
   hash: md5
   path: vectorstore
