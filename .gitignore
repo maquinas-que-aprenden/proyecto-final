@@ -49,3 +49,4 @@ mlruns/
 # ── Archivos locales / personales ──────────────
 src/classifier/tareas/
 .venv_rag/
+proyecto-final\src\finetuning\tareas
