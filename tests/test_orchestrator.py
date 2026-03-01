@@ -94,7 +94,7 @@ class TestSystemPrompt:
 
     def test_contiene_disclaimer_legal(self):
         """Requisito de dominio: toda respuesta debe indicar que es un informe preliminar."""
-        assert "profesional jurídico" in SYSTEM_PROMPT
+        assert "Informe preliminar generado por IA. Consulte profesional jurídico." in SYSTEM_PROMPT
 
     def test_menciona_eu_ai_act(self):
         """El agente debe saber que su dominio es el EU AI Act y el BOE."""
