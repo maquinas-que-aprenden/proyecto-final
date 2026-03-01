@@ -1,16 +1,3 @@
-Este módulo valida ``run(query) -> dict``, el punto de entrada del orquestador,
-y las tres herramientas que el agente ReAct puede invocar:
-``search_legal_docs``, ``classify_risk`` y ``generate_report``.
-
-¿Por qué smoke tests y no unit tests puros?
-El orquestador depende de Amazon Bedrock (no disponible en CI) y de LangGraph
-para crear el agente ReAct. Mockeamos el agente completo para verificar que:
-  - El contrato de ``run()`` es estable (devuelve dict con ``messages``).
-  - Las herramientas rechazan entradas inválidas antes de llamar a servicios externos.
-  - ``classify_risk`` formatea correctamente la salida de ``predict_risk()``.
-  - El SYSTEM_PROMPT contiene las instrucciones legales obligatorias.
-
-¿Cómo ejecutarlos?
 """test_orchestrator.py — Tests del agente ReAct orquestador y sus herramientas.
 
 ¿Qué se prueba?
@@ -81,6 +68,7 @@ _mock_langgraph.prebuilt = _mock_langgraph_prebuilt
 # Importar el módulo DESPUÉS de los mocks
 import src.orchestrator.main as orch_module  # noqa: E402
 from src.orchestrator.main import (  # noqa: E402
+    SYSTEM_PROMPT,
     search_legal_docs,
     classify_risk,
     generate_report,
@@ -95,6 +83,30 @@ def teardown_module(module):
             sys.modules.pop(name, None)
         else:
             sys.modules[name] = original
+
+
+# ---------------------------------------------------------------------------
+# Grupo 0: SYSTEM_PROMPT contiene las instrucciones legales obligatorias
+# ---------------------------------------------------------------------------
+
+class TestSystemPrompt:
+    """El prompt del agente incluye los requisitos de dominio no negociables."""
+
+    def test_contiene_disclaimer_legal(self):
+        """Requisito de dominio: toda respuesta debe indicar que es un informe preliminar."""
+        assert "profesional jurídico" in SYSTEM_PROMPT
+
+    def test_menciona_eu_ai_act(self):
+        """El agente debe saber que su dominio es el EU AI Act y el BOE."""
+        assert "EU AI Act" in SYSTEM_PROMPT
+
+    def test_instruye_citar_fuentes(self):
+        """El agente debe citar fuentes legales exactas, no responder de memoria."""
+        assert "fuentes" in SYSTEM_PROMPT.lower() or "cita" in SYSTEM_PROMPT.lower()
+
+    def test_instruye_usar_herramientas(self):
+        """El agente debe usar las herramientas disponibles antes de responder."""
+        assert "herramienta" in SYSTEM_PROMPT.lower()
 
 
 # ---------------------------------------------------------------------------

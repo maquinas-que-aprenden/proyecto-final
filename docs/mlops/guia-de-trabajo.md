@@ -313,9 +313,10 @@ pytest tests/ -v
 pytest tests/ -v -s
 ```
 
-Hay tres suites de smoke tests (42 tests en total):
+Hay cuatro suites de smoke tests (69 tests en total):
 - `test_classifier.py` — 19 tests: estructura de `predict_risk()`, robustez, explicabilidad SHAP, validación de entrada.
 - `test_rag_generate.py` — 13 tests: prompt, singleton `_get_generate_llm()`, flujo `generate()` con fallback.
-- `test_orchestrator.py` — 14 tests: SYSTEM_PROMPT, singleton `_get_agent()`, contrato de `run()`, validación de entrada de las 3 tools, formato de salida de `classify_risk`.
+- `test_orchestrator.py` — 23 tests: SYSTEM_PROMPT con requisitos legales, nombres y descripciones de las 3 tools, validación de entrada, comportamiento de `classify_risk`, `search_legal_docs` y `generate_report`, contrato de `run()`.
+- `test_retrain.py` — 14 tests: limpieza de texto, carga de JSONL, features manuales e integración de `main()` con `monkeypatch` de rutas y stub `_FakeXGB` (sin entrenamiento real).
 
-Los tests mockean `langchain_aws` (Bedrock) y `langchain_ollama` (Ollama) a nivel de módulo para no depender de servicios externos. Langfuse se desactiva automáticamente durante la ejecución de pytest.
+Los tests de orchestrator y RAG mockean `langchain_aws` (Bedrock), `langchain_core` y `langchain_ollama` (Ollama) a nivel de módulo para no depender de servicios externos. Langfuse se desactiva automáticamente durante la ejecución de pytest.
