@@ -468,15 +468,18 @@ def predict_risk(text: str) -> dict:
             ]
             if shap_top:
                 result["shap_top_features"] = shap_top
-                top_words = ", ".join(f["feature"] for f in shap_top[:3])
-                result["shap_explanation"] = (
-                    f"Factores principales para '{risk_level}': {top_words}."
-                )
     except Exception as e:
         logger.warning("No se pudo calcular explicabilidad: %s", e)
 
     # Capa de override: patrones deterministas del Anexo III tienen precedencia sobre ML
     result = _annex3_override(text, result)
+
+    # shap_explanation se construye después del override para reflejar el nivel final
+    if result.get("shap_top_features"):
+        top_words = ", ".join(f["feature"] for f in result["shap_top_features"][:3])
+        result["shap_explanation"] = (
+            f"Factores principales para '{result['risk_level']}': {top_words}."
+        )
 
     try:
         langfuse_context.update_current_observation(
