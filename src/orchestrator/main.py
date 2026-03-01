@@ -52,8 +52,10 @@ sistemas de IA por nivel de riesgo y generar informes de cumplimiento.
 Responde SIEMPRE en el mismo idioma en que el usuario escribe. \
 Por defecto, responde en español.
 
-Usa las herramientas disponibles para responder. Siempre cita las fuentes \
-legales (ley y artículo) en tu respuesta.
+Usa las herramientas disponibles para responder. Para clasificaciones de \
+riesgo, cita únicamente la referencia legal que devuelva la herramienta \
+classify_risk — no añadas ni infergas artículos adicionales del EU AI Act \
+que no estén en su respuesta.
 
 Añade siempre al final: "_Informe preliminar generado por IA. Consulte \
 profesional jurídico._"\
@@ -135,19 +137,42 @@ def classify_risk(system_description: str) -> str:
             metadata={
                 "risk_level": result.get("risk_level"),
                 "confidence": result.get("confidence"),
+                "annex3_ref": result.get("annex3_ref"),
             }
         )
     except Exception:
         pass
+
+    # Bug 2 — Referencia legal explícita: annex3_ref si hubo override determinista,
+    # si no, fallback por nivel de riesgo según EU AI Act.
+    _LEGAL_REFS = {
+        "inaceptable": "Art. 5 EU AI Act (sistema prohibido)",
+        "alto_riesgo": "Art. 6 + Anexo III EU AI Act",
+        "riesgo_limitado": "Art. 6 EU AI Act",
+        "riesgo_minimo": "Art. 6 EU AI Act (sin obligaciones adicionales)",
+    }
+    legal_ref = result.get("annex3_ref") or _LEGAL_REFS.get(
+        result["risk_level"], "Art. 6 EU AI Act"
+    )
+
     response = (
         f"Clasificacion: {result['risk_level'].upper()}\n"
         f"Confianza: {result['confidence']:.0%}\n"
+        f"Referencia legal: {legal_ref}\n"
     )
-    if result.get("shap_top_features"):
-        features = ", ".join(f["feature"] for f in result["shap_top_features"][:3])
+
+    # Bug 7 — Mostrar solo features semánticamente interpretables.
+    # Excluir componentes SVD (svd_N) y métricas de longitud (num_palabras,
+    # num_caracteres), que no tienen significado legal para el usuario.
+    _NO_INTERPRETAR = {"num_palabras", "num_caracteres"}
+    interpretable = [
+        f for f in result.get("shap_top_features", [])
+        if not f["feature"].startswith("svd_") and f["feature"] not in _NO_INTERPRETAR
+    ]
+    if interpretable:
+        features = ", ".join(f["feature"] for f in interpretable[:3])
         response += f"Factores clave: {features}\n"
-    if result.get("shap_explanation"):
-        response += f"Explicacion: {result['shap_explanation']}\n"
+
     return response
 
 
