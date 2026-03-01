@@ -33,20 +33,63 @@ GRADING_PROMPTS = {
         "Pregunta: {query}\n\n"
         'Responde solo con "si" o "no":'
     ),
+
+    # v1 — Few-shot: 2 ejemplos (1 relevante, 1 irrelevante) para guiar al modelo
+    "v1": (
+        "Tu tarea es decidir si un documento contiene información útil para responder una pregunta.\n\n"
+        "Ejemplos:\n\n"
+        "Pregunta: ¿Qué prácticas de IA están prohibidas?\n"
+        "Documento: Artículo 5. Quedan prohibidas las siguientes prácticas de IA: sistemas que utilicen "
+        "técnicas subliminales para alterar el comportamiento de una persona.\n"
+        "Respuesta: si\n\n"
+        "Pregunta: ¿Qué prácticas de IA están prohibidas?\n"
+        "Documento: Artículo 9. Se establecerá un sistema de gestión de riesgos en relación con los "
+        "sistemas de IA de alto riesgo.\n"
+        "Respuesta: no\n\n"
+        "Ahora evalúa:\n\n"
+        "Pregunta: {query}\n"
+        "Documento: {document}\n\n"
+        'Responde solo con "si" o "no":'
+    ),
+
+    # v2 — Chain of Thought: el modelo razona antes de decidir
+    "v2": (
+        "Dado el siguiente documento y la pregunta, determina si el documento contiene "
+        "información útil para responder la pregunta.\n\n"
+        "Documento: {document}\n"
+        "Pregunta: {query}\n\n"
+        "Primero identifica de qué trata el documento en una frase. "
+        "Luego decide si esa información ayuda a responder la pregunta. "
+        'Termina tu respuesta con "Veredicto: si" o "Veredicto: no".'
+    ),
 }
 
 
-def get_llm():
-    """Devuelve el LLM de grading (Ollama Qwen 2.5 3B)."""
+def get_llm(num_predict: int = 10):
+    """Devuelve el LLM de grading (Ollama Qwen 2.5 3B).
+
+    num_predict=10 es suficiente para respuestas directas (si/no).
+    Para Chain of Thought se necesitan más tokens para el razonamiento.
+    """
     from langchain_ollama import ChatOllama
-    return ChatOllama(model="qwen2.5:3b", temperature=0, num_predict=10)
+    return ChatOllama(model="qwen2.5:3b", temperature=0, num_predict=num_predict)
 
 
 def predict_label(llm, prompt_template: str, query: str, document: str) -> str:
-    """Devuelve 'si' o 'no' según el prompt de grading."""
+    """Devuelve 'si' o 'no' según el prompt de grading.
+
+    Soporta respuestas directas ("si"/"no") y respuestas con veredicto
+    al final ("Veredicto: si") como las que genera la v2 Chain of Thought.
+    """
     prompt = prompt_template.format(document=document, query=query)
     response = llm.invoke(prompt)
     answer = response.content.strip().lower()
+
+    # v2 responde con "veredicto: si/no" al final
+    if "veredicto:" in answer:
+        verdict = answer.split("veredicto:")[-1].strip()
+        return "si" if verdict.startswith("si") or verdict.startswith("sí") else "no"
+
     return "si" if answer.startswith("si") or answer.startswith("sí") else "no"
 
 
@@ -58,7 +101,9 @@ def evaluate(variant: str = "v0") -> dict:
         test_set = json.load(f)
 
     logger.info("Cargando Ollama...")
-    llm = get_llm()
+    # v2 necesita más tokens para generar el razonamiento antes del veredicto
+    num_predict = 150 if variant == "v2" else 10
+    llm = get_llm(num_predict=num_predict)
 
     logger.info("Evaluando variante '%s' con %d pares...", variant, len(test_set))
 
@@ -125,7 +170,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--variant", default="v0",
         choices=list(GRADING_PROMPTS.keys()),
-        help="Variante del prompt a evaluar (default: v0)",
+        help="Variante del prompt a evaluar: v0 (baseline), v1 (few-shot), v2 (chain of thought)",
     )
     args = parser.parse_args()
     evaluate(variant=args.variant)
