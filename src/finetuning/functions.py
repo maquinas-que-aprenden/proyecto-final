@@ -232,14 +232,16 @@ def build_peft_model(model, lora_r: int = 8, lora_alpha: int = 16, lora_dropout:
     return model, lora_config
 
 
-def get_training_args(output_dir: str, num_epochs: int = 3):
+def get_training_args(output_dir: str, num_epochs: int = 3, max_seq_len: int = 512):
     """
-    Devuelve TrainingArguments optimizados para QLoRA en GPU T4 de Colab.
+    Devuelve SFTConfig optimizado para QLoRA en GPU con >= 8 GB VRAM.
     Batch efectivo = 4 (per_device) x 4 (grad_accum) = 16.
+    Usa SFTConfig (trl >= 0.12) en lugar de TrainingArguments para incluir
+    los parámetros SFT-específicos (max_seq_length, dataset_text_field, packing).
     """
-    from transformers import TrainingArguments
+    from trl import SFTConfig
 
-    args = TrainingArguments(
+    args = SFTConfig(
         output_dir=output_dir,
         num_train_epochs=num_epochs,
         per_device_train_batch_size=4,
@@ -250,7 +252,7 @@ def get_training_args(output_dir: str, num_epochs: int = 3):
         warmup_ratio=0.1,
         fp16=True,
         logging_steps=10,
-        evaluation_strategy="epoch",
+        eval_strategy="epoch",
         save_strategy="epoch",
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
@@ -259,6 +261,10 @@ def get_training_args(output_dir: str, num_epochs: int = 3):
         seed=42,
         optim="paged_adamw_8bit",
         dataloader_pin_memory=False,
+        # Parámetros SFT-específicos (movidos de SFTTrainer a SFTConfig en trl >= 0.12)
+        max_seq_length=max_seq_len,
+        dataset_text_field="text",
+        packing=False,
     )
     print("TrainingArguments configurados:")
     print(f"  Epochs:         {args.num_train_epochs}")
@@ -276,18 +282,17 @@ def run_training(model, training_args, train_dataset, val_dataset, tokenizer,
     """
     Lanza el SFTTrainer (Supervised Fine-Tuning) y devuelve train_result.
     Imprime el número estimado de pasos antes de comenzar.
+    Nota: training_args debe ser SFTConfig (incluye max_seq_length, dataset_text_field, packing).
+    En trl >= 0.12, SFTTrainer ya no acepta esos kwargs directamente.
     """
     from trl import SFTTrainer
 
     trainer = SFTTrainer(
         model=model,
-        args=training_args,
+        args=training_args,          # SFTConfig con parámetros SFT incluidos
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
-        tokenizer=tokenizer,
-        dataset_text_field="text",
-        max_seq_length=max_seq_len,
-        packing=False,
+        processing_class=tokenizer,  # 'tokenizer' renombrado a 'processing_class' en trl >= 0.12
     )
     steps = (
         len(train_dataset)
