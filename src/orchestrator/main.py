@@ -63,6 +63,11 @@ riesgo, cita únicamente la referencia legal que devuelva la herramienta \
 classify_risk — no añadas ni infergas artículos adicionales del EU AI Act \
 que no estén en su respuesta.
 
+Cuando el usuario pida un informe de cumplimiento, llama directamente a \
+generate_report sin llamar antes a classify_risk — generate_report ya \
+incluye la clasificación de riesgo internamente. Llamar a classify_risk \
+antes de generate_report es redundante.
+
 Añade siempre al final: "_Informe preliminar generado por IA. Consulte \
 profesional jurídico._"\
 """
@@ -189,7 +194,8 @@ def generate_report(system_description: str) -> str:
     """Genera un informe de cumplimiento normativo para un sistema de IA.
 
     Usa esta herramienta cuando el usuario quiere un informe, reporte o
-    evaluación de conformidad para su sistema.
+    evaluación de conformidad para su sistema. Esta herramienta clasifica
+    el riesgo internamente — no es necesario llamar a classify_risk antes.
     """
     try:
         _SystemDescriptionInput(system_description=system_description)
