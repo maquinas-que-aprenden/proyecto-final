@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+from functools import lru_cache
 
 from langchain_aws import ChatBedrockConverse
 from langchain_core.tools import tool
@@ -34,6 +35,11 @@ from src.observability.main import get_langfuse_handler
 from src.classifier.main import predict_risk
 
 logger = logging.getLogger(__name__)
+
+@lru_cache(maxsize=256)
+def _cached_predict_risk(system_description: str) -> dict:
+    """Evita clasificar dos veces la misma descripción en una misma sesión."""
+    return predict_risk(system_description)
 
 # ---------------------------------------------------------------------------
 # Configuración
@@ -131,7 +137,7 @@ def classify_risk(system_description: str) -> str:
     except Exception as e:
         return f"Error de validacion: {e}"
 
-    result = predict_risk(system_description)
+    result = _cached_predict_risk(system_description)
     try:
         langfuse_context.update_current_observation(
             metadata={
@@ -192,8 +198,8 @@ def generate_report(system_description: str) -> str:
 
     from src.report.main import generate_report as _build_report
 
-    # 1. Clasificar riesgo del sistema
-    risk_result = predict_risk(system_description)
+    # 1. Clasificar riesgo del sistema (usa caché si classify_risk ya lo computó)
+    risk_result = _cached_predict_risk(system_description)
     risk_level = risk_result["risk_level"]
 
     # 2. Buscar artículos relevantes en el corpus legal
