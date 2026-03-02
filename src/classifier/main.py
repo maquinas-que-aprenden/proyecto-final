@@ -125,11 +125,21 @@ def _annex3_override(text: str, result: dict) -> dict:
         overridden = result.copy()
         overridden["risk_level"] = best_level
         overridden["confidence"] = 0.85
+        # Recalibrar probabilities para ser coherentes con el nivel final.
+        # El nivel sobreescrito recibe 0.85; el resto se reparte equitativamente.
+        if result.get("probabilities"):
+            n = len(result["probabilities"])
+            resto = round((1.0 - 0.85) / max(n - 1, 1), 4)
+            overridden["probabilities"] = {
+                k: (0.85 if k == best_level else resto)
+                for k in result["probabilities"]
+            }
         overridden["annex3_override"] = True
         overridden["annex3_ref"] = best_ref
         overridden["ml_prediction"] = {
             "risk_level": result["risk_level"],
             "confidence": result["confidence"],
+            "probabilities": result.get("probabilities", {}),
         }
         return overridden
     return result
