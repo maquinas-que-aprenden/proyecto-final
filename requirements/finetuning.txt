@@ -1,0 +1,27 @@
+# Dependencias para el fine-tuning de Qwen 2.5 3B con QLoRA (src/finetuning)
+# Uso: pip install -r requirements/finetuning.txt
+# Nota: diseñado para ejecutarse en Google Colab T4/A10G o entorno local con GPU >= 8 GB VRAM
+-r base.txt
+
+# Deep Learning
+# GPU (CUDA 12.1 — Colab T4/A10G):
+#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+# CPU (local sin GPU):
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+torch
+
+# Stack de fine-tuning QLoRA
+# CVE-2024-11392/11393/11394: versión mínima segura para transformers
+transformers>=4.48.0
+tokenizers
+accelerate==1.2.1
+peft==0.14.0
+trl==0.13.0
+bitsandbytes>=0.42.0
+datasets==3.2.0
+
+# Métricas de evaluación (train_test_split, classification_report, f1_score)
+scikit-learn==1.5.2
+
+# Tracking de experimentos
+mlflow==2.17.2
