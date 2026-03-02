@@ -226,3 +226,128 @@ class TestValidacionEntrada:
         from pydantic import ValidationError
         with pytest.raises(ValidationError):
             predict_risk("a" * 5001)
+
+
+# ---------------------------------------------------------------------------
+# Grupo 5: Annex III override — coherencia de campos post-override
+# ---------------------------------------------------------------------------
+
+# Resultado ML intencionalmente incorrecto para forzar el override en tests.
+# La función _annex3_override solo actúa cuando result["risk_level"] != best_level,
+# así que necesitamos un resultado ML que difiera del nivel que dicta el Anexo III.
+_MOCK_RESULT_ML = {
+    "risk_level": "riesgo_minimo",     # ML equivocado
+    "confidence": 0.62,
+    "probabilities": {
+        "inaceptable": 0.05,
+        "alto_riesgo": 0.20,
+        "riesgo_limitado": 0.13,
+        "riesgo_minimo": 0.62,
+    },
+    "shap_top_features": [{"feature": "chatbot", "contribution": 0.3}],
+}
+
+
+class TestAnnex3Override:
+    """Verifica que _annex3_override produce campos coherentes cuando actúa.
+
+    Este grupo cierra BUG-01: antes del fix, probabilities no se recalibraban
+    tras el override y podían contradecir risk_level.
+
+    Se testea _annex3_override directamente (unit tests) para no depender de
+    lo que el modelo ML prediga en cada reentrenamiento. Los textos elegidos
+    activan patrones del Anexo III de forma determinista.
+    """
+
+    @pytest.fixture(scope="class")
+    def override_recidiva(self):
+        """Override aplicado a texto de recidiva con predicción ML incorrecta."""
+        from src.classifier.main import _annex3_override
+        texto = "evaluación del riesgo de recidiva para recomendar libertad condicional"
+        return _annex3_override(texto, _MOCK_RESULT_ML.copy())
+
+    @pytest.fixture(scope="class")
+    def override_biometrico(self):
+        """Override aplicado a texto biométrico con predicción ML incorrecta."""
+        from src.classifier.main import _annex3_override
+        texto = (
+            "reconocimiento facial en tiempo real en espacios públicos "
+            "para identificación de personas"
+        )
+        return _annex3_override(texto, _MOCK_RESULT_ML.copy())
+
+    def test_override_activo_en_recidiva(self, override_recidiva):
+        """_annex3_override debe activar annex3_override=True para texto de recidiva."""
+        assert override_recidiva.get("annex3_override") is True
+
+    def test_risk_level_corregido_a_alto_riesgo(self, override_recidiva):
+        """El texto de recidiva debe sobreescribirse a alto_riesgo (Anexo III cat. 6)."""
+        assert override_recidiva["risk_level"] == "alto_riesgo"
+
+    def test_probabilities_coherentes_tras_override_recidiva(self, override_recidiva):
+        """probabilities[risk_level] debe ser el valor máximo del dict tras override."""
+        nivel = override_recidiva["risk_level"]
+        probs = override_recidiva["probabilities"]
+        assert probs[nivel] == max(probs.values()), (
+            f"BUG-01: probabilities no coherentes: risk_level='{nivel}' "
+            f"pero max prob es '{max(probs, key=probs.get)}'"
+        )
+
+    def test_confidence_igual_a_prob_del_nivel_asignado(self, override_recidiva):
+        """confidence debe coincidir con probabilities[risk_level] tras override."""
+        nivel = override_recidiva["risk_level"]
+        probs = override_recidiva["probabilities"]
+        assert override_recidiva["confidence"] == probs[nivel]
+
+    def test_probabilities_suman_uno_tras_override(self, override_recidiva):
+        """Las probabilities recalibradas deben sumar 1 (±0.02 por redondeo)."""
+        total = sum(override_recidiva["probabilities"].values())
+        assert abs(total - 1.0) < 0.02
+
+    def test_ml_prediction_preserva_risk_level_original(self, override_recidiva):
+        """ml_prediction debe guardar el risk_level que el ML predijo antes del override."""
+        ml = override_recidiva.get("ml_prediction", {})
+        assert ml.get("risk_level") == "riesgo_minimo"
+
+    def test_ml_prediction_preserva_probabilidades_originales(self, override_recidiva):
+        """ml_prediction debe incluir las probabilities ML originales para trazabilidad."""
+        ml = override_recidiva.get("ml_prediction", {})
+        assert "probabilities" in ml, "ml_prediction debe incluir 'probabilities'"
+        assert set(ml["probabilities"].keys()) == RISK_LEVELS
+        # Las probabilidades originales deben ser las del mock (ML incorrecto)
+        assert ml["probabilities"]["riesgo_minimo"] == 0.62
+
+    def test_override_activo_en_biometrico(self, override_biometrico):
+        """_annex3_override debe activar annex3_override=True para texto biométrico."""
+        assert override_biometrico.get("annex3_override") is True
+
+    def test_risk_level_corregido_a_inaceptable(self, override_biometrico):
+        """El texto biométrico en espacio público debe sobreescribirse a inaceptable."""
+        assert override_biometrico["risk_level"] == "inaceptable"
+
+    def test_probabilities_coherentes_tras_override_biometrico(self, override_biometrico):
+        """probabilities[risk_level] debe ser el valor máximo también para inaceptable."""
+        nivel = override_biometrico["risk_level"]
+        probs = override_biometrico["probabilities"]
+        assert probs[nivel] == max(probs.values())
+
+    def test_best_level_incluido_si_faltaba_en_probabilities_originales(self):
+        """Si best_level no estaba en el dict original, debe aparecer en el resultado."""
+        from src.classifier.main import _annex3_override
+        # Simula un dict de probabilities incompleto (sin alto_riesgo)
+        resultado_incompleto = {
+            "risk_level": "riesgo_minimo",
+            "confidence": 0.62,
+            "probabilities": {
+                "inaceptable": 0.15,
+                "riesgo_limitado": 0.13,
+                "riesgo_minimo": 0.72,
+                # alto_riesgo ausente intencionalmente
+            },
+        }
+        resultado = _annex3_override(
+            "evaluación del riesgo de recidiva para recomendar libertad condicional",
+            resultado_incompleto,
+        )
+        assert "alto_riesgo" in resultado["probabilities"]
+        assert resultado["probabilities"]["alto_riesgo"] == 0.85
