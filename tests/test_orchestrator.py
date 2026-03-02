@@ -69,7 +69,6 @@ _mock_langgraph.prebuilt = _mock_langgraph_prebuilt
 import src.orchestrator.main as orch_module  # noqa: E402
 from src.orchestrator.main import (  # noqa: E402
     SYSTEM_PROMPT,
-    _tool_metadata,
     search_legal_docs,
     classify_risk,
     generate_report,
@@ -298,91 +297,3 @@ class TestRun:
 
         call_args = mock_agent.invoke.call_args[0][0]
         assert "pregunta concreta sobre el Art. 9" in call_args["messages"][0][1]
-
-
-# ---------------------------------------------------------------------------
-# Grupo 7: Side-channel de metadatos (ContextVar)
-# ---------------------------------------------------------------------------
-
-class TestToolMetadata:
-    """Las tools depositan metadatos verificados en el side-channel ContextVar."""
-
-    def setup_method(self):
-        _tool_metadata.set(None)
-        orch_module._agent = None
-        orch_module._cached_predict_risk.cache_clear()
-
-    def teardown_method(self):
-        _tool_metadata.set(None)
-        orch_module._agent = None
-        orch_module._cached_predict_risk.cache_clear()
-
-    @patch.object(orch_module, "predict_risk")
-    def test_classify_risk_deposita_metadata(self, mock_predict):
-        """classify_risk deposita risk_level, confidence y legal_ref en meta['risk']."""
-        mock_predict.return_value = {
-            "risk_level": "alto_riesgo",
-            "confidence": 0.85,
-            "annex3_ref": None,
-        }
-        classify_risk.invoke({"system_description": "sistema de scoring crediticio"})
-
-        meta = _tool_metadata.get(None)
-        assert meta is not None
-        assert meta["risk"] is not None
-        assert meta["risk"]["risk_level"] == "alto_riesgo"
-        assert meta["risk"]["confidence"] == 0.85
-        assert meta["risk"]["legal_ref"] == "Art. 6 + Anexo III EU AI Act"
-
-    @patch("src.rag.main.generate")
-    @patch("src.rag.main.grade")
-    @patch("src.rag.main.retrieve")
-    def test_search_legal_docs_deposita_citations(self, mock_retrieve, mock_grade, mock_generate):
-        """search_legal_docs deposita las fuentes del RAG en meta['citations']."""
-        mock_retrieve.return_value = [{"doc": "Art. 5 prohíbe X", "metadata": {}, "score": 0.9}]
-        mock_grade.return_value = [{"doc": "Art. 5 prohíbe X", "metadata": {}, "score": 0.9}]
-        mock_generate.return_value = {
-            "answer": "Según el Art. 5...",
-            "sources": [
-                {"source": "EU AI Act", "unit_title": "Art. 5", "unit_id": "art_5"},
-                {"source": "EU AI Act", "unit_title": "Art. 6", "unit_id": "art_6"},
-            ],
-            "grounded": True,
-        }
-        search_legal_docs.invoke({"query": "¿qué prácticas están prohibidas?"})
-
-        meta = _tool_metadata.get(None)
-        assert meta is not None
-        assert len(meta["citations"]) == 2
-        assert meta["citations"][0]["source"] == "EU AI Act"
-        assert meta["citations"][0]["unit_title"] == "Art. 5"
-
-    @patch.object(orch_module, "_build_agent")
-    def test_run_devuelve_metadata(self, mock_build):
-        """run() incluye la key 'metadata' en el resultado."""
-        mock_agent = MagicMock()
-        mock_agent.invoke.return_value = {"messages": [MagicMock(content="respuesta")]}
-        mock_build.return_value = mock_agent
-
-        result = run("consulta de prueba")
-
-        assert "metadata" in result
-        assert "citations" in result["metadata"]
-        assert "risk" in result["metadata"]
-        assert "report" in result["metadata"]
-
-    @patch.object(orch_module, "_build_agent")
-    def test_run_limpia_metadata_entre_invocaciones(self, mock_build):
-        """run() limpia la ContextVar antes de cada invocación."""
-        mock_agent = MagicMock()
-        mock_agent.invoke.return_value = {"messages": [MagicMock(content="ok")]}
-        mock_build.return_value = mock_agent
-
-        # Contaminar la ContextVar con datos de una invocación anterior
-        _tool_metadata.set({"citations": [{"source": "viejo"}], "risk": {"old": True}, "report": None})
-
-        result = run("nueva consulta")
-
-        # El metadata debe estar limpio (el agente mock no llama tools)
-        assert result["metadata"]["citations"] == []
-        assert result["metadata"]["risk"] is None
