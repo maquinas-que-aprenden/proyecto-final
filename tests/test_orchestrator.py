@@ -109,17 +109,6 @@ class TestSystemPrompt:
         """El agente debe usar las herramientas disponibles antes de responder."""
         assert "herramienta" in SYSTEM_PROMPT.lower()
 
-    def test_instruye_no_llamar_classify_antes_de_generate_report(self):
-        """BUG-04: el prompt debe decir que generate_report clasifica internamente."""
-        prompt_lower = SYSTEM_PROMPT.lower()
-        assert "generate_report" in prompt_lower
-        assert (
-            "redundante" in prompt_lower
-            or "sin llamar" in prompt_lower
-            or "no llames" in prompt_lower
-            or "sin necesidad" in prompt_lower
-        )
-
     def test_generate_report_docstring_indica_clasificacion_interna(self):
         """BUG-04: el docstring de generate_report debe advertir que clasifica internamente."""
         assert "clasifica" in generate_report.description.lower() or "clasificación" in generate_report.description.lower()

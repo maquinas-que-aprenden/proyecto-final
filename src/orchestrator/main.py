@@ -86,11 +86,6 @@ Las referencias legales exactas se añadirán automáticamente a la respuesta. \
 No reformules ni modifiques las citas de artículos que devuelvan las herramientas. \
 Limítate a explicar el contenido.
 
-Cuando el usuario pida un informe de cumplimiento, llama directamente a \
-generate_report sin llamar antes a classify_risk — generate_report ya \
-incluye la clasificación de riesgo internamente. Llamar a classify_risk \
-antes de generate_report es redundante.
-
 Añade siempre al final: "_Informe preliminar generado por IA. Consulte \
 profesional jurídico._"\
 """
