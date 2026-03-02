@@ -51,9 +51,17 @@
         mode: "0755"
       ignore_errors: true
 
-    - name: Corregir permisos del directorio del proyecto (subdirectorios creados por Docker/containerd como root)
+    - name: Corregir permisos del directorio .dvc (puede quedar con permisos de root)
       ansible.builtin.file:
-        path: "{{ project_path }}"
+        path: "{{ project_path }}/.dvc"
+        owner: ubuntu
+        group: ubuntu
+        recurse: true
+      ignore_errors: true
+
+    - name: Corregir permisos del directorio data (datos gestionados por DVC)
+      ansible.builtin.file:
+        path: "{{ project_path }}/data"
         owner: ubuntu
         group: ubuntu
         recurse: true
