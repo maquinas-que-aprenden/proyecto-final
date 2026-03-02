@@ -4,12 +4,20 @@ Chat conversacional con el orquestador LangGraph.
 Ejecutar: streamlit run app.py --server.port=8080
 """
 
+import logging
 import re
+import sys
 import uuid
 
 import streamlit as st
 
 from src.orchestrator.main import run
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    stream=sys.stdout,
+)
 
 st.set_page_config(page_title="NormaBot", page_icon="\u2696\ufe0f", layout="wide")
 

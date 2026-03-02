@@ -30,7 +30,6 @@ except ImportError:
     class _NoOpLangfuse:
         def update_current_observation(self, **kwargs): pass
         def score_current_trace(self, **kwargs): pass
-
     langfuse_context = _NoOpLangfuse()  # type: ignore[assignment]
 
 from src.observability.main import get_langfuse_handler
