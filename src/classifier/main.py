@@ -125,11 +125,22 @@ def _annex3_override(text: str, result: dict) -> dict:
         overridden = result.copy()
         overridden["risk_level"] = best_level
         overridden["confidence"] = 0.85
+        # Recalibrar probabilities para ser coherentes con el nivel final.
+        # El nivel sobreescrito recibe 0.85; el resto se reparte equitativamente.
+        if result.get("probabilities"):
+            keys = set(result["probabilities"].keys()) | {best_level}
+            n = len(keys)
+            resto = round((1.0 - 0.85) / max(n - 1, 1), 4)
+            overridden["probabilities"] = {
+                k: (0.85 if k == best_level else resto)
+                for k in keys
+            }
         overridden["annex3_override"] = True
         overridden["annex3_ref"] = best_ref
         overridden["ml_prediction"] = {
             "risk_level": result["risk_level"],
             "confidence": result["confidence"],
+            "probabilities": result.get("probabilities", {}),
         }
         return overridden
     return result
@@ -468,15 +479,18 @@ def predict_risk(text: str) -> dict:
             ]
             if shap_top:
                 result["shap_top_features"] = shap_top
-                top_words = ", ".join(f["feature"] for f in shap_top[:3])
-                result["shap_explanation"] = (
-                    f"Factores principales para '{risk_level}': {top_words}."
-                )
     except Exception as e:
         logger.warning("No se pudo calcular explicabilidad: %s", e)
 
     # Capa de override: patrones deterministas del Anexo III tienen precedencia sobre ML
     result = _annex3_override(text, result)
+
+    # shap_explanation se construye después del override para reflejar el nivel final
+    if result.get("shap_top_features"):
+        top_words = ", ".join(f["feature"] for f in result["shap_top_features"][:3])
+        result["shap_explanation"] = (
+            f"Factores principales para '{result['risk_level']}': {top_words}."
+        )
 
     try:
         langfuse_context.update_current_observation(

@@ -22,7 +22,7 @@ DEFAULT_K = 5
 CHROMA_DIR = Path(__file__).resolve().parents[2] / "data" / "processed" / "vectorstore" / "chroma"
 COLLECTION_NAME = "normabot_legal_chunks"
 # Mismo modelo usado en data/index.py para generar los embeddings del vectorstore
-EMBED_MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+EMBED_MODEL_NAME = "intfloat/multilingual-e5-base"
 
 
 # Inicialización Chroma (lazy)
@@ -56,7 +56,7 @@ def _get_embed_model():
 
 def _embed_query(query: str) -> list:
     """Genera el embedding de la query con el mismo modelo usado en indexación."""
-    return _get_embed_model().encode(query).tolist()
+    return _get_embed_model().encode(f"query: {query}").tolist()
 
 
 # Funciones internas
@@ -86,13 +86,13 @@ def _detect_priority_sources(query: str) -> Optional[List[str]]:
     priority_sources = []
 
     if "rgpd" in query_lower or "lopd" in query_lower:
-        priority_sources.append("RGPD")
+        priority_sources.append("lopd_rgpd")
 
     if "aesia" in query_lower:
-        priority_sources.append("AESIA")
+        priority_sources.append("aesia")
 
     if "ai act" in query_lower or "alto riesgo" in query_lower:
-        priority_sources.append("EU_AI_ACT")
+        priority_sources.append("eu_ai_act")
 
     return priority_sources if priority_sources else None
 

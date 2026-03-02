@@ -33,6 +33,8 @@ from src.retrieval.retriever import search
 
 logger = logging.getLogger(__name__)
 
+MAX_DOC_CHARS_GRADING = 3000
+
 BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "eu.amazon.nova-lite-v1:0")
 BEDROCK_REGION = os.environ.get("BEDROCK_REGION") or os.environ.get("AWS_REGION", "eu-west-1")
 
@@ -57,6 +59,7 @@ def _get_grading_llm():
             model="qwen2.5:3b",
             temperature=0,
             num_predict=10,
+            num_ctx=4096,
         )
     return _grading_llm
 
@@ -126,7 +129,8 @@ def grade(query: str, docs: list[dict], threshold: float = 0.7) -> list[dict]:
 
     relevant = []
     for doc in docs:
-        prompt = GRADING_PROMPT.format(document=doc["doc"], query=query)
+        doc_text = doc["doc"][:MAX_DOC_CHARS_GRADING]
+        prompt = GRADING_PROMPT.format(document=doc_text, query=query)
         try:
             response = llm.invoke(prompt)
             answer = response.content.strip().lower()
