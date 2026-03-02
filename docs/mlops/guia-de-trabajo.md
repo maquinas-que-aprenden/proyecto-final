@@ -313,8 +313,8 @@ pytest tests/ -v
 pytest tests/ -v -s
 ```
 
-Hay cuatro suites de smoke tests (69 tests en total):
-- `test_classifier.py` — 19 tests: estructura de `predict_risk()`, robustez, explicabilidad SHAP, validación de entrada.
+Hay cuatro suites de smoke tests (79 tests en total):
+- `test_classifier.py` — 29 tests: estructura de `predict_risk()`, robustez, explicabilidad SHAP, validación de entrada, y coherencia de campos tras el override del Anexo III (`TestAnnex3Override`).
 - `test_rag_generate.py` — 13 tests: prompt, singleton `_get_generate_llm()`, flujo `generate()` con fallback.
 - `test_orchestrator.py` — 23 tests: SYSTEM_PROMPT con requisitos legales, nombres y descripciones de las 3 tools, validación de entrada, comportamiento de `classify_risk`, `search_legal_docs` y `generate_report`, contrato de `run()`.
 - `test_retrain.py` — 14 tests: limpieza de texto, carga de JSONL, features manuales e integración de `main()` con `monkeypatch` de rutas y stub `_FakeXGB` (sin entrenamiento real).
