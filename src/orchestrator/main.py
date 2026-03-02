@@ -260,7 +260,8 @@ def generate_report(system_description: str) -> str:
     """Genera un informe de cumplimiento normativo para un sistema de IA.
 
     Usa esta herramienta cuando el usuario quiere un informe, reporte o
-    evaluación de conformidad para su sistema.
+    evaluación de conformidad para su sistema. Esta herramienta clasifica
+    el riesgo internamente — no es necesario llamar a classify_risk antes.
     """
     try:
         _SystemDescriptionInput(system_description=system_description)

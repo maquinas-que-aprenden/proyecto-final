@@ -109,6 +109,11 @@ class TestSystemPrompt:
         """El agente debe usar las herramientas disponibles antes de responder."""
         assert "herramienta" in SYSTEM_PROMPT.lower()
 
+    def test_generate_report_docstring_indica_clasificacion_interna(self):
+        """BUG-04: el docstring de generate_report debe advertir que clasifica internamente."""
+        assert "clasifica" in generate_report.description.lower() or "clasificación" in generate_report.description.lower()
+        assert "no es necesario" in generate_report.description.lower() or "no llam" in generate_report.description.lower()
+
 
 # ---------------------------------------------------------------------------
 # Grupo 1: Estructura de las tools
@@ -157,6 +162,12 @@ class TestValidacionEntrada:
 
 class TestClassifyRiskTool:
     """classify_risk transforma el dict de predict_risk en texto legible."""
+
+    def setup_method(self):
+        orch_module._cached_predict_risk.cache_clear()
+
+    def teardown_method(self):
+        orch_module._cached_predict_risk.cache_clear()
 
     @patch.object(orch_module, "predict_risk")
     def test_risk_level_en_mayusculas(self, mock_predict):
@@ -299,6 +310,58 @@ class TestGenerateReportTool:
         call_args = mock_report.call_args
         articles_arg = call_args[0][2]
         assert len(articles_arg) == 1
+
+
+# ---------------------------------------------------------------------------
+# Grupo 5b: BUG-04 — caché evita doble computación classify+report
+# ---------------------------------------------------------------------------
+
+class TestNoDobleClasificacion:
+    """BUG-04: predict_risk no debe ejecutarse dos veces si classify_risk
+    y generate_report reciben la misma descripción en la misma sesión.
+
+    El lru_cache de _cached_predict_risk garantiza que la segunda llamada
+    devuelve el resultado cacheado sin volver a ejecutar el modelo ML.
+    """
+
+    def setup_method(self):
+        orch_module._cached_predict_risk.cache_clear()
+
+    def teardown_method(self):
+        orch_module._cached_predict_risk.cache_clear()
+
+    @patch("src.report.main.generate_report")
+    @patch("src.retrieval.retriever.search")
+    @patch.object(orch_module, "predict_risk")
+    def test_predict_risk_llamado_una_sola_vez(self, mock_predict, mock_search, mock_report):
+        """predict_risk se ejecuta una sola vez aunque classify_risk y generate_report reciban el mismo input."""
+        mock_predict.return_value = {"risk_level": "alto_riesgo", "confidence": 0.9}
+        mock_search.return_value = []
+        mock_report.return_value = "## Informe\n..."
+
+        descripcion = "sistema de evaluacion de solvencia crediticia para prestamos"
+        classify_risk.invoke({"system_description": descripcion})
+        generate_report.invoke({"system_description": descripcion})
+
+        mock_predict.assert_called_once_with(descripcion)
+
+    @patch("src.report.main.generate_report")
+    @patch("src.retrieval.retriever.search")
+    @patch.object(orch_module, "predict_risk")
+    def test_inputs_distintos_llaman_predict_risk_dos_veces(self, mock_predict, mock_search, mock_report):
+        """Si el LLM pasa strings distintos a classify_risk y generate_report,
+        la caché no puede evitar la doble llamada. Este test documenta el
+        comportamiento esperado (limitación conocida de lru_cache por string exacto).
+        """
+        mock_predict.return_value = {"risk_level": "alto_riesgo", "confidence": 0.9}
+        mock_search.return_value = []
+        mock_report.return_value = "## Informe\n..."
+
+        classify_risk.invoke({"system_description": "sistema de scoring crediticio"})
+        # Input ligeramente diferente (como podría hacer el LLM)
+        generate_report.invoke({"system_description": "Sistema de scoring crediticio."})
+
+        assert mock_predict.call_count == 2
 
 
 # ---------------------------------------------------------------------------
