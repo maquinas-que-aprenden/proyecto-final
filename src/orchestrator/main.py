@@ -103,6 +103,32 @@ class _SystemDescriptionInput(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Queries específicas por nivel de riesgo para el informe de cumplimiento.
+# Cada query busca un artículo concreto del EU AI Act, evitando que la
+# búsqueda semántica genérica favorezca guías AESIA sobre el texto legal.
+# ---------------------------------------------------------------------------
+
+_REPORT_QUERIES: dict[str, list[str]] = {
+    "inaceptable": [
+        "prácticas de inteligencia artificial prohibidas Artículo 5",
+    ],
+    "alto_riesgo": [
+        "sistema de gestión de riesgos Artículo 9",
+        "datos y gobernanza de datos Artículo 10",
+        "documentación técnica Artículo 11",
+        "transparencia información usuarios Artículo 13",
+        "vigilancia y supervisión humana Artículo 14",
+        "precisión robustez y ciberseguridad Artículo 15",
+    ],
+    "riesgo_limitado": [
+        "obligaciones de transparencia Artículo 50",
+    ],
+    "riesgo_minimo": [
+        "códigos de conducta inteligencia artificial Artículo 95",
+    ],
+}
+
+# ---------------------------------------------------------------------------
 # Herramientas
 # ---------------------------------------------------------------------------
 
@@ -248,21 +274,27 @@ def generate_report(system_description: str) -> str:
     risk_level = risk_result["risk_level"]
 
     # 2. Buscar artículos relevantes en el corpus legal
+    #    Una query por obligación conocida para evitar que la búsqueda
+    #    semántica genérica favorezca guías AESIA sobre el texto legal.
     articles = []
     try:
         from src.retrieval.retriever import search as search_docs
-        hits = search_docs(
-            f"obligaciones sistemas de riesgo {risk_level} EU AI Act", k=3,
-        )
-        for h in hits:
-            hit_meta = h.get("metadata", {}) or {}
-            source = hit_meta.get("source", "")
-            unit = hit_meta.get("unit_title") or hit_meta.get("unit_id", "")
-            label = f"{source} — {unit}".strip(" —")
-            text = h.get("text", "").strip()
-            if label:
-                entry = f"{label}\n{text}" if text else label
-                articles.append(entry)
+        queries = _REPORT_QUERIES.get(risk_level, [])
+        seen_ids: set[str] = set()
+        for q in queries:
+            hits = search_docs(q, k=1)
+            for h in hits:
+                doc_id = h.get("id", "")
+                if doc_id not in seen_ids:
+                    seen_ids.add(doc_id)
+                    hit_meta = h.get("metadata", {}) or {}
+                    source = hit_meta.get("source", "")
+                    unit = hit_meta.get("unit_title") or hit_meta.get("unit_id", "")
+                    label = f"{source} — {unit}".strip(" —")
+                    text = h.get("text", "").strip()
+                    if label:
+                        entry = f"{label}\n{text}" if text else label
+                        articles.append(entry)
     except Exception as e:
         logger.warning("Retriever no disponible para informe: %s", e)
 

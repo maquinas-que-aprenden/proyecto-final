@@ -229,6 +229,12 @@ class TestSearchLegalDocsTool:
 class TestGenerateReportTool:
     """generate_report llama a predict_risk, retriever y report.generate_report."""
 
+    def setup_method(self):
+        orch_module._cached_predict_risk.cache_clear()
+
+    def teardown_method(self):
+        orch_module._cached_predict_risk.cache_clear()
+
     @patch("src.report.main.generate_report")
     @patch("src.retrieval.retriever.search")
     @patch.object(orch_module, "predict_risk")
@@ -254,6 +260,45 @@ class TestGenerateReportTool:
 
         call_args = mock_report.call_args
         assert call_args[0][1] == "inaceptable"
+
+    @patch("src.report.main.generate_report")
+    @patch("src.retrieval.retriever.search")
+    @patch.object(orch_module, "predict_risk")
+    def test_report_alto_riesgo_busca_multiples_articulos(self, mock_predict, mock_search, mock_report):
+        """Para alto_riesgo se hace una búsqueda por cada obligación (6 queries con k=1)."""
+        mock_predict.return_value = {"risk_level": "alto_riesgo", "confidence": 0.9}
+        mock_search.return_value = [
+            {"id": "unique", "text": "texto", "metadata": {"source": "EU AI Act", "unit_title": "Art. X"}},
+        ]
+        mock_report.return_value = "## Informe\n..."
+
+        generate_report.invoke({"system_description": "sistema de scoring crediticio"})
+
+        # alto_riesgo tiene 6 queries en _REPORT_QUERIES → 6 llamadas a search
+        assert mock_search.call_count == 6
+        # Cada llamada debe usar k=1
+        for call in mock_search.call_args_list:
+            assert call[1].get("k", call[0][1] if len(call[0]) > 1 else None) == 1
+
+    @patch("src.report.main.generate_report")
+    @patch("src.retrieval.retriever.search")
+    @patch.object(orch_module, "predict_risk")
+    def test_report_deduplica_resultados(self, mock_predict, mock_search, mock_report):
+        """Si dos queries devuelven el mismo doc_id, el artículo no se duplica."""
+        mock_predict.return_value = {"risk_level": "alto_riesgo", "confidence": 0.9}
+        # Todas las queries devuelven el mismo documento (mismo id)
+        mock_search.return_value = [
+            {"id": "chunk_42", "text": "texto legal", "metadata": {"source": "EU AI Act", "unit_title": "Art. 9"}},
+        ]
+        mock_report.return_value = "## Informe\n..."
+
+        generate_report.invoke({"system_description": "sistema de scoring crediticio"})
+
+        # Se llamó a _build_report con articles; como todos tienen el mismo id,
+        # solo debe haber 1 artículo (no 6 duplicados)
+        call_args = mock_report.call_args
+        articles_arg = call_args[0][2]
+        assert len(articles_arg) == 1
 
 
 # ---------------------------------------------------------------------------
