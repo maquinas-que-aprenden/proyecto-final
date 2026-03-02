@@ -229,6 +229,12 @@ class TestSearchLegalDocsTool:
 class TestGenerateReportTool:
     """generate_report llama a predict_risk, retriever y report.generate_report."""
 
+    def setup_method(self):
+        orch_module._cached_predict_risk.cache_clear()
+
+    def teardown_method(self):
+        orch_module._cached_predict_risk.cache_clear()
+
     @patch("src.report.main.generate_report")
     @patch("src.retrieval.retriever.search")
     @patch.object(orch_module, "predict_risk")
