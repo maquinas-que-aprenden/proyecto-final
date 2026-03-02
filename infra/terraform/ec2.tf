@@ -2,7 +2,6 @@ resource "aws_instance" "normabot_server" {
   ami                         = var.ami_id
   instance_type               = "t3.large"
   key_name                    = var.key_name
-  associate_public_ip_address = true
 
   subnet_id              = aws_subnet.public_subnet.id
   vpc_security_group_ids = [aws_security_group.normabot_sg.id]
@@ -58,6 +57,10 @@ resource "aws_instance" "mlflow_server" {
     volume_size           = 8
     volume_type           = "gp3"
     delete_on_termination = true
+  }
+
+  tags = {
+    Name = "MLflow-Server"
   }
 
   metadata_options {

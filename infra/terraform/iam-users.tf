@@ -72,3 +72,43 @@ resource "aws_iam_group_policy_attachment" "dev_attach" {
   group      = aws_iam_group.dev_group.name
   policy_arn = aws_iam_policy.dev_s3_policy.arn
 }
+
+resource "aws_iam_group_policy_attachment" "dev_ec2_attach" {
+  group      = aws_iam_group.dev_group.name
+  policy_arn = aws_iam_policy.dev_ec2_policy.arn
+}
+
+resource "aws_iam_policy" "dev_ec2_policy" {
+  name        = "NormaBot-EC2-Deploy-Policy"
+  description = "Permite al equipo arrancar, parar y reiniciar los servidores NormaBot y MLflow"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "EC2DeployActions"
+        Effect = "Allow"
+        Action = [
+          "ec2:StartInstances",
+          "ec2:StopInstances",
+          "ec2:RebootInstances"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/Name" = ["NormaBot-Server", "MLflow-Server"]
+          }
+        }
+      },
+      {
+        Sid    = "EC2ReadOnly"
+        Effect = "Allow"
+        Action = [
+          "ec2:DescribeInstances",
+          "ec2:DescribeInstanceStatus"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
