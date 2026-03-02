@@ -310,10 +310,12 @@ class TestToolMetadata:
     def setup_method(self):
         _tool_metadata.set(None)
         orch_module._agent = None
+        orch_module._cached_predict_risk.cache_clear()
 
     def teardown_method(self):
         _tool_metadata.set(None)
         orch_module._agent = None
+        orch_module._cached_predict_risk.cache_clear()
 
     @patch.object(orch_module, "predict_risk")
     def test_classify_risk_deposita_metadata(self, mock_predict):

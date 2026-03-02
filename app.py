@@ -32,7 +32,8 @@ def _render_metadata(metadata: dict) -> None:
     if citations:
         with st.expander(f"Fuentes legales verificadas ({len(citations)})"):
             for c in citations:
-                label = f"{c.get('source', '')} - {c.get('unit_title', '')}".strip(" -")
+                unit = c.get("unit_title") or c.get("unit_id", "")
+                label = f"{c.get('source', '')} - {unit}".strip(" -")
                 if label:
                     st.markdown(f"- {label}")
 

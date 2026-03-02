@@ -147,7 +147,7 @@ def search_legal_docs(query: str) -> str:
     # Side-channel: depositar citas verificadas
     meta = _get_tool_metadata()
     for source_meta in result.get("sources", []):
-        if source_meta:
+        if isinstance(source_meta, dict) and source_meta:
             meta["citations"].append({
                 "source": source_meta.get("source", ""),
                 "unit_title": source_meta.get("unit_title", ""),
