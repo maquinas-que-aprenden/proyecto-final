@@ -1,0 +1,14 @@
+{
+  "model_id": "Qwen/Qwen2.5-3B-Instruct",
+  "task": "rag_relevance_grading",
+  "labels": [
+    "relevante",
+    "no relevante"
+  ],
+  "lora_r": 8,
+  "lora_alpha": 16,
+  "train_size": 443,
+  "val_size": 95,
+  "test_size": 96,
+  "grading_system_prompt": "Eres un asistente especializado en normativa de inteligencia artificial. Tu tarea es determinar si un documento contiene información útil para responder una consulta sobre regulación de IA (EU AI Act, BOE, normativa española). Responde únicamente con 'relevante' o 'no relevante', sin explicación adicional."
+}
