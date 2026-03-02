@@ -28,6 +28,7 @@ except ImportError:
     class _NoOpLangfuse:
         def update_current_observation(self, **kwargs): pass
         def score_current_trace(self, **kwargs): pass
+        def flush(self): pass
 
     langfuse_context = _NoOpLangfuse()  # type: ignore[assignment]
 
@@ -290,6 +291,13 @@ def run(query: str, session_id: str | None = None, user_id: str | None = None) -
         {"messages": [("user", query)]},
         config={"callbacks": callbacks},
     )
+    # Forzar envío inmediato para que las trazas aparezcan en Langfuse sin delay.
+    try:
+        for cb in callbacks:
+            cb.flush()
+        langfuse_context.flush()
+    except Exception as e:
+        logger.warning("Langfuse flush falló (traza puede llegar con delay): %s", e)
     return result
 
 
