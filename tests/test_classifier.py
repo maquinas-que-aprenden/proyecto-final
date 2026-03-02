@@ -330,3 +330,24 @@ class TestAnnex3Override:
         nivel = override_biometrico["risk_level"]
         probs = override_biometrico["probabilities"]
         assert probs[nivel] == max(probs.values())
+
+    def test_best_level_incluido_si_faltaba_en_probabilities_originales(self):
+        """Si best_level no estaba en el dict original, debe aparecer en el resultado."""
+        from src.classifier.main import _annex3_override
+        # Simula un dict de probabilities incompleto (sin alto_riesgo)
+        resultado_incompleto = {
+            "risk_level": "riesgo_minimo",
+            "confidence": 0.62,
+            "probabilities": {
+                "inaceptable": 0.15,
+                "riesgo_limitado": 0.13,
+                "riesgo_minimo": 0.72,
+                # alto_riesgo ausente intencionalmente
+            },
+        }
+        resultado = _annex3_override(
+            "evaluación del riesgo de recidiva para recomendar libertad condicional",
+            resultado_incompleto,
+        )
+        assert "alto_riesgo" in resultado["probabilities"]
+        assert resultado["probabilities"]["alto_riesgo"] == 0.85
