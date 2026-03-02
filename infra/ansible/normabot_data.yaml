@@ -51,9 +51,17 @@
         mode: "0755"
       ignore_errors: true
 
+    - name: Corregir permisos del directorio del proyecto (subdirectorios creados por Docker/containerd como root)
+      ansible.builtin.file:
+        path: "{{ project_path }}"
+        owner: ubuntu
+        group: ubuntu
+        recurse: true
+      ignore_errors: true
+
     - name: Hacer pull del vectorstore desde S3
       become: false
-      shell: dvc pull data/processed/vectorstore/
+      shell: dvc pull --force data/processed/vectorstore/
       args:
         chdir: "{{ project_path }}"
       environment:
