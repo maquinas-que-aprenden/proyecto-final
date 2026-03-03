@@ -1,15 +1,12 @@
 {
-  "nombre": "Exp 2: XGBoost + SVD + GS (augmented Anexo III)",
-  "model_file": "model/modelo_xgboost.joblib",
+  "nombre": "Exp 0: LogReg + TF-IDF + OHE",
+  "model_file": "model/modelo_baseline.joblib",
   "tfidf_file": "model/tfidf_vectorizer.joblib",
-  "model_type": "XGBClassifier",
-  "experimento": "2",
-  "needs_manual_features": true,
-  "test_f1_macro": 0.3538,
-  "test_accuracy": 0.8778,
-  "test_roc_auc": 0.9668,
-  "criterio": "Mayor F1-macro en test entre los 3 experimentos",
-  "augmented": true,
-  "augmented_examples": 33,
-  "fecha_reentrenamiento": "2026-02-28T17:54:25.640319"
+  "model_type": "LogisticRegression",
+  "experimento": "0",
+  "needs_manual_features": false,
+  "test_f1_macro": 0.8583,
+  "test_accuracy": 0.8556,
+  "test_roc_auc": 0.9708,
+  "criterio": "Mayor F1-macro en test entre los 3 experimentos"
 }

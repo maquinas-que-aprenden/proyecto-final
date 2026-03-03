@@ -86,12 +86,33 @@ def _build_annex3_patterns() -> list:
         (r"(apoyo|asistencia).{0,40}(juez|tribunal|sentencia|resoluc.{0,10}judicial)",
          "alto_riesgo", "Anexo III cat. 8"),
         # INACEPTABLE — Art. 5 EU AI Act
-        (r"puntuaci[oó]n.{0,30}social.{0,30}ciudadano",
-         "inaceptable", "Art. 5.1.c"),
+        # Art. 5.1.a — Manipulación subliminal o engañosa
         (r"(manipulaci[oó]n|t[eé]cnica).{0,20}subliminal",
          "inaceptable", "Art. 5.1.a"),
+        (r"subliminal.{0,40}(comportamiento|conducta|decisi[oó]n)",
+         "inaceptable", "Art. 5.1.a"),
+        # Art. 5.1.b — Explotación de vulnerabilidades
+        (r"(exploit|aprovech).{0,30}(vulnerabilidad|discapacidad|menor.{0,10}edad|tercera.{0,10}edad)",
+         "inaceptable", "Art. 5.1.b"),
+        (r"(menor.{0,15}edad|persona.{0,15}(vulnerabl|discapacitad)).{0,50}(manipul|influenc|coacci|engañ)",
+         "inaceptable", "Art. 5.1.b"),
+        # Art. 5.1.c — Puntuación social ciudadana por autoridades públicas
+        (r"puntuaci[oó]n.{0,30}social.{0,30}ciudadano",
+         "inaceptable", "Art. 5.1.c"),
+        (r"sistema.{0,20}(cr[eé]dito|scoring).{0,20}social.{0,30}(ciudadano|poblaci[oó]n|persona)",
+         "inaceptable", "Art. 5.1.c"),
+        # Art. 5.1.d — Identificación biométrica en tiempo real en espacios públicos
         (r"(reconocimiento|identificaci[oó]n).{0,30}(facial|biom[eé]tric).{0,50}(espacio.{0,10}p[uú]blic|tiempo.{0,10}real|calle|multitud)",
          "inaceptable", "Art. 5.1.d"),
+        (r"vigilancia.{0,30}biom[eé]tric.{0,30}(masiva|tiempo.{0,10}real|p[uú]blic)",
+         "inaceptable", "Art. 5.1.d"),
+        # Art. 5.1.e — Perfilado policial predictivo sin indicios concretos
+        (r"predicci[oó]n.{0,40}(delito|peligrosidad|criminal).{0,40}(sin.{0,20}indicio|sin.{0,20}prueba|preventiv).{0,20}(policial|penal)",
+         "inaceptable", "Art. 5.1.e"),
+        (r"perfilado.{0,30}(racial|[eé]tnico|conductual).{0,40}(policial|delictiv|criminal)",
+         "inaceptable", "Art. 5.1.e"),
+        (r"riesgo.{0,20}delictivo.{0,30}(personalidad|caracter[ií]sticas.{0,20}personal|perfil).{0,30}sin.{0,20}(indicio|hecho|prueba)",
+         "inaceptable", "Art. 5.1.e"),
     ]
     return [(_re.compile(p, _re.IGNORECASE | _re.DOTALL), lvl, ref) for p, lvl, ref in raw]
 
@@ -142,6 +163,10 @@ def _annex3_override(text: str, result: dict) -> dict:
             "confidence": result["confidence"],
             "probabilities": result.get("probabilities", {}),
         }
+        # Los features SHAP corresponden a la predicción ML, no al nivel legal.
+        # Se mueven a ml_prediction para no contaminar la explicación del override.
+        if "shap_top_features" in overridden:
+            overridden["ml_prediction"]["shap_top_features"] = overridden.pop("shap_top_features")
         return overridden
     return result
 
@@ -485,8 +510,14 @@ def predict_risk(text: str) -> dict:
     # Capa de override: patrones deterministas del Anexo III tienen precedencia sobre ML
     result = _annex3_override(text, result)
 
-    # shap_explanation se construye después del override para reflejar el nivel final
-    if result.get("shap_top_features"):
+    # shap_explanation: legal si hay override (los features ML no son válidos para
+    # explicar un nivel determinado por la ley), basada en modelo si no hay override.
+    if result.get("annex3_override"):
+        result["shap_explanation"] = (
+            f"Clasificación determinada por {result['annex3_ref']} EU AI Act. "
+            f"La capa normativa prevalece sobre la predicción del modelo ML."
+        )
+    elif result.get("shap_top_features"):
         top_words = ", ".join(f["feature"] for f in result["shap_top_features"][:3])
         result["shap_explanation"] = (
             f"Factores principales para '{result['risk_level']}': {top_words}."
