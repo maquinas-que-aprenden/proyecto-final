@@ -9,6 +9,8 @@ generar recomendaciones especificas y detectar casos borderline.
 
 from __future__ import annotations
 
+import unicodedata
+
 # ---------------------------------------------------------------------------
 # Obligaciones por nivel de riesgo (EU AI Act)
 # ---------------------------------------------------------------------------
@@ -375,27 +377,45 @@ def _detect_borderline(risk_level: str, probabilities: dict[str, float]) -> str 
 _NO_INTERPRETAR = {"num_palabras", "num_caracteres"}
 
 
+def _normalize_feature_name(name: str) -> str:
+    """Normaliza nombre de feature: quita tildes, minusculas, strip."""
+    base = unicodedata.normalize("NFKD", name)
+    return "".join(ch for ch in base if not unicodedata.combining(ch)).casefold().strip()
+
+
+_SHAP_RECS_NORMALIZED: dict[str, dict] = {
+    _normalize_feature_name(k): v
+    for k, v in _SHAP_FEATURE_RECOMMENDATIONS.items()
+}
+
+_NO_INTERPRETAR_NORMALIZED = {_normalize_feature_name(n) for n in _NO_INTERPRETAR}
+
+
 def _build_shap_recommendations(shap_features: list[dict]) -> list[dict]:
     """Convierte SHAP top features en recomendaciones legales especificas.
 
     Filtra features no interpretables (svd_N, num_palabras, etc.),
     busca coincidencias en _SHAP_FEATURE_RECOMMENDATIONS y deduplica
-    por annex_ref.
+    por annex_ref. Normaliza nombres (tildes, mayusculas).
     """
     results = []
     seen_annex_refs: set[str] = set()
 
     for feat in shap_features:
-        name = feat["feature"]
-
-        if name.startswith("svd_") or name in _NO_INTERPRETAR:
+        raw_name = feat.get("feature")
+        if not isinstance(raw_name, str):
             continue
 
-        if name in _SHAP_FEATURE_RECOMMENDATIONS:
-            rec = _SHAP_FEATURE_RECOMMENDATIONS[name]
+        name = _normalize_feature_name(raw_name)
+
+        if name.startswith("svd_") or name in _NO_INTERPRETAR_NORMALIZED:
+            continue
+
+        if name in _SHAP_RECS_NORMALIZED:
+            rec = _SHAP_RECS_NORMALIZED[name]
             if rec["annex_ref"] not in seen_annex_refs:
                 results.append({
-                    "feature": name,
+                    "feature": raw_name,
                     "annex_ref": rec["annex_ref"],
                     "recommendation": rec["recommendation"],
                 })

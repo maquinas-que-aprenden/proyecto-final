@@ -78,7 +78,7 @@ LLM → sintetiza respuesta final
 | `src/orchestrator/main.py` | Eliminado `generate_report`, enriquecido `classify_risk` |
 | `src/checklist/__init__.py` | Nuevo modulo |
 | `src/checklist/main.py` | Logica determinista de checklist (obligaciones, SHAP, borderline) |
-| `src/report/main.py` | Deprecado (sin callers) |
+| `src/report/main.py` | Eliminado (sin callers tras el refactor) |
 | `tests/test_checklist.py` | Tests unitarios del checklist |
 | `tests/test_orchestrator.py` | Actualizado para 2 tools |
 | `app.py` | Sidebar actualizado |

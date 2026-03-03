@@ -201,6 +201,36 @@ class TestShapRecommendations:
         ])
         assert recs == []
 
+    def test_normaliza_tildes_y_case(self):
+        """Features con variaciones de tildes/mayusculas se resuelven correctamente."""
+        recs = _build_shap_recommendations([
+            {"feature": "DIAGNOSTICO", "contribution": 0.4},
+        ])
+        assert len(recs) == 1
+        assert recs[0]["annex_ref"] == "Anexo III cat. 5.a"
+
+    def test_normaliza_crediticio_mayusculas(self):
+        """'CrEditicio' normalizado mapea a Anexo III cat. 5.b."""
+        recs = _build_shap_recommendations([
+            {"feature": "CrEditicio", "contribution": 0.5},
+        ])
+        assert len(recs) == 1
+        assert recs[0]["annex_ref"] == "Anexo III cat. 5.b"
+
+    def test_payload_shap_incompleto_se_ignora(self):
+        """Features sin clave 'feature' se ignoran sin error."""
+        recs = _build_shap_recommendations([
+            {"contribution": 0.7},
+        ])
+        assert recs == []
+
+    def test_payload_shap_feature_none_se_ignora(self):
+        """Feature con valor None se ignora sin error."""
+        recs = _build_shap_recommendations([
+            {"feature": None, "contribution": 0.5},
+        ])
+        assert recs == []
+
 
 # ---------------------------------------------------------------------------
 # Grupo 4: Checklist completo
