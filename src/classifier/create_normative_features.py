@@ -62,7 +62,7 @@ PATTERN_SUBLIMINAL = re.compile(
 
 # Art. 5.1.b — Explotación de vulnerabilidades (edad, discapacidad, situación)
 PATTERN_EXPLOITATION_VULN = re.compile(
-    r"exploit\w*\s+(vulnerab|discapac|edad|minor)"
+    r"(exploit|explot)\w*\s+(vulnerab|discapac|edad|minor)"
     r"|menor[es]?\s+de\s+edad"
     r"|discapacidad\s+(mental|cognitiva|física)"
     r"|situación\s+(económica\s+precaria|vulnerable|de\s+precariedad)"
@@ -133,7 +133,13 @@ def add_normative_features(df: pd.DataFrame, text_col: str = "descripcion") -> p
     --------
     DataFrame original más las 6 columnas nuevas (in-place no aplicado).
     """
+    if text_col not in df.columns:
+        raise ValueError(
+            f"Columna '{text_col}' no encontrada en el DataFrame. "
+            f"Columnas disponibles: {list(df.columns)}"
+        )
     df = df.copy()
+    df[text_col] = df[text_col].fillna("").astype(str)
     for col_name, pattern in PATTERNS.items():
         df[col_name] = _apply_pattern(df[text_col], pattern)
 

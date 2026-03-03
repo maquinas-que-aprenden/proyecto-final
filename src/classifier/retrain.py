@@ -288,7 +288,7 @@ def main(*, force_promote: bool = False) -> None:
             "needs_manual_features": True,
             "test_f1_macro": round(f1_macro, 4),
             "augmented": True,
-            "augmented_examples": len(df_aug),
+            "augmented_examples": sum(len(d) for d in dfs_aug),
             "fecha_reentrenamiento": datetime.now().isoformat(),
         })
         seleccion_path.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")

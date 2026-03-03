@@ -92,7 +92,7 @@ def _build_annex3_patterns() -> list:
         (r"subliminal.{0,40}(comportamiento|conducta|decisi[oó]n)",
          "inaceptable", "Art. 5.1.a"),
         # Art. 5.1.b — Explotación de vulnerabilidades
-        (r"(exploit|aprovech).{0,30}(vulnerabilidad|discapacidad|menor.{0,10}edad|tercera.{0,10}edad)",
+        (r"(exploit|explot\w*|explotaci[oó]n|aprovech).{0,30}(vulnerabilidad|discapacidad|menor.{0,10}edad|tercera.{0,10}edad)",
          "inaceptable", "Art. 5.1.b"),
         (r"(menor.{0,15}edad|persona.{0,15}(vulnerabl|discapacitad)).{0,50}(manipul|influenc|coacci|engañ)",
          "inaceptable", "Art. 5.1.b"),
