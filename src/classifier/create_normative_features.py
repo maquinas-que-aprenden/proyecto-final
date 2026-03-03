@@ -116,8 +116,11 @@ FEATURE_COLS = list(PATTERNS.keys())
 # ---------------------------------------------------------------------------
 
 def _apply_pattern(series: pd.Series, pattern: re.Pattern) -> pd.Series:
-    """Devuelve serie binaria (0/1) indicando si el patrón aparece en cada texto."""
-    return series.str.lower().str.contains(pattern, regex=True, na=False).astype(int)
+    """Devuelve serie binaria (0/1) indicando si el patrón aparece en cada texto.
+
+    Espera una serie ya en minúsculas para evitar llamadas repetidas a str.lower().
+    """
+    return series.str.contains(pattern, regex=True, na=False).astype(int)
 
 
 def add_normative_features(df: pd.DataFrame, text_col: str = "descripcion") -> pd.DataFrame:
@@ -139,9 +142,9 @@ def add_normative_features(df: pd.DataFrame, text_col: str = "descripcion") -> p
             f"Columnas disponibles: {list(df.columns)}"
         )
     df = df.copy()
-    df[text_col] = df[text_col].fillna("").astype(str)
+    series_lower = df[text_col].fillna("").astype(str).str.lower()
     for col_name, pattern in PATTERNS.items():
-        df[col_name] = _apply_pattern(df[text_col], pattern)
+        df[col_name] = _apply_pattern(series_lower, pattern)
 
     # Flag compuesto: 1 si cualquier práctica prohibida del Art. 5 se detecta
     df["article_5_flag"] = df[FEATURE_COLS].max(axis=1)
