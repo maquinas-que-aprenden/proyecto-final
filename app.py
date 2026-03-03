@@ -52,8 +52,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown(
     "**Agentes disponibles:**\n"
     "- RAG Normativo\n"
-    "- Clasificador de Riesgo\n"
-    "- Informes de Cumplimiento"
+    "- Clasificador de Riesgo + Checklist de Cumplimiento"
 )
 
 # --- Main ---

@@ -2,8 +2,8 @@
 
 Usa Amazon Bedrock (Nova Lite v1) como LLM con tool calling.
 El agente razona sobre la consulta del usuario y decide qué herramientas
-usar: búsqueda normativa (RAG), clasificación de riesgo, o informe de
-cumplimiento.
+usar: búsqueda normativa (RAG) o clasificación de riesgo con checklist
+de cumplimiento.
 """
 
 from __future__ import annotations
@@ -70,23 +70,38 @@ BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "eu.amazon.nova-lite-v1:0"
 BEDROCK_REGION = os.environ.get("BEDROCK_REGION") or os.environ.get("AWS_REGION", "eu-west-1")
 
 SYSTEM_PROMPT = """\
-Eres NormaBot, un asistente jurídico especializado en el EU AI Act \
-(Reglamento (UE) 2024/1689) y normativa española de inteligencia artificial.
+Eres NormaBot, un asistente juridico especializado en el EU AI Act \
+(Reglamento (UE) 2024/1689) y normativa espanola de inteligencia artificial.
 
-Tu trabajo es ayudar a los usuarios a entender la regulación, clasificar \
-sistemas de IA por nivel de riesgo y generar informes de cumplimiento.
+Tu trabajo es ayudar a los usuarios a entender la regulacion, clasificar \
+sistemas de IA por nivel de riesgo y evaluar sus obligaciones de cumplimiento.
 
 Responde SIEMPRE en el mismo idioma en que el usuario escribe. \
-Por defecto, responde en español.
+Por defecto, responde en espanol.
 
-Usa las herramientas disponibles para responder.
+Dispones de dos herramientas:
 
-Las referencias legales exactas se añadirán automáticamente a la respuesta. \
-No reformules ni modifiques las citas de artículos que devuelvan las herramientas. \
-Limítate a explicar el contenido.
+1. **search_legal_docs**: Busca articulos, definiciones y conceptos legales \
+en el corpus normativo (EU AI Act, BOE). Usala para preguntas sobre contenido \
+de la ley.
 
-Añade siempre al final: "_Informe preliminar generado por IA. Consulte \
-profesional jurídico._"\
+2. **classify_risk**: Clasifica un sistema de IA por nivel de riesgo y genera \
+un checklist completo de cumplimiento. Incluye: clasificacion, obligaciones \
+legales aplicables, advertencias si el caso es borderline, y recomendaciones \
+especificas basadas en las caracteristicas del sistema. Usala cuando el \
+usuario describe un sistema de IA, pide clasificacion, informe, evaluacion \
+o checklist de cumplimiento.
+
+Reglas:
+- Cita unicamente las referencias legales que devuelvan las herramientas. \
+No inventes ni infieras articulos adicionales.
+- Presenta los resultados del checklist de forma clara y estructurada.
+- Si el checklist indica un caso borderline, destaca la advertencia.
+- Si el nivel es 'inaceptable', enfatiza que el sistema esta PROHIBIDO.
+- Para informes completos, combina classify_risk + search_legal_docs.
+
+Anade siempre al final: "_Informe preliminar generado por IA. Consulte \
+profesional juridico._"\
 """
 
 # ---------------------------------------------------------------------------
@@ -101,32 +116,6 @@ class _QueryInput(BaseModel):
 class _SystemDescriptionInput(BaseModel):
     system_description: str = Field(min_length=1, max_length=5000)
 
-
-# ---------------------------------------------------------------------------
-# Queries específicas por nivel de riesgo para el informe de cumplimiento.
-# Cada query busca un artículo concreto del EU AI Act, evitando que la
-# búsqueda semántica genérica favorezca guías AESIA sobre el texto legal.
-# ---------------------------------------------------------------------------
-
-_REPORT_QUERIES: dict[str, list[str]] = {
-    "inaceptable": [
-        "prácticas de inteligencia artificial prohibidas Artículo 5",
-    ],
-    "alto_riesgo": [
-        "sistema de gestión de riesgos Artículo 9",
-        "datos y gobernanza de datos Artículo 10",
-        "documentación técnica Artículo 11",
-        "transparencia información usuarios Artículo 13",
-        "vigilancia y supervisión humana Artículo 14",
-        "precisión robustez y ciberseguridad Artículo 15",
-    ],
-    "riesgo_limitado": [
-        "obligaciones de transparencia Artículo 50",
-    ],
-    "riesgo_minimo": [
-        "códigos de conducta inteligencia artificial Artículo 95",
-    ],
-}
 
 # ---------------------------------------------------------------------------
 # Herramientas
@@ -185,24 +174,34 @@ def search_legal_docs(query: str) -> str:
 @tool
 @observe(name="tool.classify_risk")
 def classify_risk(system_description: str) -> str:
-    """Clasifica un sistema de IA según su nivel de riesgo
-    (inaceptable, alto, limitado, mínimo).
+    """Clasifica un sistema de IA segun su nivel de riesgo
+    (inaceptable, alto, limitado, minimo) y genera un checklist de
+    cumplimiento con obligaciones legales, recomendaciones especificas
+    y deteccion de casos borderline.
 
     Usa esta herramienta cuando el usuario describe un sistema de IA y quiere
-    saber su nivel de riesgo según el EU AI Act.
+    saber su nivel de riesgo, obtener un informe de cumplimiento, evaluacion
+    o checklist segun el EU AI Act.
     """
     try:
         _SystemDescriptionInput(system_description=system_description)
     except Exception as e:
         return f"Error de validacion: {e}"
 
+    from src.checklist.main import build_compliance_checklist
+
     result = _cached_predict_risk(system_description)
+    checklist = build_compliance_checklist(result, system_description)
+
     try:
         langfuse_context.update_current_observation(
             metadata={
-                "risk_level": result.get("risk_level"),
-                "confidence": result.get("confidence"),
-                "annex3_ref": result.get("annex3_ref"),
+                "risk_level": checklist["risk_level"],
+                "confidence": checklist["confidence"],
+                "annex3_ref": checklist.get("annex3_ref"),
+                "borderline": checklist["borderline_warning"] is not None,
+                "n_obligations": len(checklist["obligations"]),
+                "n_specific_recs": len(checklist["specific_recommendations"]),
             }
         )
     except Exception:
@@ -232,101 +231,40 @@ def classify_risk(system_description: str) -> str:
         "annex3_override": result.get("annex3_override", False),
     }
 
-    response = (
-        f"Clasificacion: {result['risk_level'].upper()}\n"
-        f"Confianza: {result['confidence']:.0%}\n"
-        f"Referencia legal: {legal_ref}\n"
-    )
+    return _format_checklist(checklist)
 
-    # Bug 7 — Mostrar solo features semánticamente interpretables.
-    # Excluir componentes SVD (svd_N) y métricas de longitud (num_palabras,
-    # num_caracteres), que no tienen significado legal para el usuario.
-    _NO_INTERPRETAR = {"num_palabras", "num_caracteres"}
-    interpretable = [
-        f for f in result.get("shap_top_features", [])
-        if not f["feature"].startswith("svd_") and f["feature"] not in _NO_INTERPRETAR
+
+def _format_checklist(checklist: dict) -> str:
+    """Formatea el checklist como texto estructurado para el agente."""
+    lines = [
+        f"NIVEL DE RIESGO: {checklist['risk_level'].upper()}",
+        f"CONFIANZA: {checklist['confidence']:.0%}",
     ]
-    if interpretable:
-        features = ", ".join(f["feature"] for f in interpretable[:3])
-        response += f"Factores clave: {features}\n"
 
-    return response
+    if checklist.get("annex3_override"):
+        lines.append(f"OVERRIDE ANEXO III: {checklist.get('annex3_ref', '')}")
 
+    if checklist.get("borderline_warning"):
+        lines.append(f"ADVERTENCIA BORDERLINE: {checklist['borderline_warning']}")
 
+    lines.append("")
+    lines.append("OBLIGACIONES APLICABLES:")
+    for i, ob in enumerate(checklist["obligations"], 1):
+        tag = "[OBLIGATORIO]" if ob["mandatory"] else "[VOLUNTARIO]"
+        lines.append(f"  {i}. {tag} {ob['article']} - {ob['title']}")
+        lines.append(f"     {ob['description']}")
 
-@tool
-@observe(name="tool.generate_report")
-def generate_report(system_description: str) -> str:
-    """Genera un informe de cumplimiento normativo para un sistema de IA.
+    if checklist["specific_recommendations"]:
+        lines.append("")
+        lines.append("RECOMENDACIONES ESPECIFICAS (basadas en caracteristicas del sistema):")
+        for i, rec in enumerate(checklist["specific_recommendations"], 1):
+            lines.append(f"  {i}. [{rec['annex_ref']}] (feature: {rec['feature']})")
+            lines.append(f"     {rec['recommendation']}")
 
-    Usa esta herramienta cuando el usuario quiere un informe, reporte o
-    evaluación de conformidad para su sistema. Esta herramienta clasifica
-    el riesgo internamente — no es necesario llamar a classify_risk antes.
-    """
-    try:
-        _SystemDescriptionInput(system_description=system_description)
-    except Exception as e:
-        return f"Error de validacion: {e}"
+    lines.append("")
+    lines.append(checklist["disclaimer"])
 
-    from src.report.main import generate_report as _build_report
-
-    # 1. Clasificar riesgo del sistema (usa caché si classify_risk ya lo computó)
-    risk_result = _cached_predict_risk(system_description)
-    risk_level = risk_result["risk_level"]
-
-    # 2. Buscar artículos relevantes en el corpus legal
-    #    Una query por obligación conocida para evitar que la búsqueda
-    #    semántica genérica favorezca guías AESIA sobre el texto legal.
-    articles = []
-    try:
-        from src.retrieval.retriever import search as search_docs
-        queries = _REPORT_QUERIES.get(risk_level, [])
-        seen_ids: set[str] = set()
-        for q in queries:
-            hits = search_docs(q, k=1)
-            for h in hits:
-                doc_id = h.get("id", "")
-                if doc_id not in seen_ids:
-                    seen_ids.add(doc_id)
-                    hit_meta = h.get("metadata", {}) or {}
-                    source = hit_meta.get("source", "")
-                    unit = hit_meta.get("unit_title") or hit_meta.get("unit_id", "")
-                    label = f"{source} — {unit}".strip(" —")
-                    text = h.get("text", "").strip()
-                    if label:
-                        entry = f"{label}\n{text}" if text else label
-                        articles.append(entry)
-    except Exception as e:
-        logger.warning("Retriever no disponible para informe: %s", e)
-
-    if not articles:
-        logger.warning(
-            "Sin artículos verificados del corpus para nivel '%s'. "
-            "Informe generado sin citas verificadas.",
-            risk_level,
-        )
-        articles = ["No se pudieron verificar artículos específicos en el corpus legal."]
-
-    try:
-        langfuse_context.update_current_observation(
-            metadata={
-                "risk_level": risk_level,
-                "n_articles": len(articles),
-                "articles_verified": articles[0] != "No se pudieron verificar artículos específicos en el corpus legal.",
-            }
-        )
-    except Exception:
-        pass
-
-    # 3. Side-channel: depositar metadatos del informe
-    meta = _get_tool_metadata()
-    meta["report"] = {
-        "risk_level": risk_level,
-        "n_articles": len(articles),
-    }
-
-    # 4. Generar informe con template
-    return _build_report(system_description, risk_level, articles)
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -343,7 +281,7 @@ def _build_agent():
         region_name=BEDROCK_REGION,
         temperature=0.0,
     )
-    tools = [search_legal_docs, classify_risk, generate_report]
+    tools = [search_legal_docs, classify_risk]
     return create_react_agent(llm, tools, prompt=SYSTEM_PROMPT)
 
 
