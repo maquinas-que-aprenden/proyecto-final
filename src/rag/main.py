@@ -141,6 +141,20 @@ def grade(query: str, docs: list[dict], threshold: float = 0.7) -> list[dict]:
             if doc["score"] >= threshold:
                 relevant.append(doc)
 
+    # Garantía mínima: si el grader descartó todo, devolver top-2 por score
+    # Evita que Q4 (0/5) llegue al generador sin ningún contexto
+    if not relevant:
+        relevant = sorted(docs, key=lambda d: d["score"], reverse=True)[:2]
+        logger.warning("Grader devolvió 0 relevantes — fallback a top-2 por score")
+        try:
+            langfuse_context.update_current_observation(
+                level="WARNING",
+                status_message="Grader devolvió 0 relevantes — fallback a top-2 por score",
+                metadata={"n_docs_in": len(docs), "n_relevant": len(relevant), "method": "empty_fallback"},
+            )
+        except Exception:
+            pass
+
     try:
         langfuse_context.update_current_observation(
             metadata={"n_docs_in": len(docs), "n_relevant": len(relevant), "method": "llm"},
