@@ -70,10 +70,21 @@ def _format_results(results: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 def _detect_article_number(query: str) -> Optional[str]:
-    """Detecta si la query menciona un artículo específico por número."""
-    m = re.search(r'\bart[íi]culo\s+(\d+)\b', query, flags=re.IGNORECASE)
+    """Detecta si la query menciona un artículo específico por número.
+
+    Soporta: "artículo 5", "articulo 5", "art. 5", "art 5".
+    """
+    m = re.search(r'\bart(?:[íi]culo|\.?)\s+(\d+)\b', query, flags=re.IGNORECASE)
     if m:
         return m.group(1)
+    return None
+
+
+def _detect_annex_reference(query: str) -> Optional[str]:
+    """Detecta si la query menciona un anexo específico (ej: 'Anexo III')."""
+    m = re.search(r'\banexo\s+([IVXLC]+|\d+)\b', query, flags=re.IGNORECASE)
+    if m:
+        return m.group(1).upper()
     return None
 
 
@@ -90,6 +101,9 @@ def _detect_priority_sources(query: str) -> Optional[List[str]]:
 
     if "ai act" in query_lower or "alto riesgo" in query_lower:
         priority_sources.append("eu_ai_act")
+
+    if "boe" in query_lower or "ley orgánica" in query_lower or "ley organica" in query_lower or "derechos digitales" in query_lower:
+        priority_sources.append("boe")
 
     return priority_sources if priority_sources else None
 
@@ -111,6 +125,7 @@ def search_base(query: str, k: int = DEFAULT_K) -> List[Dict[str, Any]]:
 def search_soft(query: str, k: int = DEFAULT_K) -> List[Dict[str, Any]]:
     priority_sources = _detect_priority_sources(query)
     article_num = _detect_article_number(query)
+    annex_ref = _detect_annex_reference(query)
 
     collection = _get_collection()
     results = collection.query(
@@ -120,27 +135,29 @@ def search_soft(query: str, k: int = DEFAULT_K) -> List[Dict[str, Any]]:
 
     formatted = _format_results(results)
 
-    if not priority_sources and not article_num:
+    if not priority_sources and not article_num and not annex_ref:
         return formatted[:k]
 
-    article_hits = []
+    exact_hits = []
     source_hits = []
     other_hits = []
 
     for hit in formatted:
         meta = hit.get("metadata", {})
         unit_id = str(meta.get("unit_id", ""))
+        unit_title = str(meta.get("unit_title", ""))
         source = meta.get("source", "")
 
         if article_num and unit_id == article_num:
-            # El artículo mencionado explícitamente va primero
-            article_hits.append(hit)
+            exact_hits.append(hit)
+        elif annex_ref and annex_ref in unit_title.upper():
+            exact_hits.append(hit)
         elif priority_sources and source in priority_sources:
             source_hits.append(hit)
         else:
             other_hits.append(hit)
 
-    return (article_hits + source_hits + other_hits)[:k]
+    return (exact_hits + source_hits + other_hits)[:k]
 
 
 # API principal
