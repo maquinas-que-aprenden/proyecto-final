@@ -11,13 +11,31 @@ from __future__ import annotations
 import contextvars
 import logging
 import os
+import threading
 from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
+from typing_extensions import Annotated
+
 from langchain_aws import ChatBedrockConverse
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
-from langgraph.prebuilt import create_react_agent
+from langgraph.prebuilt import create_react_agent, InjectedStore
+from langgraph.store.memory import InMemoryStore
 from pydantic import BaseModel, Field
+
+from src.memory.hooks import pre_model_hook
+
+# Checkpointer: SQLite persistente si está disponible, sino en memoria
+try:
+    from langgraph.checkpoint.sqlite import SqliteSaver
+
+    _SQLITE_AVAILABLE = True
+except ImportError:
+    from langgraph.checkpoint.memory import InMemorySaver
+
+    _SQLITE_AVAILABLE = False
 
 try:
     from langfuse.decorators import observe, langfuse_context
@@ -68,6 +86,7 @@ def _cached_predict_risk(system_description: str) -> dict:
 
 BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "eu.amazon.nova-lite-v1:0")
 BEDROCK_REGION = os.environ.get("BEDROCK_REGION") or os.environ.get("AWS_REGION", "eu-west-1")
+MEMORY_DIR = os.environ.get("NORMABOT_MEMORY_DIR", "data/memory")
 
 SYSTEM_PROMPT = """\
 Eres NormaBot, un asistente jurídico especializado en el EU AI Act \
@@ -330,21 +349,139 @@ def generate_report(system_description: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Agente ReAct
+# Herramienta de memoria de usuario
+# ---------------------------------------------------------------------------
+
+
+def _user_namespace(config: RunnableConfig) -> tuple[str, str]:
+    """Namespace aislado por usuario para el store de preferencias.
+
+    Usa ``user_id`` si está disponible (preferencias persisten entre sesiones),
+    sino ``thread_id`` como fallback (preferencias aisladas por sesión).
+    """
+    cfg = config.get("configurable", {})
+    scope = cfg.get("user_id") or cfg.get("thread_id", "default")
+    return ("user_preferences", scope)
+
+
+@tool
+def save_user_preference(
+    key: str,
+    value: str,
+    store: Annotated[Any, InjectedStore()],
+    config: RunnableConfig,
+) -> str:
+    """Guarda una preferencia o dato del usuario para recordarlo en futuras
+    conversaciones.
+
+    Usa esta herramienta cuando el usuario te pida explícitamente que
+    recuerdes algo sobre él o su organización (sector, tipo de sistema,
+    preferencias, contexto).
+    """
+    store.put(_user_namespace(config), key, {"value": value})
+    return f"Preferencia guardada: {key} = {value}"
+
+
+@tool
+def get_user_preferences(
+    store: Annotated[Any, InjectedStore()],
+    config: RunnableConfig,
+) -> str:
+    """Recupera las preferencias guardadas del usuario.
+
+    Usa esta herramienta al inicio de la conversación o cuando necesites
+    contexto sobre el usuario.
+    """
+    items = store.search(_user_namespace(config))
+    if not items:
+        return "No hay preferencias guardadas."
+    return "\n".join(f"- {item.key}: {item.value['value']}" for item in items)
+
+
+# ---------------------------------------------------------------------------
+# Agente ReAct con memoria
 # ---------------------------------------------------------------------------
 
 _agent = None
+_checkpointer = None
+_store = None
+_lock = threading.Lock()
+
+
+def _get_checkpointer():
+    """Singleton thread-safe del checkpointer (double-checked locking).
+
+    Intenta SQLite si está disponible; degrada a InMemorySaver si falla
+    la creación del directorio o la inicialización de la base de datos.
+    """
+    global _checkpointer
+    if _checkpointer is not None:
+        return _checkpointer
+
+    with _lock:
+        if _checkpointer is not None:
+            return _checkpointer
+
+        if _SQLITE_AVAILABLE:
+            try:
+                memory_dir = Path(MEMORY_DIR)
+                memory_dir.mkdir(parents=True, exist_ok=True)
+                db_path = str(memory_dir / "conversations.db")
+                saver = SqliteSaver.from_conn_string(db_path)
+                saver.setup()
+                _checkpointer = saver
+                logger.info("Checkpointer SQLite inicializado: %s", db_path)
+            except Exception:
+                logger.warning(
+                    "SQLite checkpointer falló, degradando a memoria",
+                    exc_info=True,
+                )
+                _checkpointer = InMemorySaver()
+        else:
+            _checkpointer = InMemorySaver()
+            logger.info(
+                "Checkpointer en memoria (langgraph-checkpoint-sqlite no instalado)"
+            )
+
+    return _checkpointer
+
+
+def _get_store() -> InMemoryStore:
+    """Singleton thread-safe del store para memoria cross-thread."""
+    global _store
+    if _store is not None:
+        return _store
+
+    with _lock:
+        if _store is None:
+            _store = InMemoryStore()
+            logger.info("InMemoryStore inicializado para preferencias de usuario")
+
+    return _store
 
 
 def _build_agent():
-    """Construye el agente ReAct con Bedrock Nova Lite y las herramientas."""
+    """Construye el agente ReAct con Bedrock Nova Lite, herramientas y memoria."""
     llm = ChatBedrockConverse(
         model=BEDROCK_MODEL_ID,
         region_name=BEDROCK_REGION,
         temperature=0.0,
     )
-    tools = [search_legal_docs, classify_risk, generate_report]
-    return create_react_agent(llm, tools, prompt=SYSTEM_PROMPT)
+    tools = [
+        search_legal_docs,
+        classify_risk,
+        generate_report,
+        save_user_preference,
+        get_user_preferences,
+    ]
+    return create_react_agent(
+        llm,
+        tools,
+        prompt=SYSTEM_PROMPT,
+        checkpointer=_get_checkpointer(),
+        store=_get_store(),
+        pre_model_hook=pre_model_hook,
+    )
 
 
 def _get_agent():
@@ -356,7 +493,11 @@ def _get_agent():
 
 
 def run(query: str, session_id: str | None = None, user_id: str | None = None) -> dict:
-    """Ejecuta el agente ReAct con una consulta del usuario."""
+    """Ejecuta el agente ReAct con memoria conversacional.
+
+    Con el checkpointer, solo se envía el mensaje nuevo. El checkpointer
+    carga automáticamente el historial previo para el ``thread_id``.
+    """
     agent = _get_agent()
     _tool_metadata.set(None)  # limpiar invocación anterior
 
@@ -372,9 +513,17 @@ def run(query: str, session_id: str | None = None, user_id: str | None = None) -
         logger.debug("Langfuse no disponible: %s — continuando sin trazas", e)
         callbacks = []
 
+    config = {
+        "callbacks": callbacks,
+        "configurable": {
+            "thread_id": session_id or "default",
+            "user_id": user_id,
+        },
+    }
+
     result = agent.invoke(
         {"messages": [("user", query)]},
-        config={"callbacks": callbacks},
+        config=config,
     )
 
     # Recoger metadatos verificados de las herramientas (side-channel)
@@ -386,19 +535,19 @@ def run(query: str, session_id: str | None = None, user_id: str | None = None) -
 if __name__ == "__main__":
     import uuid
 
-    # Generamos un ID único para agrupar estas consultas en una misma sesión de Langfuse
+    # Generamos un ID único para agrupar estas consultas en una misma sesión
     test_session = f"session-{uuid.uuid4().hex[:8]}"
 
+    # Demo de memoria multi-turn: las queries usan la misma sesión
     queries = [
         "¿Qué dice el artículo 5 del EU AI Act?",
         "Clasifica mi sistema de reconocimiento facial",
-        "Genera un informe de cumplimiento para mi chatbot",
-        "Clasifica un sistema de scoring crediticio y dime que articulos aplican",
+        # Esta query depende del contexto previo (multi-turn):
+        "Genera un informe de cumplimiento para ese sistema",
     ]
 
     for q in queries:
         print(f"{'=' * 60}")
-        # Pasamos el session_id para que Langfuse v3 lo capture mediante el CallbackHandler
         result = run(q, session_id=test_session)
 
         final_message = result["messages"][-1]
@@ -406,4 +555,4 @@ if __name__ == "__main__":
         print(f"  Response: {final_message.content[:200]}...")
         print()
 
-    print(f"✓ orchestrator/main.py OK — Agente funcional (Sesión: {test_session})")
+    print(f"✓ orchestrator/main.py OK — Agente con memoria (Sesión: {test_session})")

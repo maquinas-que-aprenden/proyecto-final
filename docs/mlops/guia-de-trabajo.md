@@ -313,10 +313,11 @@ pytest tests/ -v
 pytest tests/ -v -s
 ```
 
-Hay cuatro suites de smoke tests (83 tests en total):
+Hay cinco suites de smoke tests (88 tests en total):
 - `test_classifier.py` — 29 tests: estructura de `predict_risk()`, robustez, explicabilidad SHAP, validación de entrada, coherencia de campos tras el override del Anexo III (`TestAnnex3Override`).
+- `test_memory.py` — 5 tests: hook `pre_model_hook` de truncación del historial de conversación para no exceder la ventana de contexto del LLM.
+- `test_orchestrator.py` — 30 tests: SYSTEM_PROMPT con requisitos legales (incluida instrucción anti-doble-clasificación), nombres y descripciones de las 3 tools, validación de entrada, comportamiento de `classify_risk`, `search_legal_docs` y `generate_report`, ausencia de doble llamada al clasificador (`TestNoDobleClasificacion`), side-channel de metadatos, contrato de `run()`, y memoria conversacional.
 - `test_rag_generate.py` — 13 tests: prompt, singleton `_get_generate_llm()`, flujo `generate()` con fallback.
-- `test_orchestrator.py` — 27 tests: SYSTEM_PROMPT con requisitos legales (incluida instrucción anti-doble-clasificación), nombres y descripciones de las 3 tools, validación de entrada, comportamiento de `classify_risk`, `search_legal_docs` y `generate_report`, ausencia de doble llamada al clasificador (`TestNoDobleClasificacion`), contrato de `run()`.
 - `test_retrain.py` — 14 tests: limpieza de texto, carga de JSONL, features manuales e integración de `main()` con `monkeypatch` de rutas y stub `_FakeXGB` (sin entrenamiento real).
 
 Los tests de orchestrator y RAG mockean `langchain_aws` (Bedrock), `langchain_core` y `langchain_ollama` (Ollama) a nivel de módulo para no depender de servicios externos. Langfuse se desactiva automáticamente durante la ejecución de pytest.
