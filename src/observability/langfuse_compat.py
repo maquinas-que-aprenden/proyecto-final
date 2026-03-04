@@ -8,10 +8,12 @@ Si no, exporta no-ops transparentes.
 try:
     from langfuse.decorators import observe, langfuse_context
 except ImportError:
-    def observe(name=None):  # type: ignore[misc]
-        def decorator(func):
-            return func
-        return decorator
+    def observe(func=None, *, name=None):  # type: ignore[misc]
+        def decorator(fn):
+            return fn
+        if func is not None:
+            return func  # @observe sin paréntesis
+        return decorator  # @observe(...) con parámetros
 
     class _NoOpLangfuse:
         def update_current_observation(self, **kwargs): pass

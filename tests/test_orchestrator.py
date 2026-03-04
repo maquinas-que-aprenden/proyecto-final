@@ -145,11 +145,8 @@ class TestToolsDefinidas:
             orch_module._build_agent()
 
         tools = mock_create.call_args.args[1]
-        names = [t.name for t in tools]
-        assert "search_legal_docs" in names
-        assert "classify_risk" in names
-        assert "save_user_preference" in names
-        assert "get_user_preferences" in names
+        names = {t.name for t in tools}
+        assert names == {"search_legal_docs", "classify_risk", "save_user_preference", "get_user_preferences"}
 
 
 # ---------------------------------------------------------------------------
