@@ -138,14 +138,18 @@ class TestToolsDefinidas:
         for t in [search_legal_docs, classify_risk]:
             assert t.description, f"Tool '{t.name}' no tiene descripcion"
 
-    def test_build_agent_expone_solo_dos_tools(self):
-        """No-regresion: _build_agent pasa exactamente [search_legal_docs, classify_risk]."""
+    def test_build_agent_expone_tools_esperados(self):
+        """No-regresion: _build_agent pasa las herramientas esperadas."""
         with patch.object(orch_module, "ChatBedrockConverse"), \
              patch.object(orch_module, "create_react_agent", return_value=MagicMock()) as mock_create:
             orch_module._build_agent()
 
         tools = mock_create.call_args.args[1]
-        assert [t.name for t in tools] == ["search_legal_docs", "classify_risk"]
+        names = [t.name for t in tools]
+        assert "search_legal_docs" in names
+        assert "classify_risk" in names
+        assert "save_user_preference" in names
+        assert "get_user_preferences" in names
 
 
 # ---------------------------------------------------------------------------
@@ -285,7 +289,6 @@ class TestSearchLegalDocsTool:
         mock_generate.return_value = {
             "answer": "Segun el Art. 5 del EU AI Act...",
             "sources": [],
-            "grounded": True,
         }
         result = search_legal_docs.invoke({"query": "que dice el articulo 5?"})
         assert "Art. 5" in result
@@ -382,7 +385,6 @@ class TestToolMetadata:
                 {"source": "EU AI Act", "unit_title": "Art. 5", "unit_id": "art_5"},
                 {"source": "EU AI Act", "unit_title": "Art. 6", "unit_id": "art_6"},
             ],
-            "grounded": True,
         }
         search_legal_docs.invoke({"query": "¿qué prácticas están prohibidas?"})
 

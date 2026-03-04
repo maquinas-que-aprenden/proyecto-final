@@ -2,19 +2,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 import re
 import threading
-try:
-    from langfuse.decorators import observe, langfuse_context
-except ImportError:
-    def observe(name=None):  # type: ignore[misc]
-        def decorator(func):
-            return func
-        return decorator
-
-    class _NoOpLangfuse:
-        def update_current_observation(self, **kwargs): pass
-        def score_current_trace(self, **kwargs): pass
-
-    langfuse_context = _NoOpLangfuse()  # type: ignore[assignment]
+from src.observability.langfuse_compat import observe, langfuse_context
 
 # Configuración
 
@@ -177,58 +165,3 @@ def search(query: str, mode: str = "soft", k: int = DEFAULT_K) -> List[Dict[str,
     except Exception:
         pass
     return results
-
-
-
-    # --- Tool output for Agents / LangGraph ---
-@observe(name="retriever.search_tool")
-def search_tool(query: str, k: int = DEFAULT_K, mode: str = "soft", max_chars: int = 3500) -> str:
-    """
-    Devuelve contexto listo para LLM (string), basado en la búsqueda del vectorstore.
-    - No cambia la API 'search()' (que devuelve hits crudos).
-    - Este wrapper es para agentes: texto limpio + fuentes.
-    """
-    hits = search(query=query, mode=mode, k=k)
-
-    if not hits:
-        return "NO_RESULTS"
-
-    blocks = []
-    sources = []
-
-    for i, h in enumerate(hits, start=1):
-        meta = h.get("metadata", {}) or {}
-        src = meta.get("source", "unknown")
-        file = meta.get("file", "unknown")
-        unit = meta.get("unit_title") or meta.get("unit_id") or meta.get("unit_type") or ""
-
-        sources.append(f"{src}:{file}:{unit}".strip(":"))
-
-        text = (h.get("text") or "").strip()
-        if not text:
-            continue
-
-        blocks.append(f"[{i}] source={src} file={file}\n{text}")
-
-    out = "CONTEXT:\n" + "\n\n".join(blocks)
-    out += "\n\nSOURCES:\n" + "\n".join(sorted(set(sources)))
-
-    truncated = len(out) > max_chars
-    # Recorte por seguridad
-    if truncated:
-        out = out[:max_chars] + "\n\n[TRUNCATED]"
-
-    try:
-        langfuse_context.update_current_observation(
-            metadata={
-                "n_hits": len(hits),
-                "n_blocks": len(blocks),
-                "n_sources": len(set(sources)),
-                "output_chars": len(out),
-                "truncated": truncated,
-            }
-        )
-    except Exception:
-        pass
-
-    return out

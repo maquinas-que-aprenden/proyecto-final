@@ -37,19 +37,7 @@ except ImportError:
 
     _SQLITE_AVAILABLE = False
 
-try:
-    from langfuse.decorators import observe, langfuse_context
-except ImportError:
-    def observe(name=None):  # type: ignore[misc]
-        def decorator(func):
-            return func
-        return decorator
-
-    class _NoOpLangfuse:
-        def update_current_observation(self, **kwargs): pass
-        def score_current_trace(self, **kwargs): pass
-    langfuse_context = _NoOpLangfuse()  # type: ignore[assignment]
-
+from src.observability.langfuse_compat import observe, langfuse_context
 from src.observability.main import get_langfuse_handler
 from src.classifier.main import predict_risk
 

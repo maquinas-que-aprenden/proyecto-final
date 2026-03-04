@@ -153,11 +153,10 @@ class TestGenerateFlow:
 
         assert "El art. 5 establece..." in result["answer"]
         assert "Consulte profesional jurídico" in result["answer"]
-        assert result["grounded"] is True
         assert len(result["sources"]) == 1
 
     @patch.object(rag_module, "_get_generate_llm")
-    def test_fallback_cuando_llm_falla(self, mock_get_llm):
+    def test_error_cuando_llm_falla(self, mock_get_llm):
         mock_llm = MagicMock()
         mock_llm.invoke.side_effect = RuntimeError("Bedrock no disponible")
         mock_get_llm.return_value = mock_llm
@@ -168,16 +167,12 @@ class TestGenerateFlow:
                 "metadata": {"source": "EU AI Act", "unit_title": "Art. 5"},
             },
         ]
-        result = generate("pregunta", context)
-
-        assert result["grounded"] is False
-        assert "documentos encontrados" in result["answer"]
-        assert "EU AI Act — Art. 5" in result["answer"]
-        assert "Consulte profesional jurídico" in result["answer"]
+        import pytest
+        with pytest.raises(RuntimeError, match="Bedrock no disponible"):
+            generate("pregunta", context)
 
     def test_context_vacio_devuelve_no_encontrados(self):
         result = generate("pregunta", [])
 
-        assert result["grounded"] is False
         assert "No se encontraron" in result["answer"]
         assert result["sources"] == []

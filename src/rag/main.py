@@ -15,19 +15,8 @@ try:
     from langchain_aws import ChatBedrockConverse as _ChatBedrockConverse
 except ImportError:
     _ChatBedrockConverse = None  # type: ignore[assignment,misc]
-try:
-    from langfuse.decorators import observe, langfuse_context
-except ImportError:
-    def observe(name=None):  # type: ignore[misc]
-        def decorator(func):
-            return func
-        return decorator
 
-    class _NoOpLangfuse:
-        def update_current_observation(self, **kwargs): pass
-        def score_current_trace(self, **kwargs): pass
-
-    langfuse_context = _NoOpLangfuse()  # type: ignore[assignment]
+from src.observability.langfuse_compat import observe, langfuse_context
 
 from src.retrieval.retriever import search
 
@@ -195,62 +184,35 @@ def _format_context(docs: list[dict]) -> str:
 
 @observe(name="rag.generate")
 def generate(query: str, context: list[dict]) -> dict:
-    """Genera una respuesta con citas legales usando Bedrock Nova Lite.
-
-    Fallback a resumen por concatenacion si el LLM no esta disponible.
-    """
+    """Genera una respuesta con citas legales usando Bedrock Nova Lite."""
     sources = [d.get("metadata", {}) for d in context]
 
     if not context:
         langfuse_context.update_current_observation(
-            metadata={"n_context_docs": 0, "grounded": False},
+            metadata={"n_context_docs": 0},
         )
         return {
             "answer": "No se encontraron documentos relevantes para esta consulta.",
             "sources": [],
-            "grounded": False,
         }
 
     formatted_context = _format_context(context)
     prompt = GENERATE_PROMPT.format(context=formatted_context, query=query)
 
-    grounded = True
-    try:
-        llm = _get_generate_llm()
-        response = llm.invoke(prompt)
-        answer = response.content.strip()
-    except Exception as e:
-        logger.warning("LLM de generacion no disponible, usando fallback: %s", e, exc_info=True)
-        try:
-            langfuse_context.update_current_observation(
-                level="WARNING",
-                status_message=f"Bedrock no disponible — generate con extractos (degradación): {e}",
-            )
-        except Exception:
-            pass
-        # Fallback: concatenar extractos relevantes (sin citas verificadas por LLM)
-        grounded = False
-        snippets = [d["doc"][:200] for d in context[:3]]
-        citations = [
-            f"{m.get('source', '')} — {m.get('unit_title') or m.get('unit_id', '')}".strip(" —")
-            for m in sources if m
-        ]
-        answer = "Según los documentos encontrados:\n\n" + "\n\n".join(snippets)
-        if citations:
-            answer += "\n\nFuentes: " + "; ".join(c for c in citations if c)
-
+    llm = _get_generate_llm()
+    response = llm.invoke(prompt)
+    answer = response.content.strip()
     answer += "\n\n_Informe preliminar generado por IA. Consulte profesional jurídico._"
 
     try:
         langfuse_context.update_current_observation(
-            metadata={"n_context_docs": len(context), "grounded": grounded},
+            metadata={"n_context_docs": len(context)},
         )
     except Exception:
         pass
     return {
         "answer": answer,
         "sources": sources,
-        "grounded": grounded,
     }
 
 
@@ -267,6 +229,5 @@ if __name__ == "__main__":
     result = generate(query, relevant)
     print(f"Generate:  {result['answer']}")
     print(f"Sources:   {result['sources']}")
-    print(f"Grounded:  {result['grounded']}")
 
     print("\n✓ rag/main.py OK")

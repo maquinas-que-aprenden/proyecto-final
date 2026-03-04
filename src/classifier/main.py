@@ -29,20 +29,8 @@ from pathlib import Path
 
 import joblib
 import numpy as np
-try:
-    from langfuse.decorators import observe, langfuse_context
-except ImportError:
-    # langfuse opcional: el clasificador funciona sin observabilidad instalada
-    def observe(name=None):  # type: ignore[misc]
-        def decorator(func):
-            return func
-        return decorator
-
-    class _NoOpLangfuse:
-        def update_current_observation(self, **kwargs): pass
-        def score_current_trace(self, **kwargs): pass
-
-    langfuse_context = _NoOpLangfuse()  # type: ignore[assignment]
+from src.checklist.main import SEVERITY
+from src.observability.langfuse_compat import observe, langfuse_context
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -55,12 +43,6 @@ class _TextInput(BaseModel):
 # Patrones del Anexo III para override determinista post-predicción ML.
 # Se compilan una sola vez y se aplican sobre el texto ORIGINAL (sin limpiar).
 _ANNEX3_PATTERNS: list | None = None
-_SEVERITY: dict[str, int] = {
-    "inaceptable": 3,
-    "alto_riesgo": 2,
-    "riesgo_limitado": 1,
-    "riesgo_minimo": 0,
-}
 
 
 def _build_annex3_patterns() -> list:
@@ -112,7 +94,7 @@ def _annex3_override(text: str, result: dict) -> dict:
     best_ref: str | None = None
     for pattern, expected_level, legal_ref in _ANNEX3_PATTERNS:
         if pattern.search(text):
-            if best_level is None or _SEVERITY[expected_level] > _SEVERITY[best_level]:
+            if best_level is None or SEVERITY[expected_level] > SEVERITY[best_level]:
                 best_level = expected_level
                 best_ref = legal_ref
 
