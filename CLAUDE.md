@@ -8,18 +8,24 @@ NormaBot is an Agentic RAG system for querying Spanish/EU AI regulation (BOE, EU
 
 ## Architecture
 
-A **ReAct agent** (LangGraph `create_react_agent`) orchestrates two tools:
+A **ReAct agent** (LangGraph `create_react_agent`) orchestrates four tools:
 
-1. **RAG Normativo** (`src/rag/main.py`) — Corrective RAG: Retrieve → Grade → Generate with legal citations. Uses ChromaDB + `paraphrase-multilingual-MiniLM-L12-v2` embeddings. `retrieve()` calls `src.retrieval.retriever.search()` (ChromaDB real). `grade()` uses **Ollama Qwen 2.5 3B** (local LLM) for relevance grading with score-based fallback. `generate()` is still a stub. Data pipeline in `data/ingest.py` (raw→chunks) and `data/index.py` (chunks→embeddings→ChromaDB).
-2. **Clasificador de Riesgo + Checklist** (`src/classifier/`, `src/checklist/main.py`) — XGBoost classifies AI systems into 4 EU AI Act risk levels (inaceptable, alto, limitado, mínimo). Full ML pipeline in `functions.py`: spaCy text cleaning, TF-IDF + manual keyword features, Grid Search with StratifiedKFold, SHAP explainability, MLflow tracking. Includes deterministic compliance checklist with obligations, SHAP-based recommendations, and borderline detection.
+1. **RAG Normativo** (`src/rag/main.py`) — Corrective RAG: Retrieve → Grade → Generate with legal citations. Uses ChromaDB + `paraphrase-multilingual-MiniLM-L12-v2` embeddings. `retrieve()` calls `src.retrieval.retriever.search()` (ChromaDB real). `grade()` uses **Ollama Qwen 2.5 3B** (local LLM) for relevance grading with score-based fallback. `generate()` uses Bedrock Nova Lite with fallback to concatenation summary. Data pipeline in `data/ingest.py` (raw→chunks) and `data/index.py` (chunks→embeddings→ChromaDB).
+2. **Clasificador de Riesgo + Checklist** (`src/classifier/`, `src/checklist/main.py`) — XGBoost classifies AI systems into 4 EU AI Act risk levels (inaceptable, alto, limitado, mínimo). Full ML pipeline in `functions.py`: spaCy text cleaning, TF-IDF + manual keyword features, Grid Search with StratifiedKFold, SHAP explainability, MLflow tracking. Includes deterministic compliance checklist with obligations, SHAP-based recommendations, and borderline detection. Results cached via `lru_cache`.
+3. **Guardar preferencias** — `save_user_preference`: stores user preferences/context in an `InMemoryStore` namespaced by `user_id` or `thread_id`.
+4. **Recuperar preferencias** — `get_user_preferences`: retrieves stored preferences for personalized responses.
 
-**Orchestrator** (`src/orchestrator/main.py`): ReAct agent using Amazon Bedrock (Nova Lite v1) with tool calling. The LLM decides which tool(s) to invoke based on the user query. The two `@tool` functions (`search_legal_docs`, `classify_risk`) connect to `src/rag` and `src/classifier`+`src/checklist`.
+**Orchestrator** (`src/orchestrator/main.py`): ReAct agent using Amazon Bedrock (Nova Lite v1) with tool calling. The LLM decides which tool(s) to invoke based on the user query. The two main `@tool` functions (`search_legal_docs`, `classify_risk`) connect to `src/rag` and `src/classifier`+`src/checklist`. Features:
+- **Memory**: SQLite checkpointer (with InMemorySaver fallback) for conversation persistence across turns. `pre_model_hook` from `src/memory/hooks.py` trims messages to stay within LLM context window (30K tokens).
+- **Side-channel metadata**: `_tool_metadata` (`ContextVar`) collects verified citations and risk data from tools, passed directly to the UI without LLM reformulation.
+- **Thread-safe singletons**: `_get_checkpointer()` and `_get_store()` use double-checked locking.
+- **Langfuse observability**: all tools decorated with `@observe`.
+
+**Memory** (`src/memory/hooks.py`): `pre_model_hook` trims conversation history using `trim_messages` (strategy="last", 30K token limit) before sending to LLM, preserving full history in checkpointer.
 
 **Retriever** (`src/retrieval/retriever.py`): ChromaDB PersistentClient with lazy initialization. `search()` supports `mode="base"` (direct semantic) and `mode="soft"` (source-prioritized). `search_tool()` returns LLM-ready formatted string. Collection: `normabot_legal_chunks`.
 
-**State** (`src/agents/state.py`): `AgentState` TypedDict with `Annotated[list, operator.add]` for accumulating documents and sources across nodes.
-
-**Entry point**: `app.py` — Streamlit chat UI that calls `src.orchestrator.main.run(query)`.
+**Entry point**: `app.py` — Streamlit chat UI with session management (`session_id`, `user_id`), `_render_metadata()` for verified side-channel data (risk classification, legal citations), and `<thinking>` tag stripping.
 
 ## Classifier: Two Parallel Experiments
 
@@ -35,7 +41,7 @@ Both share similar function signatures but differ in: `evaluar_modelo()` (root t
 # Lint
 ruff check .
 
-# Tests (tests/ is currently empty)
+# Tests (5 suites, ~88 tests)
 pytest tests/ -v
 
 # Run single test file
@@ -74,6 +80,7 @@ pip install -r requirements/infra.txt  # AWS, DVC, Langfuse, RAGAS
 - spaCy model: `es_core_news_sm` (loaded lazily via singleton `_get_nlp()` / `_get_nlp_ner()` in `functions.py`)
 - Ollama model: `qwen2.5:3b` (loaded lazily via singleton `_get_grading_llm()` in `src/rag/main.py`). Requires Ollama running locally (`brew services start ollama`)
 - MLflow: URI via `MLFLOW_TRACKING_URI` env var, password from `MLFLOW_PASSWORD` env var or `.env` in classifier dir
+- Tests mock external dependencies (Bedrock, Ollama, LangGraph) at `sys.modules` level to avoid needing credentials or services in CI
 
 ## Infrastructure
 
@@ -91,6 +98,7 @@ pip install -r requirements/infra.txt  # AWS, DVC, Langfuse, RAGAS
   - `data/notebooks/` — evaluation notebooks (embeddings tuning, retrieval tests, complex queries)
 - **Container registry**: `ghcr.io/maquinas-que-aprenden/proyecto-final`
 - **Ollama**: Local LLM inference. Used for RAG document grading (Qwen 2.5 3B). Install: `brew install ollama`. Pull model: `ollama pull qwen2.5:3b`. Start: `brew services start ollama`. In Docker/EC2: needs Ollama sidecar or pre-installed.
+- **Langfuse**: v2 (`>=2.7.3,<3.0.0`) for observability. All tools and pipeline functions decorated with `@observe`. Disabled in tests via `LANGFUSE_ENABLED=false`. Known limitation: root LangGraph trace via `CallbackHandler` not available due to langchain 0.3 incompatibility; individual tool traces work via `@observe`.
 - **CodeRabbit**: configured in `.coderabbit.yaml` — reviews focus only on logic/security/performance bugs, all style linters disabled
 
 ## Key Domain Rules
@@ -98,16 +106,19 @@ pip install -r requirements/infra.txt  # AWS, DVC, Langfuse, RAGAS
 - Every generated response MUST include the disclaimer: *"Informe preliminar generado por IA. Consulte profesional jurídico."*
 - Legal citations must be exact (law, article, date). Hallucinated citations are unacceptable.
 - Classifier dataset is small (200-300 examples). Always use `class_weight='balanced'` and document as a known limitation.
-- LLM stack: Bedrock Nova Lite for orchestrator, **Ollama Qwen 2.5 3B** (local) for RAG document grading. RAG generation LLM pending (task 1.3). Model selection rationale: grading is a binary classification task (sí/no per document, ~5 calls per query) — a local 3B model avoids API keys, rate limits, and network latency. Qwen 2.5 3B chosen over Llama 3.2 3B and Gemma 2 2B for superior Spanish language support.
+- LLM stack: Bedrock Nova Lite for orchestrator and RAG generation, **Ollama Qwen 2.5 3B** (local) for RAG document grading. Model selection rationale: grading is a binary classification task (sí/no per document, ~5 calls per query) — a local 3B model avoids API keys, rate limits, and network latency. Qwen 2.5 3B chosen over Llama 3.2 3B and Gemma 2 2B for superior Spanish language support.
 
 ## Environment Variables
 
 Required in `.env`:
 - `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` — Bedrock access
 - `BEDROCK_MODEL_ID` — defaults to `eu.amazon.nova-lite-v1:0`
+- `BEDROCK_REGION` — defaults to `AWS_REGION`, then `eu-west-1`
 - `MLFLOW_PASSWORD` — MLflow tracking server auth
 - `MLFLOW_TRACKING_URI` — defaults to `https://34.244.146.100`
 - `MLFLOW_TRACKING_INSECURE_TLS` — set if using self-signed certs
+- `NORMABOT_MEMORY_DIR` — defaults to `data/memory` (SQLite conversations DB)
+- `LANGFUSE_ENABLED` — set to `false` in tests (via `conftest.py`)
 
 ## Team
 
