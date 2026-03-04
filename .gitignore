@@ -22,6 +22,9 @@ aws.pem
 /data/processed/vectorstore/
 /data/processed/chunks_legal/*.jsonl
 
+# ── Memoria conversacional ───────────────────
+/data/memory/
+
 # ── IaC (Terraform / Ansible) ──────────────────
 infra/ansible/inventory.ini
 infra/terraform/.terraform/
