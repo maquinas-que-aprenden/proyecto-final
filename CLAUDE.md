@@ -10,8 +10,8 @@ NormaBot is an Agentic RAG system for querying Spanish/EU AI regulation (BOE, EU
 
 A **ReAct agent** (LangGraph `create_react_agent`) orchestrates four tools:
 
-1. **RAG Normativo** (`src/rag/main.py`) — Corrective RAG: Retrieve → Grade → Generate with legal citations. Uses ChromaDB + `paraphrase-multilingual-MiniLM-L12-v2` embeddings. `retrieve()` calls `src.retrieval.retriever.search()` (ChromaDB real). `grade()` uses **Ollama Qwen 2.5 3B** (local LLM) for relevance grading with score-based fallback. `generate()` uses Bedrock Nova Lite with fallback to concatenation summary. Data pipeline in `data/ingest.py` (raw→chunks) and `data/index.py` (chunks→embeddings→ChromaDB).
-2. **Clasificador de Riesgo + Checklist** (`src/classifier/`, `src/checklist/main.py`) — XGBoost classifies AI systems into 4 EU AI Act risk levels (inaceptable, alto, limitado, mínimo). Full ML pipeline in `functions.py`: spaCy text cleaning, TF-IDF + manual keyword features, Grid Search with StratifiedKFold, SHAP explainability, MLflow tracking. Includes deterministic compliance checklist with obligations, SHAP-based recommendations, and borderline detection. Results cached via `lru_cache`.
+1. **RAG Normativo** (`src/rag/main.py`) — Corrective RAG: Retrieve → Grade → Generate with legal citations. Uses ChromaDB + `intfloat/multilingual-e5-base` embeddings. `retrieve()` calls `src.retrieval.retriever.search()` (ChromaDB real). `grade()` uses **Ollama Qwen 2.5 3B** (local LLM) for relevance grading with score-based fallback. `generate()` uses Bedrock Nova Lite with fallback to concatenation summary. Data pipeline in `data/ingest.py` (raw→chunks) and `data/index.py` (chunks→embeddings→ChromaDB).
+2. **Clasificador de Riesgo + Checklist** (`src/classifier/`, `src/checklist/main.py`) — XGBoost classifies AI systems into 4 EU AI Act risk levels (inaceptable, alto, limitado, mínimo). Full ML pipeline in `functions.py`: spaCy text cleaning, TF-IDF + manual keyword features, Grid Search with StratifiedKFold, SHAP explainability, MLflow tracking. Annexo III deterministic override (9 regex patterns). Includes deterministic compliance checklist with obligations, SHAP-based recommendations, and borderline detection. Results cached via `lru_cache`.
 3. **Guardar preferencias** — `save_user_preference`: stores user preferences/context in an `InMemoryStore` namespaced by `user_id` or `thread_id`.
 4. **Recuperar preferencias** — `get_user_preferences`: retrieves stored preferences for personalized responses.
 
@@ -41,7 +41,7 @@ Both share similar function signatures but differ in: `evaluar_modelo()` (root t
 # Lint
 ruff check .
 
-# Tests (5 suites, ~88 tests)
+# Tests (5 suites, ~108 tests)
 pytest tests/ -v
 
 # Run single test file
@@ -84,7 +84,7 @@ pip install -r requirements/infra.txt  # AWS, DVC, Langfuse, RAGAS
 
 ## Infrastructure
 
-- **CI/CD**: GitHub Actions — `pr_lint.yml` (ruff on changed .py/.ipynb files), `ci-develop.yml` (lint → Docker build to ghcr.io :develop), `cicd-main.yml` (lint → Docker build → deploy to EC2 via SSH)
+- **CI/CD**: GitHub Actions — `pr_lint.yml` (ruff on changed .py/.ipynb files), `ci-develop.yml` (lint → smoke tests → Docker build to ghcr.io :develop), `cicd-main.yml` (lint → smoke tests → Docker build → deploy to EC2 via SSH), `eval.yml` (RAGAS evaluation on EC2, manual trigger via `workflow_dispatch`)
 - **Docker**: `python:3.12-slim`, port 8080, healthcheck on `/_stcore/health`
 - **IaC**: `infra/terraform/` (VPC, EC2, S3, IAM for Bedrock) + `infra/ansible/` (docker-compose deploy, nginx, MLflow server)
 - **DVC**: configured for data versioning; `data/raw/`, `data/processed/vectorstore/` and `data/processed/chunks_legal/*.jsonl` are gitignored. DVC metadata (`.dvc` files) tracked in `data/processed/`.
@@ -98,7 +98,7 @@ pip install -r requirements/infra.txt  # AWS, DVC, Langfuse, RAGAS
   - `data/notebooks/` — evaluation notebooks (embeddings tuning, retrieval tests, complex queries)
 - **Container registry**: `ghcr.io/maquinas-que-aprenden/proyecto-final`
 - **Ollama**: Local LLM inference. Used for RAG document grading (Qwen 2.5 3B). Install: `brew install ollama`. Pull model: `ollama pull qwen2.5:3b`. Start: `brew services start ollama`. In Docker/EC2: needs Ollama sidecar or pre-installed.
-- **Langfuse**: v2 (`>=2.7.3,<3.0.0`) for observability. All tools and pipeline functions decorated with `@observe`. Disabled in tests via `LANGFUSE_ENABLED=false`. Known limitation: root LangGraph trace via `CallbackHandler` not available due to langchain 0.3 incompatibility; individual tool traces work via `@observe`.
+- **Langfuse**: v2 (`>=2.7.3,<3.0.0`) for observability. All tools and pipeline functions decorated with `@observe`. `src/observability/main.py` provides `get_langfuse_handler()` for LangChain `CallbackHandler` integration. Disabled in tests via `LANGFUSE_ENABLED=false`. Known limitation: root LangGraph trace via `CallbackHandler` not available due to langchain 0.3 incompatibility; individual tool traces work via `@observe`.
 - **CodeRabbit**: configured in `.coderabbit.yaml` — reviews focus only on logic/security/performance bugs, all style linters disabled
 
 ## Key Domain Rules
@@ -119,6 +119,9 @@ Required in `.env`:
 - `MLFLOW_TRACKING_INSECURE_TLS` — set if using self-signed certs
 - `NORMABOT_MEMORY_DIR` — defaults to `data/memory` (SQLite conversations DB)
 - `LANGFUSE_ENABLED` — set to `false` in tests (via `conftest.py`)
+- `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` — Langfuse auth
+- `LANGFUSE_HOST` — defaults to `https://cloud.langfuse.com`
+- `APP_VERSION` — defaults to `dev` (sent to Langfuse for trace versioning)
 
 ## Team
 
