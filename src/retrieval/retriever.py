@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+import re
 import threading
 try:
     from langfuse.decorators import observe, langfuse_context
@@ -80,6 +81,14 @@ def _format_results(results: Dict[str, Any]) -> List[Dict[str, Any]]:
     return formatted
 
 
+def _detect_article_number(query: str) -> Optional[str]:
+    """Detecta si la query menciona un artículo específico por número."""
+    m = re.search(r'\bart[íi]culo\s+(\d+)\b', query, flags=re.IGNORECASE)
+    if m:
+        return m.group(1)
+    return None
+
+
 def _detect_priority_sources(query: str) -> Optional[List[str]]:
     query_lower = query.lower()
 
@@ -113,6 +122,7 @@ def search_base(query: str, k: int = DEFAULT_K) -> List[Dict[str, Any]]:
 
 def search_soft(query: str, k: int = DEFAULT_K) -> List[Dict[str, Any]]:
     priority_sources = _detect_priority_sources(query)
+    article_num = _detect_article_number(query)
 
     collection = _get_collection()
     results = collection.query(
@@ -122,23 +132,27 @@ def search_soft(query: str, k: int = DEFAULT_K) -> List[Dict[str, Any]]:
 
     formatted = _format_results(results)
 
-    if not priority_sources:
+    if not priority_sources and not article_num:
         return formatted[:k]
 
-    priority_hits = []
+    article_hits = []
+    source_hits = []
     other_hits = []
 
     for hit in formatted:
-        source = hit.get("metadata", {}).get("source", "")
+        meta = hit.get("metadata", {})
+        unit_id = str(meta.get("unit_id", ""))
+        source = meta.get("source", "")
 
-        if source in priority_sources:
-            priority_hits.append(hit)
+        if article_num and unit_id == article_num:
+            # El artículo mencionado explícitamente va primero
+            article_hits.append(hit)
+        elif priority_sources and source in priority_sources:
+            source_hits.append(hit)
         else:
             other_hits.append(hit)
 
-    ordered = priority_hits + other_hits
-
-    return ordered[:k]
+    return (article_hits + source_hits + other_hits)[:k]
 
 
 # API principal
