@@ -1,0 +1,146 @@
+[
+  {
+    "query": "¿Qué prácticas de IA están prohibidas según el EU AI Act?",
+    "document": "Artículo 5. Quedan prohibidas las siguientes prácticas de IA: a) sistemas que utilicen técnicas subliminales para alterar el comportamiento de una persona de manera que cause o pueda causar perjuicio físico o psicológico; b) sistemas que exploten vulnerabilidades de grupos específicos de personas.",
+    "label": "si",
+    "nota": "Habla directamente de prácticas prohibidas — relevante"
+  },
+  {
+    "query": "¿Qué prácticas de IA están prohibidas según el EU AI Act?",
+    "document": "Artículo 9. Se establecerá un sistema de gestión de riesgos en relación con los sistemas de IA de alto riesgo. Consistirá en un proceso iterativo continuo planificado y ejecutado durante todo el ciclo de vida del sistema.",
+    "label": "no",
+    "nota": "Habla de gestión de riesgos, no de prohibiciones — irrelevante"
+  },
+  {
+    "query": "¿Cuándo se considera que un sistema de IA es de alto riesgo?",
+    "document": "Artículo 6. Un sistema de IA se considerará de alto riesgo cuando esté comprendido en alguno de los ámbitos del Anexo III y presente un riesgo significativo de perjuicio para la salud, la seguridad o los derechos fundamentales.",
+    "label": "si",
+    "nota": "Define directamente cuándo un sistema es de alto riesgo — relevante"
+  },
+  {
+    "query": "¿Cuándo se considera que un sistema de IA es de alto riesgo?",
+    "document": "Artículo 52. Los proveedores garantizarán que los sistemas de IA destinados a interactuar con personas físicas se diseñen de modo que las personas sean informadas de que están interactuando con un sistema de IA.",
+    "label": "no",
+    "nota": "Habla de transparencia hacia usuarios, no de clasificación de riesgo — irrelevante"
+  },
+  {
+    "query": "¿Qué obligaciones tiene un proveedor de IA de alto riesgo respecto a la documentación técnica?",
+    "document": "Artículo 11. Los proveedores de sistemas de IA de alto riesgo elaborarán la documentación técnica del sistema antes de que este se introduzca en el mercado o se ponga en servicio, y la mantendrán actualizada.",
+    "label": "si",
+    "nota": "Describe exactamente las obligaciones de documentación técnica — relevante"
+  },
+  {
+    "query": "¿Qué obligaciones tiene un proveedor de IA de alto riesgo respecto a la documentación técnica?",
+    "document": "Artículo 71. Las infracciones de las prácticas prohibidas del artículo 5 estarán sujetas a multas administrativas de hasta 35 000 000 EUR o el 7% del volumen de negocios total anual mundial.",
+    "label": "no",
+    "nota": "Habla de sanciones económicas, no de documentación técnica — irrelevante"
+  },
+  {
+    "query": "¿Qué multas prevé el EU AI Act por incumplimiento?",
+    "document": "Artículo 71. Las infracciones de las prácticas prohibidas del artículo 5 estarán sujetas a multas administrativas de hasta 35 000 000 EUR o el 7% del volumen de negocios total anual mundial del ejercicio precedente.",
+    "label": "si",
+    "nota": "Habla directamente de multas — relevante"
+  },
+  {
+    "query": "¿Qué multas prevé el EU AI Act por incumplimiento?",
+    "document": "Artículo 14. Los sistemas de IA de alto riesgo se diseñarán y desarrollarán de modo que puedan ser vigilados de manera efectiva por personas físicas durante su período de utilización.",
+    "label": "no",
+    "nota": "Habla de supervisión humana, no de sanciones — irrelevante"
+  },
+  {
+    "query": "¿Qué dice el EU AI Act sobre la supervisión humana?",
+    "document": "Artículo 14. Los sistemas de IA de alto riesgo se diseñarán y desarrollarán de modo que puedan ser vigilados de manera efectiva por personas físicas durante su período de utilización, incluida la posibilidad de intervención humana.",
+    "label": "si",
+    "nota": "Trata exactamente de la supervisión humana — relevante"
+  },
+  {
+    "query": "¿Qué dice el EU AI Act sobre la supervisión humana?",
+    "document": "Artículo 10. Los conjuntos de datos de entrenamiento, validación y prueba estarán sujetos a prácticas de gobernanza y gestión de datos adecuadas al fin previsto del sistema de IA de alto riesgo.",
+    "label": "no",
+    "nota": "Habla de datos, no de supervisión humana — irrelevante"
+  },
+  {
+    "query": "¿Qué requisitos de gobernanza de datos exige el EU AI Act?",
+    "document": "Artículo 10. Los conjuntos de datos de entrenamiento, validación y prueba estarán sujetos a prácticas de gobernanza y gestión de datos adecuadas al fin previsto del sistema de IA de alto riesgo.",
+    "label": "si",
+    "nota": "Habla directamente de gobernanza de datos — relevante"
+  },
+  {
+    "query": "¿Qué requisitos de gobernanza de datos exige el EU AI Act?",
+    "document": "Anexo III. Sistemas de IA de alto riesgo contemplados en el artículo 6, apartado 2: 1) Infraestructuras críticas. 2) Educación y formación profesional. 3) Empleo, gestión de trabajadores.",
+    "label": "no",
+    "nota": "Lista categorías de alto riesgo, no requisitos de datos — irrelevante"
+  },
+  {
+    "query": "¿Están obligados los sistemas de IA a informar a los usuarios de que están interactuando con una IA?",
+    "document": "Artículo 52. Los proveedores garantizarán que los sistemas de IA destinados a interactuar con personas físicas se diseñen de modo que las personas sean informadas de que están interactuando con un sistema de IA.",
+    "label": "si",
+    "nota": "Responde directamente a la obligación de informar — relevante"
+  },
+  {
+    "query": "¿Están obligados los sistemas de IA a informar a los usuarios de que están interactuando con una IA?",
+    "document": "Artículo 9. Se establecerá un sistema de gestión de riesgos en relación con los sistemas de IA de alto riesgo. Consistirá en un proceso iterativo continuo planificado y ejecutado durante todo el ciclo de vida del sistema.",
+    "label": "no",
+    "nota": "Habla de gestión de riesgos, no de obligaciones de transparencia — irrelevante"
+  },
+  {
+    "query": "¿Qué sistemas de IA están incluidos en el Anexo III del EU AI Act?",
+    "document": "Anexo III. Sistemas de IA de alto riesgo contemplados en el artículo 6, apartado 2: 1) Infraestructuras críticas. 2) Educación y formación profesional. 3) Empleo, gestión de trabajadores y acceso al trabajo por cuenta propia. 4) Acceso a servicios privados esenciales y servicios públicos. 5) Aplicación de la ley.",
+    "label": "si",
+    "nota": "Lista exactamente los sistemas del Anexo III — relevante"
+  },
+  {
+    "query": "¿Qué sistemas de IA están incluidos en el Anexo III del EU AI Act?",
+    "document": "Artículo 5. Quedan prohibidas las siguientes prácticas de IA: sistemas que utilicen técnicas subliminales para alterar el comportamiento de una persona de manera que cause perjuicio físico o psicológico.",
+    "label": "no",
+    "nota": "Habla de prácticas prohibidas, no del Anexo III — irrelevante"
+  },
+  {
+    "query": "¿Qué es el sistema de gestión de riesgos del EU AI Act?",
+    "document": "Artículo 9. Se establecerá un sistema de gestión de riesgos en relación con los sistemas de IA de alto riesgo. Consistirá en un proceso iterativo continuo planificado y ejecutado durante todo el ciclo de vida del sistema de IA.",
+    "label": "si",
+    "nota": "Define el sistema de gestión de riesgos — relevante"
+  },
+  {
+    "query": "¿Qué es el sistema de gestión de riesgos del EU AI Act?",
+    "document": "Artículo 52. Los proveedores garantizarán que los sistemas de IA destinados a interactuar con personas sean informadas de que están interactuando con un sistema de IA, salvo que sea evidente por el contexto.",
+    "label": "no",
+    "nota": "Habla de transparencia al usuario, no de gestión de riesgos — irrelevante"
+  },
+  {
+    "query": "¿Qué obliga la LOPD-GDD respecto a las evaluaciones de impacto?",
+    "document": "Artículo 80 bis de la LOPD-GDD. El responsable del tratamiento deberá realizar una evaluación de impacto cuando el tratamiento entrañe un alto riesgo para los derechos y libertades de las personas físicas.",
+    "label": "si",
+    "nota": "Responde directamente sobre evaluaciones de impacto en LOPD — relevante"
+  },
+  {
+    "query": "¿Qué obliga la LOPD-GDD respecto a las evaluaciones de impacto?",
+    "document": "Artículo 6. Un sistema de IA se considerará de alto riesgo cuando esté comprendido en alguno de los ámbitos del Anexo III y presente un riesgo significativo para la salud, la seguridad o los derechos fundamentales.",
+    "label": "no",
+    "nota": "Clasifica sistemas de IA, no habla de la LOPD ni de evaluaciones de impacto — irrelevante"
+  },
+  {
+    "query": "¿Cuáles son los requisitos de transparencia para sistemas de IA de riesgo limitado?",
+    "document": "Artículo 52. Los proveedores de sistemas de IA que interactúen con personas o generen contenido sintético deberán informar a los usuarios de ello. Para chatbots, la obligación de informar aplica salvo que sea obvio por el contexto.",
+    "label": "si",
+    "nota": "Habla de transparencia para sistemas con interacción con personas (riesgo limitado) — relevante"
+  },
+  {
+    "query": "¿Cuáles son los requisitos de transparencia para sistemas de IA de riesgo limitado?",
+    "document": "Artículo 71. Las infracciones de las prácticas prohibidas del artículo 5 estarán sujetas a multas administrativas de hasta 35 000 000 EUR o el 7% del volumen de negocios total anual mundial.",
+    "label": "no",
+    "nota": "Habla de sanciones, no de transparencia ni riesgo limitado — irrelevante"
+  },
+  {
+    "query": "¿Qué es el Comité Europeo de Inteligencia Artificial?",
+    "document": "Artículo 9. Se establecerá un sistema de gestión de riesgos en relación con los sistemas de IA de alto riesgo. Consistirá en un proceso iterativo continuo planificado y ejecutado durante todo el ciclo de vida del sistema.",
+    "label": "no",
+    "nota": "No menciona el Comité Europeo de IA — irrelevante"
+  },
+  {
+    "query": "¿Qué es el Comité Europeo de Inteligencia Artificial?",
+    "document": "Artículo 6. Un sistema de IA se considerará de alto riesgo cuando esté comprendido en alguno de los ámbitos del Anexo III.",
+    "label": "no",
+    "nota": "Clasifica sistemas, no describe el Comité Europeo de IA — irrelevante"
+  }
+]
