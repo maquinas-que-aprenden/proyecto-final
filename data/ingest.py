@@ -321,6 +321,10 @@ def main() -> None:
 
     all_chunks = boe_chunks + eu_chunks + aesia_chunks + lopd_chunks
 
+    if not all_chunks:
+        print("\n[ERROR] No se generaron chunks. Revisa rutas de data/raw y patrones de chunking.")
+        return
+
     print(f"  BOE: {len(boe_chunks)} chunks")
     print(f"  EU AI Act: {len(eu_chunks)} chunks")
     print(f"  AESIA: {len(aesia_chunks)} chunks")
