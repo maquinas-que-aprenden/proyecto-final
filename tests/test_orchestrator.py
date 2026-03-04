@@ -1,20 +1,19 @@
 """test_orchestrator.py — Tests del agente ReAct orquestador y sus herramientas.
 
-¿Qué se prueba?
-1. Estructura de las tools: tienen nombre, descripción y son invocables.
-2. Validación Pydantic de entrada: textos vacíos devuelven "Error de validacion".
-3. Comportamiento de classify_risk: formatea correctamente la salida de predict_risk.
-4. Comportamiento de search_legal_docs: propaga el pipeline RAG (retrieve→grade→generate).
-5. Comportamiento de generate_report: clasifica, busca artículos y llama al generador.
-6. run(): devuelve dict con "messages" usando un agente mockeado.
+Que se prueba:
+1. Estructura de las tools: tienen nombre, descripcion y son invocables.
+2. Validacion Pydantic de entrada: textos vacios devuelven "Error de validacion".
+3. Comportamiento de classify_risk: formatea clasificacion + checklist de cumplimiento.
+4. Comportamiento de search_legal_docs: propaga el pipeline RAG (retrieve->grade->generate).
+5. run(): devuelve dict con "messages" usando un agente mockeado.
 
 Estrategia de mocking
-langchain_aws, langchain_core y langgraph no están instalados en venv_proyecto
-(son dependencias de producción/app, no de ML). Se inyectan como MagicMock en
+langchain_aws, langchain_core y langgraph no estan instalados en venv_proyecto
+(son dependencias de produccion/app, no de ML). Se inyectan como MagicMock en
 sys.modules antes de importar src.orchestrator.main, igual que hace
 test_rag_generate.py con langchain_aws. El teardown_module restaura el estado.
 
-¿Cómo ejecutar?
+Como ejecutar:
     pytest tests/test_orchestrator.py -v
 """
 
@@ -25,7 +24,7 @@ from unittest.mock import MagicMock, patch
 
 
 # ---------------------------------------------------------------------------
-# Inyección de mocks de módulos no instalados en venv_proyecto
+# Inyeccion de mocks de modulos no instalados en venv_proyecto
 # ---------------------------------------------------------------------------
 
 _mocked_modules: dict[str, object] = {}
@@ -43,10 +42,10 @@ _mock_langchain_aws.ChatBedrockConverse = MagicMock()
 
 # langchain_core.tools — solo mockeamos el submodulo tools (no el parent
 # langchain_core) para no romper imports de langchain_core.messages, .tracers, etc.
-# El decorador @tool debe devolver la función sin modificarla para que los tests
+# El decorador @tool debe devolver la funcion sin modificarla para que los tests
 # puedan llamarla directamente. Usamos un wrapper real (no MagicMock).
 def _passthrough_tool(func=None, **kwargs):
-    """Stub de @tool: devuelve la función con atributos mínimos de LangChain tool."""
+    """Stub de @tool: devuelve la funcion con atributos minimos de LangChain tool."""
     if func is None:
         return _passthrough_tool
     func.name = func.__name__
@@ -76,14 +75,13 @@ _mock_lg_store = _inject_module_mock("langgraph.store")
 _mock_lg_store_memory = _inject_module_mock("langgraph.store.memory")
 _mock_lg_store_memory.InMemoryStore = MagicMock(return_value=MagicMock())
 
-# Importar el módulo DESPUÉS de los mocks
+# Importar el modulo DESPUES de los mocks
 import src.orchestrator.main as orch_module  # noqa: E402
 from src.orchestrator.main import (  # noqa: E402
     SYSTEM_PROMPT,
     _tool_metadata,
     search_legal_docs,
     classify_risk,
-    generate_report,
     run,
 )
 
@@ -105,25 +103,22 @@ class TestSystemPrompt:
     """El prompt del agente incluye los requisitos de dominio no negociables."""
 
     def test_contiene_disclaimer_legal(self):
-        """Requisito de dominio: toda respuesta debe indicar que es un informe preliminar."""
-        assert "Informe preliminar generado por IA. Consulte profesional jurídico." in SYSTEM_PROMPT
+        assert "Informe preliminar generado por IA. Consulte profesional juridico." in SYSTEM_PROMPT
 
     def test_menciona_eu_ai_act(self):
-        """El agente debe saber que su dominio es el EU AI Act y el BOE."""
         assert "EU AI Act" in SYSTEM_PROMPT
 
     def test_instruye_citar_fuentes(self):
-        """El agente debe citar fuentes legales exactas, no responder de memoria."""
-        assert "fuentes" in SYSTEM_PROMPT.lower() or "cita" in SYSTEM_PROMPT.lower()
+        assert "cita" in SYSTEM_PROMPT.lower() or "fuentes" in SYSTEM_PROMPT.lower()
 
     def test_instruye_usar_herramientas(self):
-        """El agente debe usar las herramientas disponibles antes de responder."""
         assert "herramienta" in SYSTEM_PROMPT.lower()
 
-    def test_generate_report_docstring_indica_clasificacion_interna(self):
-        """BUG-04: el docstring de generate_report debe advertir que clasifica internamente."""
-        assert "clasifica" in generate_report.description.lower() or "clasificación" in generate_report.description.lower()
-        assert "no es necesario" in generate_report.description.lower() or "no llam" in generate_report.description.lower()
+    def test_describe_classify_risk(self):
+        assert "classify_risk" in SYSTEM_PROMPT
+
+    def test_describe_search_legal_docs(self):
+        assert "search_legal_docs" in SYSTEM_PROMPT
 
 
 # ---------------------------------------------------------------------------
@@ -131,7 +126,7 @@ class TestSystemPrompt:
 # ---------------------------------------------------------------------------
 
 class TestToolsDefinidas:
-    """Las 3 tools tienen nombre correcto y descripción no vacía."""
+    """Las 2 tools tienen nombre correcto y descripcion no vacia."""
 
     def test_search_legal_docs_nombre(self):
         assert search_legal_docs.name == "search_legal_docs"
@@ -139,20 +134,26 @@ class TestToolsDefinidas:
     def test_classify_risk_nombre(self):
         assert classify_risk.name == "classify_risk"
 
-    def test_generate_report_nombre(self):
-        assert generate_report.name == "generate_report"
-
     def test_todas_tienen_descripcion(self):
-        for t in [search_legal_docs, classify_risk, generate_report]:
-            assert t.description, f"Tool '{t.name}' no tiene descripción"
+        for t in [search_legal_docs, classify_risk]:
+            assert t.description, f"Tool '{t.name}' no tiene descripcion"
+
+    def test_build_agent_expone_solo_dos_tools(self):
+        """No-regresion: _build_agent pasa exactamente [search_legal_docs, classify_risk]."""
+        with patch.object(orch_module, "ChatBedrockConverse"), \
+             patch.object(orch_module, "create_react_agent", return_value=MagicMock()) as mock_create:
+            orch_module._build_agent()
+
+        tools = mock_create.call_args.args[1]
+        assert [t.name for t in tools] == ["search_legal_docs", "classify_risk"]
 
 
 # ---------------------------------------------------------------------------
-# Grupo 2: Validación Pydantic de entrada
+# Grupo 2: Validacion Pydantic de entrada
 # ---------------------------------------------------------------------------
 
 class TestValidacionEntrada:
-    """Entradas inválidas devuelven 'Error de validacion' sin lanzar excepción."""
+    """Entradas invalidas devuelven 'Error de validacion' sin lanzar excepcion."""
 
     def test_classify_risk_rechaza_texto_vacio(self):
         result = classify_risk.invoke({"system_description": ""})
@@ -162,17 +163,13 @@ class TestValidacionEntrada:
         result = search_legal_docs.invoke({"query": ""})
         assert "Error" in result
 
-    def test_generate_report_rechaza_texto_vacio(self):
-        result = generate_report.invoke({"system_description": ""})
-        assert "Error" in result
-
 
 # ---------------------------------------------------------------------------
-# Grupo 3: classify_risk formatea la respuesta de predict_risk
+# Grupo 3: classify_risk devuelve clasificacion + checklist
 # ---------------------------------------------------------------------------
 
 class TestClassifyRiskTool:
-    """classify_risk transforma el dict de predict_risk en texto legible."""
+    """classify_risk transforma predict_risk en checklist de cumplimiento."""
 
     def setup_method(self):
         orch_module._cached_predict_risk.cache_clear()
@@ -181,33 +178,83 @@ class TestClassifyRiskTool:
         orch_module._cached_predict_risk.cache_clear()
 
     @patch.object(orch_module, "predict_risk")
-    def test_risk_level_en_mayusculas(self, mock_predict):
-        mock_predict.return_value = {"risk_level": "alto_riesgo", "confidence": 0.85}
+    def test_incluye_nivel_de_riesgo(self, mock_predict):
+        mock_predict.return_value = {
+            "risk_level": "alto_riesgo",
+            "confidence": 0.85,
+            "probabilities": {},
+        }
         result = classify_risk.invoke({"system_description": "sistema de scoring crediticio"})
         assert "ALTO_RIESGO" in result
 
     @patch.object(orch_module, "predict_risk")
-    def test_confianza_formateada_como_porcentaje(self, mock_predict):
-        mock_predict.return_value = {"risk_level": "alto_riesgo", "confidence": 0.85}
+    def test_incluye_confianza(self, mock_predict):
+        mock_predict.return_value = {
+            "risk_level": "alto_riesgo",
+            "confidence": 0.85,
+            "probabilities": {},
+        }
         result = classify_risk.invoke({"system_description": "sistema de scoring crediticio"})
         assert "85%" in result
 
     @patch.object(orch_module, "predict_risk")
-    def test_incluye_shap_cuando_disponible(self, mock_predict):
+    def test_incluye_obligaciones(self, mock_predict):
         mock_predict.return_value = {
             "risk_level": "alto_riesgo",
             "confidence": 0.9,
-            "shap_top_features": [{"feature": "crediticio", "contribution": 0.5}],
-            "shap_explanation": "Factores principales: crediticio.",
+            "probabilities": {},
         }
         result = classify_risk.invoke({"system_description": "scoring crediticio"})
+        assert "OBLIGACIONES APLICABLES" in result
+        assert "Art. 9" in result
+
+    @patch.object(orch_module, "predict_risk")
+    def test_incluye_shap_recommendations(self, mock_predict):
+        mock_predict.return_value = {
+            "risk_level": "alto_riesgo",
+            "confidence": 0.9,
+            "probabilities": {},
+            "shap_top_features": [{"feature": "crediticio", "contribution": 0.5}],
+        }
+        result = classify_risk.invoke({"system_description": "scoring crediticio"})
+        assert "RECOMENDACIONES ESPECIFICAS" in result
         assert "crediticio" in result
 
     @patch.object(orch_module, "predict_risk")
-    def test_sin_shap_no_lanza_error(self, mock_predict):
-        mock_predict.return_value = {"risk_level": "riesgo_minimo", "confidence": 0.7}
+    def test_incluye_borderline_warning(self, mock_predict):
+        mock_predict.return_value = {
+            "risk_level": "alto_riesgo",
+            "confidence": 0.72,
+            "probabilities": {
+                "alto_riesgo": 0.72,
+                "inaceptable": 0.22,
+                "riesgo_limitado": 0.04,
+                "riesgo_minimo": 0.02,
+            },
+        }
+        result = classify_risk.invoke({"system_description": "sistema borderline"})
+        assert "ADVERTENCIA BORDERLINE" in result
+
+    @patch.object(orch_module, "predict_risk")
+    def test_riesgo_minimo_sin_obligaciones_mandatory(self, mock_predict):
+        mock_predict.return_value = {
+            "risk_level": "riesgo_minimo",
+            "confidence": 0.7,
+            "probabilities": {},
+        }
         result = classify_risk.invoke({"system_description": "filtro de spam"})
         assert "RIESGO_MINIMO" in result
+        assert "[VOLUNTARIO]" in result
+
+    @patch.object(orch_module, "predict_risk")
+    def test_incluye_disclaimer(self, mock_predict):
+        mock_predict.return_value = {
+            "risk_level": "riesgo_minimo",
+            "confidence": 0.7,
+            "probabilities": {},
+        }
+        result = classify_risk.invoke({"system_description": "filtro de spam"})
+        assert "Informe preliminar generado por IA" in result
 
 
 # ---------------------------------------------------------------------------
@@ -215,168 +262,37 @@ class TestClassifyRiskTool:
 # ---------------------------------------------------------------------------
 
 class TestSearchLegalDocsTool:
-    """search_legal_docs llama a retrieve→grade→generate y maneja casos vacíos."""
+    """search_legal_docs llama a retrieve->grade->generate y maneja casos vacios."""
 
     @patch("src.rag.main.retrieve", return_value=[])
     def test_sin_documentos_devuelve_mensaje(self, _mock):
-        result = search_legal_docs.invoke({"query": "¿qué dice el artículo 5?"})
+        result = search_legal_docs.invoke({"query": "que dice el articulo 5?"})
         assert "No se encontraron" in result
 
     @patch("src.rag.main.grade", return_value=[])
     @patch("src.rag.main.retrieve")
     def test_sin_relevantes_devuelve_mensaje(self, mock_retrieve, _mock_grade):
         mock_retrieve.return_value = [{"doc": "texto", "metadata": {}, "score": 0.3}]
-        result = search_legal_docs.invoke({"query": "¿qué dice el artículo 5?"})
+        result = search_legal_docs.invoke({"query": "que dice el articulo 5?"})
         assert "ninguno fue relevante" in result
 
     @patch("src.rag.main.generate")
     @patch("src.rag.main.grade")
     @patch("src.rag.main.retrieve")
     def test_con_documentos_devuelve_respuesta(self, mock_retrieve, mock_grade, mock_generate):
-        mock_retrieve.return_value = [{"doc": "Art. 5 prohíbe X", "metadata": {}, "score": 0.9}]
-        mock_grade.return_value = [{"doc": "Art. 5 prohíbe X", "metadata": {}, "score": 0.9}]
+        mock_retrieve.return_value = [{"doc": "Art. 5 prohibe X", "metadata": {}, "score": 0.9}]
+        mock_grade.return_value = [{"doc": "Art. 5 prohibe X", "metadata": {}, "score": 0.9}]
         mock_generate.return_value = {
-            "answer": "Según el Art. 5 del EU AI Act...",
+            "answer": "Segun el Art. 5 del EU AI Act...",
             "sources": [],
             "grounded": True,
         }
-        result = search_legal_docs.invoke({"query": "¿qué dice el artículo 5?"})
+        result = search_legal_docs.invoke({"query": "que dice el articulo 5?"})
         assert "Art. 5" in result
 
 
 # ---------------------------------------------------------------------------
-# Grupo 5: generate_report clasifica y construye el informe
-# ---------------------------------------------------------------------------
-
-class TestGenerateReportTool:
-    """generate_report llama a predict_risk, retriever y report.generate_report."""
-
-    def setup_method(self):
-        orch_module._cached_predict_risk.cache_clear()
-
-    def teardown_method(self):
-        orch_module._cached_predict_risk.cache_clear()
-
-    @patch("src.report.main.generate_report")
-    @patch("src.retrieval.retriever.search")
-    @patch.object(orch_module, "predict_risk")
-    def test_genera_informe(self, mock_predict, mock_search, mock_report):
-        mock_predict.return_value = {"risk_level": "alto_riesgo", "confidence": 0.9}
-        mock_search.return_value = []
-        mock_report.return_value = "## Informe de Cumplimiento\n..."
-
-        result = generate_report.invoke({"system_description": "sistema de scoring crediticio"})
-
-        assert result
-        mock_report.assert_called_once()
-
-    @patch("src.report.main.generate_report")
-    @patch("src.retrieval.retriever.search")
-    @patch.object(orch_module, "predict_risk")
-    def test_pasa_risk_level_al_informe(self, mock_predict, mock_search, mock_report):
-        mock_predict.return_value = {"risk_level": "inaceptable", "confidence": 0.95}
-        mock_search.return_value = []
-        mock_report.return_value = "## Informe\n..."
-
-        generate_report.invoke({"system_description": "sistema de puntuación social"})
-
-        call_args = mock_report.call_args
-        assert call_args[0][1] == "inaceptable"
-
-    @patch("src.report.main.generate_report")
-    @patch("src.retrieval.retriever.search")
-    @patch.object(orch_module, "predict_risk")
-    def test_report_alto_riesgo_busca_multiples_articulos(self, mock_predict, mock_search, mock_report):
-        """Para alto_riesgo se hace una búsqueda por cada obligación (6 queries con k=1)."""
-        mock_predict.return_value = {"risk_level": "alto_riesgo", "confidence": 0.9}
-        mock_search.return_value = [
-            {"id": "unique", "text": "texto", "metadata": {"source": "EU AI Act", "unit_title": "Art. X"}},
-        ]
-        mock_report.return_value = "## Informe\n..."
-
-        generate_report.invoke({"system_description": "sistema de scoring crediticio"})
-
-        # alto_riesgo tiene 6 queries en _REPORT_QUERIES → 6 llamadas a search
-        assert mock_search.call_count == 6
-        # Cada llamada debe usar k=1
-        for call in mock_search.call_args_list:
-            assert call[1].get("k", call[0][1] if len(call[0]) > 1 else None) == 1
-
-    @patch("src.report.main.generate_report")
-    @patch("src.retrieval.retriever.search")
-    @patch.object(orch_module, "predict_risk")
-    def test_report_deduplica_resultados(self, mock_predict, mock_search, mock_report):
-        """Si dos queries devuelven el mismo doc_id, el artículo no se duplica."""
-        mock_predict.return_value = {"risk_level": "alto_riesgo", "confidence": 0.9}
-        # Todas las queries devuelven el mismo documento (mismo id)
-        mock_search.return_value = [
-            {"id": "chunk_42", "text": "texto legal", "metadata": {"source": "EU AI Act", "unit_title": "Art. 9"}},
-        ]
-        mock_report.return_value = "## Informe\n..."
-
-        generate_report.invoke({"system_description": "sistema de scoring crediticio"})
-
-        # Se llamó a _build_report con articles; como todos tienen el mismo id,
-        # solo debe haber 1 artículo (no 6 duplicados)
-        call_args = mock_report.call_args
-        articles_arg = call_args[0][2]
-        assert len(articles_arg) == 1
-
-
-# ---------------------------------------------------------------------------
-# Grupo 5b: BUG-04 — caché evita doble computación classify+report
-# ---------------------------------------------------------------------------
-
-class TestNoDobleClasificacion:
-    """BUG-04: predict_risk no debe ejecutarse dos veces si classify_risk
-    y generate_report reciben la misma descripción en la misma sesión.
-
-    El lru_cache de _cached_predict_risk garantiza que la segunda llamada
-    devuelve el resultado cacheado sin volver a ejecutar el modelo ML.
-    """
-
-    def setup_method(self):
-        orch_module._cached_predict_risk.cache_clear()
-
-    def teardown_method(self):
-        orch_module._cached_predict_risk.cache_clear()
-
-    @patch("src.report.main.generate_report")
-    @patch("src.retrieval.retriever.search")
-    @patch.object(orch_module, "predict_risk")
-    def test_predict_risk_llamado_una_sola_vez(self, mock_predict, mock_search, mock_report):
-        """predict_risk se ejecuta una sola vez aunque classify_risk y generate_report reciban el mismo input."""
-        mock_predict.return_value = {"risk_level": "alto_riesgo", "confidence": 0.9}
-        mock_search.return_value = []
-        mock_report.return_value = "## Informe\n..."
-
-        descripcion = "sistema de evaluacion de solvencia crediticia para prestamos"
-        classify_risk.invoke({"system_description": descripcion})
-        generate_report.invoke({"system_description": descripcion})
-
-        mock_predict.assert_called_once_with(descripcion)
-
-    @patch("src.report.main.generate_report")
-    @patch("src.retrieval.retriever.search")
-    @patch.object(orch_module, "predict_risk")
-    def test_inputs_distintos_llaman_predict_risk_dos_veces(self, mock_predict, mock_search, mock_report):
-        """Si el LLM pasa strings distintos a classify_risk y generate_report,
-        la caché no puede evitar la doble llamada. Este test documenta el
-        comportamiento esperado (limitación conocida de lru_cache por string exacto).
-        """
-        mock_predict.return_value = {"risk_level": "alto_riesgo", "confidence": 0.9}
-        mock_search.return_value = []
-        mock_report.return_value = "## Informe\n..."
-
-        classify_risk.invoke({"system_description": "sistema de scoring crediticio"})
-        # Input ligeramente diferente (como podría hacer el LLM)
-        generate_report.invoke({"system_description": "Sistema de scoring crediticio."})
-
-        assert mock_predict.call_count == 2
-
-
-# ---------------------------------------------------------------------------
-# Grupo 6: run() devuelve dict con messages
+# Grupo 5: run() devuelve dict con messages
 # ---------------------------------------------------------------------------
 
 class TestRun:
@@ -394,7 +310,7 @@ class TestRun:
         mock_agent.invoke.return_value = {"messages": [MagicMock(content="respuesta legal")]}
         mock_build.return_value = mock_agent
 
-        result = run("¿Qué riesgo tiene un chatbot?")
+        result = run("Que riesgo tiene un chatbot?")
         assert isinstance(result, dict)
 
     @patch.object(orch_module, "_build_agent")
@@ -420,7 +336,7 @@ class TestRun:
 
 
 # ---------------------------------------------------------------------------
-# Grupo 7: Side-channel de metadatos (ContextVar)
+# Grupo 6: Side-channel de metadatos (ContextVar)
 # ---------------------------------------------------------------------------
 
 class TestToolMetadata:
