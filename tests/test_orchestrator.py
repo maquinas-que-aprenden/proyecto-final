@@ -80,6 +80,7 @@ _mock_lg_store_memory.InMemoryStore = MagicMock(return_value=MagicMock())
 import src.orchestrator.main as orch_module  # noqa: E402
 from src.orchestrator.main import (  # noqa: E402
     SYSTEM_PROMPT,
+    _tool_metadata,
     search_legal_docs,
     classify_risk,
     generate_report,
@@ -118,6 +119,11 @@ class TestSystemPrompt:
     def test_instruye_usar_herramientas(self):
         """El agente debe usar las herramientas disponibles antes de responder."""
         assert "herramienta" in SYSTEM_PROMPT.lower()
+
+    def test_generate_report_docstring_indica_clasificacion_interna(self):
+        """BUG-04: el docstring de generate_report debe advertir que clasifica internamente."""
+        assert "clasifica" in generate_report.description.lower() or "clasificación" in generate_report.description.lower()
+        assert "no es necesario" in generate_report.description.lower() or "no llam" in generate_report.description.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -167,6 +173,12 @@ class TestValidacionEntrada:
 
 class TestClassifyRiskTool:
     """classify_risk transforma el dict de predict_risk en texto legible."""
+
+    def setup_method(self):
+        orch_module._cached_predict_risk.cache_clear()
+
+    def teardown_method(self):
+        orch_module._cached_predict_risk.cache_clear()
 
     @patch.object(orch_module, "predict_risk")
     def test_risk_level_en_mayusculas(self, mock_predict):
@@ -239,6 +251,12 @@ class TestSearchLegalDocsTool:
 class TestGenerateReportTool:
     """generate_report llama a predict_risk, retriever y report.generate_report."""
 
+    def setup_method(self):
+        orch_module._cached_predict_risk.cache_clear()
+
+    def teardown_method(self):
+        orch_module._cached_predict_risk.cache_clear()
+
     @patch("src.report.main.generate_report")
     @patch("src.retrieval.retriever.search")
     @patch.object(orch_module, "predict_risk")
@@ -264,6 +282,97 @@ class TestGenerateReportTool:
 
         call_args = mock_report.call_args
         assert call_args[0][1] == "inaceptable"
+
+    @patch("src.report.main.generate_report")
+    @patch("src.retrieval.retriever.search")
+    @patch.object(orch_module, "predict_risk")
+    def test_report_alto_riesgo_busca_multiples_articulos(self, mock_predict, mock_search, mock_report):
+        """Para alto_riesgo se hace una búsqueda por cada obligación (6 queries con k=1)."""
+        mock_predict.return_value = {"risk_level": "alto_riesgo", "confidence": 0.9}
+        mock_search.return_value = [
+            {"id": "unique", "text": "texto", "metadata": {"source": "EU AI Act", "unit_title": "Art. X"}},
+        ]
+        mock_report.return_value = "## Informe\n..."
+
+        generate_report.invoke({"system_description": "sistema de scoring crediticio"})
+
+        # alto_riesgo tiene 6 queries en _REPORT_QUERIES → 6 llamadas a search
+        assert mock_search.call_count == 6
+        # Cada llamada debe usar k=1
+        for call in mock_search.call_args_list:
+            assert call[1].get("k", call[0][1] if len(call[0]) > 1 else None) == 1
+
+    @patch("src.report.main.generate_report")
+    @patch("src.retrieval.retriever.search")
+    @patch.object(orch_module, "predict_risk")
+    def test_report_deduplica_resultados(self, mock_predict, mock_search, mock_report):
+        """Si dos queries devuelven el mismo doc_id, el artículo no se duplica."""
+        mock_predict.return_value = {"risk_level": "alto_riesgo", "confidence": 0.9}
+        # Todas las queries devuelven el mismo documento (mismo id)
+        mock_search.return_value = [
+            {"id": "chunk_42", "text": "texto legal", "metadata": {"source": "EU AI Act", "unit_title": "Art. 9"}},
+        ]
+        mock_report.return_value = "## Informe\n..."
+
+        generate_report.invoke({"system_description": "sistema de scoring crediticio"})
+
+        # Se llamó a _build_report con articles; como todos tienen el mismo id,
+        # solo debe haber 1 artículo (no 6 duplicados)
+        call_args = mock_report.call_args
+        articles_arg = call_args[0][2]
+        assert len(articles_arg) == 1
+
+
+# ---------------------------------------------------------------------------
+# Grupo 5b: BUG-04 — caché evita doble computación classify+report
+# ---------------------------------------------------------------------------
+
+class TestNoDobleClasificacion:
+    """BUG-04: predict_risk no debe ejecutarse dos veces si classify_risk
+    y generate_report reciben la misma descripción en la misma sesión.
+
+    El lru_cache de _cached_predict_risk garantiza que la segunda llamada
+    devuelve el resultado cacheado sin volver a ejecutar el modelo ML.
+    """
+
+    def setup_method(self):
+        orch_module._cached_predict_risk.cache_clear()
+
+    def teardown_method(self):
+        orch_module._cached_predict_risk.cache_clear()
+
+    @patch("src.report.main.generate_report")
+    @patch("src.retrieval.retriever.search")
+    @patch.object(orch_module, "predict_risk")
+    def test_predict_risk_llamado_una_sola_vez(self, mock_predict, mock_search, mock_report):
+        """predict_risk se ejecuta una sola vez aunque classify_risk y generate_report reciban el mismo input."""
+        mock_predict.return_value = {"risk_level": "alto_riesgo", "confidence": 0.9}
+        mock_search.return_value = []
+        mock_report.return_value = "## Informe\n..."
+
+        descripcion = "sistema de evaluacion de solvencia crediticia para prestamos"
+        classify_risk.invoke({"system_description": descripcion})
+        generate_report.invoke({"system_description": descripcion})
+
+        mock_predict.assert_called_once_with(descripcion)
+
+    @patch("src.report.main.generate_report")
+    @patch("src.retrieval.retriever.search")
+    @patch.object(orch_module, "predict_risk")
+    def test_inputs_distintos_llaman_predict_risk_dos_veces(self, mock_predict, mock_search, mock_report):
+        """Si el LLM pasa strings distintos a classify_risk y generate_report,
+        la caché no puede evitar la doble llamada. Este test documenta el
+        comportamiento esperado (limitación conocida de lru_cache por string exacto).
+        """
+        mock_predict.return_value = {"risk_level": "alto_riesgo", "confidence": 0.9}
+        mock_search.return_value = []
+        mock_report.return_value = "## Informe\n..."
+
+        classify_risk.invoke({"system_description": "sistema de scoring crediticio"})
+        # Input ligeramente diferente (como podría hacer el LLM)
+        generate_report.invoke({"system_description": "Sistema de scoring crediticio."})
+
+        assert mock_predict.call_count == 2
 
 
 # ---------------------------------------------------------------------------
@@ -311,7 +420,95 @@ class TestRun:
 
 
 # ---------------------------------------------------------------------------
-# Grupo 7: Memoria conversacional — run() pasa thread_id en config
+# Grupo 7: Side-channel de metadatos (ContextVar)
+# ---------------------------------------------------------------------------
+
+class TestToolMetadata:
+    """Las tools depositan metadatos verificados en el side-channel ContextVar."""
+
+    def setup_method(self):
+        _tool_metadata.set(None)
+        orch_module._agent = None
+        orch_module._cached_predict_risk.cache_clear()
+
+    def teardown_method(self):
+        _tool_metadata.set(None)
+        orch_module._agent = None
+        orch_module._cached_predict_risk.cache_clear()
+
+    @patch.object(orch_module, "predict_risk")
+    def test_classify_risk_deposita_metadata(self, mock_predict):
+        """classify_risk deposita risk_level, confidence y legal_ref en meta['risk']."""
+        mock_predict.return_value = {
+            "risk_level": "alto_riesgo",
+            "confidence": 0.85,
+            "annex3_ref": None,
+        }
+        classify_risk.invoke({"system_description": "sistema de scoring crediticio"})
+
+        meta = _tool_metadata.get(None)
+        assert meta is not None
+        assert meta["risk"] is not None
+        assert meta["risk"]["risk_level"] == "alto_riesgo"
+        assert meta["risk"]["confidence"] == 0.85
+        assert meta["risk"]["legal_ref"] == "Art. 6 + Anexo III EU AI Act"
+
+    @patch("src.rag.main.generate")
+    @patch("src.rag.main.grade")
+    @patch("src.rag.main.retrieve")
+    def test_search_legal_docs_deposita_citations(self, mock_retrieve, mock_grade, mock_generate):
+        """search_legal_docs deposita las fuentes del RAG en meta['citations']."""
+        mock_retrieve.return_value = [{"doc": "Art. 5 prohíbe X", "metadata": {}, "score": 0.9}]
+        mock_grade.return_value = [{"doc": "Art. 5 prohíbe X", "metadata": {}, "score": 0.9}]
+        mock_generate.return_value = {
+            "answer": "Según el Art. 5...",
+            "sources": [
+                {"source": "EU AI Act", "unit_title": "Art. 5", "unit_id": "art_5"},
+                {"source": "EU AI Act", "unit_title": "Art. 6", "unit_id": "art_6"},
+            ],
+            "grounded": True,
+        }
+        search_legal_docs.invoke({"query": "¿qué prácticas están prohibidas?"})
+
+        meta = _tool_metadata.get(None)
+        assert meta is not None
+        assert len(meta["citations"]) == 2
+        assert meta["citations"][0]["source"] == "EU AI Act"
+        assert meta["citations"][0]["unit_title"] == "Art. 5"
+
+    @patch.object(orch_module, "_build_agent")
+    def test_run_devuelve_metadata(self, mock_build):
+        """run() incluye la key 'metadata' en el resultado."""
+        mock_agent = MagicMock()
+        mock_agent.invoke.return_value = {"messages": [MagicMock(content="respuesta")]}
+        mock_build.return_value = mock_agent
+
+        result = run("consulta de prueba")
+
+        assert "metadata" in result
+        assert "citations" in result["metadata"]
+        assert "risk" in result["metadata"]
+        assert "report" in result["metadata"]
+
+    @patch.object(orch_module, "_build_agent")
+    def test_run_limpia_metadata_entre_invocaciones(self, mock_build):
+        """run() limpia la ContextVar antes de cada invocación."""
+        mock_agent = MagicMock()
+        mock_agent.invoke.return_value = {"messages": [MagicMock(content="ok")]}
+        mock_build.return_value = mock_agent
+
+        # Contaminar la ContextVar con datos de una invocación anterior
+        _tool_metadata.set({"citations": [{"source": "viejo"}], "risk": {"old": True}, "report": None})
+
+        result = run("nueva consulta")
+
+        # El metadata debe estar limpio (el agente mock no llama tools)
+        assert result["metadata"]["citations"] == []
+        assert result["metadata"]["risk"] is None
+
+
+# ---------------------------------------------------------------------------
+# Grupo 8: Memoria conversacional — run() pasa thread_id en config
 # ---------------------------------------------------------------------------
 
 class TestMemoriaConversacional:

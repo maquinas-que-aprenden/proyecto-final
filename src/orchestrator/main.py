@@ -8,9 +8,11 @@ cumplimiento.
 
 from __future__ import annotations
 
+import contextvars
 import logging
 import os
 import threading
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -46,13 +48,37 @@ except ImportError:
     class _NoOpLangfuse:
         def update_current_observation(self, **kwargs): pass
         def score_current_trace(self, **kwargs): pass
-
     langfuse_context = _NoOpLangfuse()  # type: ignore[assignment]
 
 from src.observability.main import get_langfuse_handler
 from src.classifier.main import predict_risk
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Side-channel para metadatos verificados de las herramientas
+# Los datos legales (citas, nivel de riesgo) se transportan por fuera del LLM
+# para evitar que el modelo reformule o alucine referencias legales.
+# ---------------------------------------------------------------------------
+
+_tool_metadata: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar(
+    "tool_metadata", default=None
+)
+
+
+def _get_tool_metadata() -> dict[str, Any]:
+    """Devuelve (o inicializa) el dict de metadatos de la invocación actual."""
+    meta = _tool_metadata.get(None)
+    if meta is None:
+        meta = {"citations": [], "risk": None, "report": None}
+        _tool_metadata.set(meta)
+    return meta
+
+
+@lru_cache(maxsize=256)
+def _cached_predict_risk(system_description: str) -> dict:
+    """Evita clasificar dos veces la misma descripción en una misma sesión."""
+    return predict_risk(system_description)
 
 # ---------------------------------------------------------------------------
 # Configuración
@@ -72,8 +98,11 @@ sistemas de IA por nivel de riesgo y generar informes de cumplimiento.
 Responde SIEMPRE en el mismo idioma en que el usuario escribe. \
 Por defecto, responde en español.
 
-Usa las herramientas disponibles para responder. Siempre cita las fuentes \
-legales (ley y artículo) en tu respuesta.
+Usa las herramientas disponibles para responder.
+
+Las referencias legales exactas se añadirán automáticamente a la respuesta. \
+No reformules ni modifiques las citas de artículos que devuelvan las herramientas. \
+Limítate a explicar el contenido.
 
 Añade siempre al final: "_Informe preliminar generado por IA. Consulte \
 profesional jurídico._"\
@@ -91,6 +120,32 @@ class _QueryInput(BaseModel):
 class _SystemDescriptionInput(BaseModel):
     system_description: str = Field(min_length=1, max_length=5000)
 
+
+# ---------------------------------------------------------------------------
+# Queries específicas por nivel de riesgo para el informe de cumplimiento.
+# Cada query busca un artículo concreto del EU AI Act, evitando que la
+# búsqueda semántica genérica favorezca guías AESIA sobre el texto legal.
+# ---------------------------------------------------------------------------
+
+_REPORT_QUERIES: dict[str, list[str]] = {
+    "inaceptable": [
+        "prácticas de inteligencia artificial prohibidas Artículo 5",
+    ],
+    "alto_riesgo": [
+        "sistema de gestión de riesgos Artículo 9",
+        "datos y gobernanza de datos Artículo 10",
+        "documentación técnica Artículo 11",
+        "transparencia información usuarios Artículo 13",
+        "vigilancia y supervisión humana Artículo 14",
+        "precisión robustez y ciberseguridad Artículo 15",
+    ],
+    "riesgo_limitado": [
+        "obligaciones de transparencia Artículo 50",
+    ],
+    "riesgo_minimo": [
+        "códigos de conducta inteligencia artificial Artículo 95",
+    ],
+}
 
 # ---------------------------------------------------------------------------
 # Herramientas
@@ -132,6 +187,17 @@ def search_legal_docs(query: str) -> str:
         return "Se encontraron documentos pero ninguno fue relevante para la consulta."
 
     result = generate(query, relevant)
+
+    # Side-channel: depositar citas verificadas
+    meta = _get_tool_metadata()
+    for source_meta in result.get("sources", []):
+        if isinstance(source_meta, dict) and source_meta:
+            meta["citations"].append({
+                "source": source_meta.get("source", ""),
+                "unit_title": source_meta.get("unit_title", ""),
+                "unit_id": source_meta.get("unit_id", ""),
+            })
+
     return result["answer"]
 
 
@@ -149,25 +215,60 @@ def classify_risk(system_description: str) -> str:
     except Exception as e:
         return f"Error de validacion: {e}"
 
-    result = predict_risk(system_description)
+    result = _cached_predict_risk(system_description)
     try:
         langfuse_context.update_current_observation(
             metadata={
                 "risk_level": result.get("risk_level"),
                 "confidence": result.get("confidence"),
+                "annex3_ref": result.get("annex3_ref"),
             }
         )
     except Exception:
         pass
+
+    # Referencia legal determinista: annex3_ref si hubo override del clasificador,
+    # si no, fallback por nivel de riesgo según EU AI Act.
+    # El side-channel (meta["risk"]) transporta este valor directo a la UI
+    # para que el LLM no pueda reformularlo ni alucinar otra cita.
+    _LEGAL_REFS = {
+        "inaceptable": "Art. 5 EU AI Act (sistema prohibido)",
+        "alto_riesgo": "Art. 6 + Anexo III EU AI Act",
+        "riesgo_limitado": "Art. 6 EU AI Act",
+        "riesgo_minimo": "Art. 6 EU AI Act (sin obligaciones adicionales)",
+    }
+    legal_ref = result.get("annex3_ref") or _LEGAL_REFS.get(
+        result["risk_level"], "Art. 6 EU AI Act"
+    )
+
+    # Side-channel: depositar clasificación verificada
+    meta = _get_tool_metadata()
+    meta["risk"] = {
+        "risk_level": result["risk_level"],
+        "confidence": result["confidence"],
+        "legal_ref": legal_ref,
+        "annex3_ref": result.get("annex3_ref"),
+        "annex3_override": result.get("annex3_override", False),
+    }
+
     response = (
         f"Clasificacion: {result['risk_level'].upper()}\n"
         f"Confianza: {result['confidence']:.0%}\n"
+        f"Referencia legal: {legal_ref}\n"
     )
-    if result.get("shap_top_features"):
-        features = ", ".join(f["feature"] for f in result["shap_top_features"][:3])
+
+    # Bug 7 — Mostrar solo features semánticamente interpretables.
+    # Excluir componentes SVD (svd_N) y métricas de longitud (num_palabras,
+    # num_caracteres), que no tienen significado legal para el usuario.
+    _NO_INTERPRETAR = {"num_palabras", "num_caracteres"}
+    interpretable = [
+        f for f in result.get("shap_top_features", [])
+        if not f["feature"].startswith("svd_") and f["feature"] not in _NO_INTERPRETAR
+    ]
+    if interpretable:
+        features = ", ".join(f["feature"] for f in interpretable[:3])
         response += f"Factores clave: {features}\n"
-    if result.get("shap_explanation"):
-        response += f"Explicacion: {result['shap_explanation']}\n"
+
     return response
 
 
@@ -178,7 +279,8 @@ def generate_report(system_description: str) -> str:
     """Genera un informe de cumplimiento normativo para un sistema de IA.
 
     Usa esta herramienta cuando el usuario quiere un informe, reporte o
-    evaluación de conformidad para su sistema.
+    evaluación de conformidad para su sistema. Esta herramienta clasifica
+    el riesgo internamente — no es necesario llamar a classify_risk antes.
     """
     try:
         _SystemDescriptionInput(system_description=system_description)
@@ -187,26 +289,32 @@ def generate_report(system_description: str) -> str:
 
     from src.report.main import generate_report as _build_report
 
-    # 1. Clasificar riesgo del sistema
-    risk_result = predict_risk(system_description)
+    # 1. Clasificar riesgo del sistema (usa caché si classify_risk ya lo computó)
+    risk_result = _cached_predict_risk(system_description)
     risk_level = risk_result["risk_level"]
 
     # 2. Buscar artículos relevantes en el corpus legal
+    #    Una query por obligación conocida para evitar que la búsqueda
+    #    semántica genérica favorezca guías AESIA sobre el texto legal.
     articles = []
     try:
         from src.retrieval.retriever import search as search_docs
-        hits = search_docs(
-            f"obligaciones sistemas de riesgo {risk_level} EU AI Act", k=3,
-        )
-        for h in hits:
-            meta = h.get("metadata", {}) or {}
-            source = meta.get("source", "")
-            unit = meta.get("unit_title") or meta.get("unit_id", "")
-            label = f"{source} — {unit}".strip(" —")
-            text = h.get("text", "").strip()
-            if label:
-                entry = f"{label}\n{text}" if text else label
-                articles.append(entry)
+        queries = _REPORT_QUERIES.get(risk_level, [])
+        seen_ids: set[str] = set()
+        for q in queries:
+            hits = search_docs(q, k=1)
+            for h in hits:
+                doc_id = h.get("id", "")
+                if doc_id not in seen_ids:
+                    seen_ids.add(doc_id)
+                    hit_meta = h.get("metadata", {}) or {}
+                    source = hit_meta.get("source", "")
+                    unit = hit_meta.get("unit_title") or hit_meta.get("unit_id", "")
+                    label = f"{source} — {unit}".strip(" —")
+                    text = h.get("text", "").strip()
+                    if label:
+                        entry = f"{label}\n{text}" if text else label
+                        articles.append(entry)
     except Exception as e:
         logger.warning("Retriever no disponible para informe: %s", e)
 
@@ -229,7 +337,14 @@ def generate_report(system_description: str) -> str:
     except Exception:
         pass
 
-    # 3. Generar informe con template
+    # 3. Side-channel: depositar metadatos del informe
+    meta = _get_tool_metadata()
+    meta["report"] = {
+        "risk_level": risk_level,
+        "n_articles": len(articles),
+    }
+
+    # 4. Generar informe con template
     return _build_report(system_description, risk_level, articles)
 
 
@@ -384,6 +499,7 @@ def run(query: str, session_id: str | None = None, user_id: str | None = None) -
     carga automáticamente el historial previo para el ``thread_id``.
     """
     agent = _get_agent()
+    _tool_metadata.set(None)  # limpiar invocación anterior
 
     try:
         callbacks = [
@@ -409,6 +525,10 @@ def run(query: str, session_id: str | None = None, user_id: str | None = None) -
         {"messages": [("user", query)]},
         config=config,
     )
+
+    # Recoger metadatos verificados de las herramientas (side-channel)
+    tool_meta = _tool_metadata.get(None)
+    result["metadata"] = tool_meta or {"citations": [], "risk": None, "report": None}
     return result
 
 

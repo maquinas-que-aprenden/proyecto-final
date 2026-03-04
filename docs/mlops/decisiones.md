@@ -78,7 +78,7 @@ De momento solo hay una para MLflow. Es preferible usar SQLite dentro de la prop
     * `cicd-main.yml`: lint completo + smoke tests (pytest) + construye, publica con tag `:latest` y despliega automáticamente en el servidor en cada push a `main`. Los tests también corren en PRs a `main` como gate antes del merge.
     * `eval.yml`: ejecuta la evaluación RAGAS en EC2 contra la imagen `:latest` desplegada. Se lanza manualmente (`workflow_dispatch`).
 * El despliegue se hace vía SSH a la EC2. El script de deploy hace login en GHCR, `dvc pull` del vectorstore y levanta el contenedor con `docker compose up -d --pull always --force-recreate`. Pendiente: valorar si simplificar a `docker run` directo.
-* Los smoke tests (77 tests, 5 suites: clasificador, memoria conversacional, RAG generate, orquestador, reentrenamiento) se ejecutan con `pytest tests/ -v`. Los servicios externos (Bedrock, Ollama) están mockeados y el reentrenamiento usa un stub `_FakeXGB`, por lo que no requieren credenciales ni entrenamiento real en CI.
+* Los smoke tests (88 tests, 5 suites: clasificador, memoria conversacional, RAG generate, orquestador, reentrenamiento) se ejecutan con `pytest tests/ -v`. Los servicios externos (Bedrock, Ollama) están mockeados y el reentrenamiento usa un stub `_FakeXGB`, por lo que no requieren credenciales ni entrenamiento real en CI. El clasificador incluye `TestAnnex3Override` (10 tests) y el orquestador `TestNoDobleClasificacion` (2 tests) para los bugs críticos cerrados en la semana de cierre.
 
 ## Observabilidad y trazabilidad
 * Usamos [MLflow](https://mlflow.org/) para los modelos de clasificación: métricas de entrenamiento y registro del modelo.
