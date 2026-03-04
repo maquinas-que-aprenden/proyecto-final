@@ -167,6 +167,12 @@ def _annex3_override(text: str, result: dict) -> dict:
         # Se mueven a ml_prediction para no contaminar la explicación del override.
         if "shap_top_features" in overridden:
             overridden["ml_prediction"]["shap_top_features"] = overridden.pop("shap_top_features")
+        # La explicación legal prevalece: se establece aquí para que esté disponible
+        # tanto cuando se llama predict_risk() como en tests directos de esta función.
+        overridden["shap_explanation"] = (
+            f"Clasificación determinada por {best_ref} EU AI Act. "
+            f"La capa normativa prevalece sobre la predicción del modelo ML."
+        )
         return overridden
     return result
 
@@ -274,12 +280,14 @@ def _load_artifacts():
             return
 
         needs_manual_features = False
+        explicit_pipeline: str | None = None
         meta_path = _MODEL_DIR / "mejor_modelo_seleccion.json"
         if meta_path.exists():
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
             model_file = _MODEL_DIR.parent / meta["model_file"]
             tfidf_file = _MODEL_DIR.parent / meta["tfidf_file"]
             needs_manual_features = meta.get("needs_manual_features", False)
+            explicit_pipeline = meta.get("pipeline_type")
             logger.info("Cargando modelo desde metadata: %s", meta.get("nombre", ""))
         else:
             model_file = _MODEL_DIR / "mejor_modelo.joblib"
@@ -297,8 +305,14 @@ def _load_artifacts():
             if le_path.exists():
                 _label_encoder = joblib.load(le_path)
 
-            # Auto-detectar tipo de pipeline segun artefactos disponibles y metadata
-            if _svd is not None and needs_manual_features:
+            # Determinar tipo de pipeline.
+            # Se usa "pipeline_type" del JSON si está presente (fuente de verdad).
+            # El directorio puede contener artefactos de múltiples experimentos
+            # (svd_transformer.joblib existe aunque el modelo activo no lo use),
+            # por lo que la auto-detección por presencia de archivos no es fiable.
+            if explicit_pipeline in ("tfidf_only", "tfidf_svd", "tfidf_svd_manual"):
+                _pipeline_type = explicit_pipeline
+            elif _svd is not None and needs_manual_features:
                 _pipeline_type = "tfidf_svd_manual"
             elif _svd is not None:
                 _pipeline_type = "tfidf_svd"
@@ -510,18 +524,22 @@ def predict_risk(text: str) -> dict:
     # Capa de override: patrones deterministas del Anexo III tienen precedencia sobre ML
     result = _annex3_override(text, result)
 
-    # shap_explanation: legal si hay override (los features ML no son válidos para
-    # explicar un nivel determinado por la ley), basada en modelo si no hay override.
-    if result.get("annex3_override"):
-        result["shap_explanation"] = (
-            f"Clasificación determinada por {result['annex3_ref']} EU AI Act. "
-            f"La capa normativa prevalece sobre la predicción del modelo ML."
-        )
-    elif result.get("shap_top_features"):
-        top_words = ", ".join(f["feature"] for f in result["shap_top_features"][:3])
-        result["shap_explanation"] = (
-            f"Factores principales para '{result['risk_level']}': {top_words}."
-        )
+    # shap_explanation con override: ya establecida por _annex3_override().
+    # shap_explanation sin override: basada en features del modelo, filtrando
+    # componentes SVD y métricas de longitud no interpretables legalmente.
+    if result.get("shap_top_features"):
+        # Mismos criterios de filtrado que el orquestador (Bug 7):
+        # svd_N y métricas de longitud no tienen significado legal para el usuario.
+        _NO_INTERPRETAR_EXPL = {"num_palabras", "num_caracteres"}
+        legibles = [
+            f for f in result["shap_top_features"]
+            if not f["feature"].startswith("svd_") and f["feature"] not in _NO_INTERPRETAR_EXPL
+        ]
+        if legibles:
+            top_words = ", ".join(f["feature"] for f in legibles[:3])
+            result["shap_explanation"] = (
+                f"Factores principales para '{result['risk_level']}': {top_words}."
+            )
 
     try:
         langfuse_context.update_current_observation(
