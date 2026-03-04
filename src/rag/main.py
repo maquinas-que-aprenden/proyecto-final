@@ -1,20 +1,15 @@
-"""rag/main.py — Agente RAG Normativo (Corrective RAG)
-Flujo Retrieve → Grade → Generate con citas legales desde ChromaDB.
+"""rag/main.py — Pipeline RAG Normativo (Corrective RAG)
+Flujo Retrieve → Grade desde ChromaDB. La generación la hace el orchestrator.
 """
 
 from __future__ import annotations
 
 import logging
-import os
 
 try:
     from langchain_ollama import ChatOllama
 except ImportError:
     ChatOllama = None  # type: ignore[assignment,misc]
-try:
-    from langchain_aws import ChatBedrockConverse as _ChatBedrockConverse
-except ImportError:
-    _ChatBedrockConverse = None  # type: ignore[assignment,misc]
 
 from src.observability.langfuse_compat import observe, langfuse_context
 
@@ -23,9 +18,6 @@ from src.retrieval.retriever import search
 logger = logging.getLogger(__name__)
 
 MAX_DOC_CHARS_GRADING = 3000
-
-BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "eu.amazon.nova-lite-v1:0")
-BEDROCK_REGION = os.environ.get("BEDROCK_REGION") or os.environ.get("AWS_REGION", "eu-west-1")
 
 GRADING_PROMPT = (
     "Dado el siguiente documento y la pregunta, "
@@ -139,39 +131,8 @@ def grade(query: str, docs: list[dict], threshold: float = 0.7) -> list[dict]:
     return relevant
 
 
-GENERATE_PROMPT = """\
-Eres un asistente juridico especializado en el EU AI Act y normativa española de IA.
-Responde la pregunta usando SOLO la informacion de los documentos proporcionados.
-Cita siempre la ley y articulo exactos. Si no hay informacion suficiente, dilo.
-No inventes articulos ni citas que no aparezcan en los documentos.
-
-Documentos:
-{context}
-
-Pregunta: {query}
-
-Responde de forma clara y estructurada. Cita las fuentes al final."""
-
-_generate_llm = None
-
-
-def _get_generate_llm():
-    """Devuelve el LLM para generacion (Bedrock Nova Lite, singleton)."""
-    if _ChatBedrockConverse is None:
-        raise ImportError("langchain_aws no instalado. Ejecuta: pip install langchain-aws")
-    global _generate_llm
-    if _generate_llm is None:
-        _generate_llm = _ChatBedrockConverse(
-            model=BEDROCK_MODEL_ID,
-            region_name=BEDROCK_REGION,
-            temperature=0.1,
-            max_tokens=1024,
-        )
-    return _generate_llm
-
-
-def _format_context(docs: list[dict]) -> str:
-    """Formatea los documentos recuperados como contexto para el prompt."""
+def format_context(docs: list[dict]) -> str:
+    """Formatea los documentos relevantes como contexto para el orchestrator."""
     blocks = []
     for i, d in enumerate(docs, 1):
         meta = d.get("metadata", {})
@@ -180,40 +141,6 @@ def _format_context(docs: list[dict]) -> str:
         header = f"[{i}] {source} — {unit}".strip(" —")
         blocks.append(f"{header}\n{d['doc']}")
     return "\n\n".join(blocks)
-
-
-@observe(name="rag.generate")
-def generate(query: str, context: list[dict]) -> dict:
-    """Genera una respuesta con citas legales usando Bedrock Nova Lite."""
-    sources = [d.get("metadata", {}) for d in context]
-
-    if not context:
-        langfuse_context.update_current_observation(
-            metadata={"n_context_docs": 0},
-        )
-        return {
-            "answer": "No se encontraron documentos relevantes para esta consulta.",
-            "sources": [],
-        }
-
-    formatted_context = _format_context(context)
-    prompt = GENERATE_PROMPT.format(context=formatted_context, query=query)
-
-    llm = _get_generate_llm()
-    response = llm.invoke(prompt)
-    answer = response.content.strip()
-    answer += "\n\n_Informe preliminar generado por IA. Consulte profesional jurídico._"
-
-    try:
-        langfuse_context.update_current_observation(
-            metadata={"n_context_docs": len(context)},
-        )
-    except Exception:
-        pass
-    return {
-        "answer": answer,
-        "sources": sources,
-    }
 
 
 if __name__ == "__main__":
@@ -226,8 +153,6 @@ if __name__ == "__main__":
     relevant = grade(query, docs)
     print(f"Grade:     {len(relevant)} relevantes")
 
-    result = generate(query, relevant)
-    print(f"Generate:  {result['answer']}")
-    print(f"Sources:   {result['sources']}")
+    print(f"Context:\n{format_context(relevant)}")
 
     print("\n✓ rag/main.py OK")

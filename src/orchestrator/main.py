@@ -143,7 +143,7 @@ def search_legal_docs(query: str) -> str:
     except Exception as e:
         return f"Error de validacion: {e}"
 
-    from src.rag.main import retrieve, grade, generate
+    from src.rag.main import retrieve, grade, format_context
 
     docs = retrieve(query)
     if not docs:
@@ -163,19 +163,18 @@ def search_legal_docs(query: str) -> str:
     if not relevant:
         return "Se encontraron documentos pero ninguno fue relevante para la consulta."
 
-    result = generate(query, relevant)
-
     # Side-channel: depositar citas verificadas
     meta = _get_tool_metadata()
-    for source_meta in result.get("sources", []):
-        if isinstance(source_meta, dict) and source_meta:
+    for d in relevant:
+        source_meta = d.get("metadata", {})
+        if source_meta:
             meta["citations"].append({
                 "source": source_meta.get("source", ""),
                 "unit_title": source_meta.get("unit_title", ""),
                 "unit_id": source_meta.get("unit_id", ""),
             })
 
-    return result["answer"]
+    return format_context(relevant)
 
 
 @tool

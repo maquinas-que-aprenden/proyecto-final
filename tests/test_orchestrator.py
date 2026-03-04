@@ -4,7 +4,7 @@ Que se prueba:
 1. Estructura de las tools: tienen nombre, descripcion y son invocables.
 2. Validacion Pydantic de entrada: textos vacios devuelven "Error de validacion".
 3. Comportamiento de classify_risk: formatea clasificacion + checklist de cumplimiento.
-4. Comportamiento de search_legal_docs: propaga el pipeline RAG (retrieve->grade->generate).
+4. Comportamiento de search_legal_docs: propaga el pipeline RAG (retrieve->grade->format_context).
 5. run(): devuelve dict con "messages" usando un agente mockeado.
 
 Estrategia de mocking
@@ -266,7 +266,7 @@ class TestClassifyRiskTool:
 # ---------------------------------------------------------------------------
 
 class TestSearchLegalDocsTool:
-    """search_legal_docs llama a retrieve->grade->generate y maneja casos vacios."""
+    """search_legal_docs llama a retrieve->grade->format_context y maneja casos vacios."""
 
     @patch("src.rag.main.retrieve", return_value=[])
     def test_sin_documentos_devuelve_mensaje(self, _mock):
@@ -280,18 +280,14 @@ class TestSearchLegalDocsTool:
         result = search_legal_docs.invoke({"query": "que dice el articulo 5?"})
         assert "ninguno fue relevante" in result
 
-    @patch("src.rag.main.generate")
     @patch("src.rag.main.grade")
     @patch("src.rag.main.retrieve")
-    def test_con_documentos_devuelve_respuesta(self, mock_retrieve, mock_grade, mock_generate):
-        mock_retrieve.return_value = [{"doc": "Art. 5 prohibe X", "metadata": {}, "score": 0.9}]
-        mock_grade.return_value = [{"doc": "Art. 5 prohibe X", "metadata": {}, "score": 0.9}]
-        mock_generate.return_value = {
-            "answer": "Segun el Art. 5 del EU AI Act...",
-            "sources": [],
-        }
+    def test_con_documentos_devuelve_contexto(self, mock_retrieve, mock_grade):
+        mock_retrieve.return_value = [{"doc": "Art. 5 prohibe X", "metadata": {"source": "EU AI Act"}, "score": 0.9}]
+        mock_grade.return_value = [{"doc": "Art. 5 prohibe X", "metadata": {"source": "EU AI Act"}, "score": 0.9}]
         result = search_legal_docs.invoke({"query": "que dice el articulo 5?"})
-        assert "Art. 5" in result
+        assert "Art. 5 prohibe X" in result
+        assert "EU AI Act" in result
 
 
 # ---------------------------------------------------------------------------
@@ -372,20 +368,16 @@ class TestToolMetadata:
         assert meta["risk"]["confidence"] == 0.85
         assert meta["risk"]["legal_ref"] == "Art. 6 + Anexo III EU AI Act"
 
-    @patch("src.rag.main.generate")
     @patch("src.rag.main.grade")
     @patch("src.rag.main.retrieve")
-    def test_search_legal_docs_deposita_citations(self, mock_retrieve, mock_grade, mock_generate):
+    def test_search_legal_docs_deposita_citations(self, mock_retrieve, mock_grade):
         """search_legal_docs deposita las fuentes del RAG en meta['citations']."""
-        mock_retrieve.return_value = [{"doc": "Art. 5 prohíbe X", "metadata": {}, "score": 0.9}]
-        mock_grade.return_value = [{"doc": "Art. 5 prohíbe X", "metadata": {}, "score": 0.9}]
-        mock_generate.return_value = {
-            "answer": "Según el Art. 5...",
-            "sources": [
-                {"source": "EU AI Act", "unit_title": "Art. 5", "unit_id": "art_5"},
-                {"source": "EU AI Act", "unit_title": "Art. 6", "unit_id": "art_6"},
-            ],
-        }
+        docs = [
+            {"doc": "Art. 5 prohíbe X", "metadata": {"source": "EU AI Act", "unit_title": "Art. 5", "unit_id": "art_5"}, "score": 0.9},
+            {"doc": "Art. 6 establece Y", "metadata": {"source": "EU AI Act", "unit_title": "Art. 6", "unit_id": "art_6"}, "score": 0.8},
+        ]
+        mock_retrieve.return_value = docs
+        mock_grade.return_value = docs
         search_legal_docs.invoke({"query": "¿qué prácticas están prohibidas?"})
 
         meta = _tool_metadata.get(None)
