@@ -540,6 +540,12 @@ def predict_risk(text: str) -> dict:
             result["shap_explanation"] = (
                 f"Factores principales para '{result['risk_level']}': {top_words}."
             )
+        elif not result.get("shap_explanation"):
+            # Todos los features son SVD u otras métricas internas no interpretables.
+            # Se asigna un fallback claro en vez de omitir la explicación por completo.
+            result["shap_explanation"] = (
+                "No se identificaron factores interpretables específicos."
+            )
 
     try:
         langfuse_context.update_current_observation(
