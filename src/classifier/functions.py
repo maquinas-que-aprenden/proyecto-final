@@ -109,6 +109,8 @@ _nlp = None
 _nlp_ner = None
 _spacy_available = None  # None = no comprobado aún
 _spacy_lock = threading.Lock()  # protege la inicialización concurrente
+_nlp_load_failed = False      # True tras primer fallo de spacy.load() — evita reintentos
+_nlp_ner_load_failed = False  # ídem para el pipeline NER
 
 
 def _check_spacy():
@@ -124,31 +126,37 @@ def _check_spacy():
 
 
 def _get_nlp():
-    global _nlp
-    if not _check_spacy():
+    global _nlp, _nlp_load_failed
+    if not _check_spacy() or _nlp_load_failed:
         return None
     if _nlp is None:
         with _spacy_lock:
             if _nlp is None:  # double-check tras adquirir el lock
+                if _nlp_load_failed:
+                    return None
                 try:
                     import spacy
                     _nlp = spacy.load("es_core_news_sm", disable=["parser", "ner"])
                 except Exception:
+                    _nlp_load_failed = True
                     return None
     return _nlp
 
 
 def _get_nlp_ner():
-    global _nlp_ner
-    if not _check_spacy():
+    global _nlp_ner, _nlp_ner_load_failed
+    if not _check_spacy() or _nlp_ner_load_failed:
         return None
     if _nlp_ner is None:
         with _spacy_lock:
             if _nlp_ner is None:  # double-check tras adquirir el lock
+                if _nlp_ner_load_failed:
+                    return None
                 try:
                     import spacy
                     _nlp_ner = spacy.load("es_core_news_sm")
                 except Exception:
+                    _nlp_ner_load_failed = True
                     return None
     return _nlp_ner
 

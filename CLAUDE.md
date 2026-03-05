@@ -27,9 +27,12 @@ Files under `src/classifier/`:
 - **`retrain.py`** — Incremental retraining with augmented data (Annex III examples). Promotes artefacts only if F1-macro improves by ≥ 0.005.
 - **`create_normative_features.py`** — Enriches training dataset with 5 binary features (Art. 5 EU AI Act patterns). CLI: `python -m src.classifier.create_normative_features`.
 - **`_constants.py`** — Single source of truth for `KEYWORDS_DOMINIO`, `PALABRAS_SUPERVISION`, `STOPWORDS_ES`, `RISK_LABELS`, `LEAKAGE_COLUMNS`. All other modules import from here.
-- **`classifier_dataset_fusionado/`** — Experiment artefacts, datasets, and trained model (previously `classifier_2/`).
+- **`classifier_dataset_real/`** — Experiments on the original hand-labelled real dataset. MLflow experiment: `clasificador_riesgo_dataset_real`.
+- **`classifier_dataset_artificial/`** — Experiments on a purely synthetic dataset. MLflow experiment: `clasificador_riesgo_dataset_artificial`.
+- **`classifier_dataset_fusionado/`** — **Production model.** Experiments on the merged dataset (real + synthetic). MLflow experiment: `clasificador_riesgo_dataset_fusionado`. Artefacts loaded by `main.py` at runtime.
   - `model/` — `modelo_xgboost.joblib`, `tfidf_vectorizer.joblib`, `svd_transformer.joblib`, `label_encoder.joblib`, `mejor_modelo_seleccion.json`
   - `data/finetune/` — `train.jsonl`, `test.jsonl`
+- **`classifier_ultimo_dataset/`** — Experiments on `dataset_sintetico_v2.csv` (latest synthetic dataset). MLflow experiment: `clasificador_riesgo_ultimo_dataset`. Schema uses `sector`/`tipo_datos` columns instead of `category`/`context`.
 
 ## Commands
 
