@@ -4,6 +4,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -165,10 +166,10 @@ def run_ragas(ragas_dataset) -> dict:
         raise RuntimeError(f"Fallo crítico en Bedrock/Ragas: {e}")
 
     return {
-        "faithfulness": round(float(results["faithfulness"]), 4),
-        "answer_relevancy": round(float(results["answer_relevancy"]), 4),
-        "context_precision": round(float(results["context_precision"]), 4),
-        "context_recall": round(float(results["context_recall"]), 4),
+        "faithfulness": round(float(np.nanmean(results["faithfulness"])), 4),
+        "answer_relevancy": round(float(np.nanmean(results["answer_relevancy"])), 4),
+        "context_precision": round(float(np.nanmean(results["context_precision"])), 4),
+        "context_recall": round(float(np.nanmean(results["context_recall"])), 4),
     }
 
 # Cuando se apruebe PR#36 lo añado a observabilidad
