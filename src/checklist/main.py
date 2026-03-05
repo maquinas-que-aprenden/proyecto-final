@@ -308,7 +308,7 @@ _SHAP_FEATURE_RECOMMENDATIONS: dict[str, dict] = {
 
 _BORDERLINE_THRESHOLD = 0.20
 
-_SEVERITY: dict[str, int] = {
+SEVERITY: dict[str, int] = {
     "inaceptable": 3,
     "alto_riesgo": 2,
     "riesgo_limitado": 1,
@@ -355,7 +355,7 @@ def _detect_borderline(risk_level: str, probabilities: dict[str, float]) -> str 
 
     # Priorizar por severidad (más restrictivo primero), luego por probabilidad
     other_classes.sort(
-        key=lambda x: (_SEVERITY.get(x[0], 0), x[1]),
+        key=lambda x: (SEVERITY.get(x[0], 0), x[1]),
         reverse=True,
     )
     concern_class, concern_prob = other_classes[0]

@@ -37,19 +37,7 @@ except ImportError:
 
     _SQLITE_AVAILABLE = False
 
-try:
-    from langfuse.decorators import observe, langfuse_context
-except ImportError:
-    def observe(name=None):  # type: ignore[misc]
-        def decorator(func):
-            return func
-        return decorator
-
-    class _NoOpLangfuse:
-        def update_current_observation(self, **kwargs): pass
-        def score_current_trace(self, **kwargs): pass
-    langfuse_context = _NoOpLangfuse()  # type: ignore[assignment]
-
+from src.observability.langfuse_compat import observe, langfuse_context
 from src.observability.main import get_langfuse_handler
 from src.classifier.main import predict_risk
 
@@ -155,7 +143,7 @@ def search_legal_docs(query: str) -> str:
     except Exception as e:
         return f"Error de validacion: {e}"
 
-    from src.rag.main import retrieve, grade, generate
+    from src.rag.main import retrieve, grade, format_context
 
     docs = retrieve(query)
     if not docs:
@@ -175,19 +163,18 @@ def search_legal_docs(query: str) -> str:
     if not relevant:
         return "Se encontraron documentos pero ninguno fue relevante para la consulta."
 
-    result = generate(query, relevant)
-
     # Side-channel: depositar citas verificadas
     meta = _get_tool_metadata()
-    for source_meta in result.get("sources", []):
-        if isinstance(source_meta, dict) and source_meta:
+    for d in relevant:
+        source_meta = d.get("metadata", {})
+        if source_meta:
             meta["citations"].append({
                 "source": source_meta.get("source", ""),
                 "unit_title": source_meta.get("unit_title", ""),
                 "unit_id": source_meta.get("unit_id", ""),
             })
 
-    return result["answer"]
+    return format_context(relevant)
 
 
 @tool
