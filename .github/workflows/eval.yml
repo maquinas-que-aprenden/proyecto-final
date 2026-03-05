@@ -24,7 +24,7 @@ jobs:
               -v "$(pwd)/data/processed/vectorstore:/app/data/processed/vectorstore:ro" \
               --env-file .env \
               -e GITHUB_SHA="$ACTUAL_SHA" \
-              -e PYTHONPATH=/app/eval \
+              -e PYTHONPATH=/app:/app/eval \
               -w /app \
               ghcr.io/maquinas-que-aprenden/proyecto-final:latest \
               python eval/run_ragas.py --ci

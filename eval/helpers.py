@@ -4,6 +4,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +14,8 @@ MLFLOW_EXPERIMENT = "normabot-ragas-eval"
 THRESHOLDS = {
     "faithfulness": 0.80,
     "answer_relevancy": 0.85,
+    "context_precision": 0.70,
+    "context_recall": 0.70,
 }
 
 def load_dataset() -> list[dict]:
@@ -45,6 +48,13 @@ def get_agent_answers(dataset: list[dict]) -> list[dict]:
         use_agent = False
         logger.warning("Agente no disponible (%s: %s) — usando respuestas mock del dataset", type(e).__name__, e)
 
+    try:
+        from src.rag.main import retrieve, grade
+        use_retriever = True
+    except ImportError:
+        use_retriever = False
+        logger.warning("Módulo src.rag.main no disponible — usando contextos estáticos del dataset")
+
     rows = []
     for item in dataset:
         question = item["question"]
@@ -61,10 +71,22 @@ def get_agent_answers(dataset: list[dict]) -> list[dict]:
             # Fallback mock: usamos ground_truth como answer para que RAGAS pueda correr
             answer = item.get("ground_truth", "")
 
+        # Obtener contextos reales del retriever para que RAGAS evalúe sobre
+        # lo que el pipeline realmente recuperó, no sobre fragmentos estáticos.
+        contexts = item["contexts"]  # fallback a los contextos estáticos del dataset
+        if use_retriever:
+            try:
+                docs = retrieve(question)
+                relevant = grade(question, docs)
+                if relevant:
+                    contexts = [d["doc"] for d in relevant]
+            except Exception:
+                logger.exception("Error en retrieval para '%s' — usando contextos estáticos", question[:50])
+
         rows.append({
             "question": question,
             "answer": answer,
-            "contexts": item["contexts"],
+            "contexts": contexts,
             "ground_truth": item["ground_truth"],
         })
 
@@ -105,10 +127,10 @@ def get_ragas_embeddings():
 
 def run_ragas(ragas_dataset) -> dict:
     from ragas import evaluate
-    from ragas.metrics import Faithfulness, AnswerRelevancy
+    from ragas.metrics import Faithfulness, AnswerRelevancy, ContextPrecision, ContextRecall
 
     ragas_llm = get_ragas_llm()
-    
+
     # Cargar embeddings para evitar error de OpenAI
     try:
         ragas_embeddings = get_ragas_embeddings()
@@ -118,25 +140,41 @@ def run_ragas(ragas_dataset) -> dict:
         ragas_embeddings = None
 
     logger.info("Calculando métricas RAGAS...")
-    
+
     # Definimos las métricas pasando los embeddings explícitamente
     metrics = [
         Faithfulness(llm=ragas_llm),
-        AnswerRelevancy(llm=ragas_llm, embeddings=ragas_embeddings)
+        AnswerRelevancy(llm=ragas_llm, embeddings=ragas_embeddings),
+        ContextPrecision(llm=ragas_llm),
+        ContextRecall(llm=ragas_llm),
     ]
+
+    column_map = {
+        "user_input": "question",
+        "response": "answer",
+        "retrieved_contexts": "contexts",
+        "reference": "ground_truth",
+    }
 
     try:
         results = evaluate(
             dataset=ragas_dataset,
             metrics=metrics,
+            column_map=column_map,
         )
     except Exception as e:
         raise RuntimeError(f"Fallo crítico en Bedrock/Ragas: {e}")
 
-    return {
-        "faithfulness": round(float(results["faithfulness"]), 4),
-        "answer_relevancy": round(float(results["answer_relevancy"]), 4),
+    metrics = {
+        "faithfulness": round(float(np.nanmean(results["faithfulness"])), 4),
+        "answer_relevancy": round(float(np.nanmean(results["answer_relevancy"])), 4),
+        "context_precision": round(float(np.nanmean(results["context_precision"])), 4),
+        "context_recall": round(float(np.nanmean(results["context_recall"])), 4),
     }
+    nan_metrics = [k for k, v in metrics.items() if np.isnan(v)]
+    if nan_metrics:
+        raise RuntimeError(f"Métricas con NaN tras evaluación RAGAS: {nan_metrics}")
+    return metrics
 
 # Cuando se apruebe PR#36 lo añado a observabilidad
 def log_to_mlflow(metrics: dict, n_examples: int, git_sha: str) -> None:
@@ -238,8 +276,8 @@ def check_thresholds(metrics: dict) -> list[str]:
     failures = []
     for metric, threshold in THRESHOLDS.items():
         value = metrics.get(metric, 0.0)
-        if value < threshold:
-            failures.append(
-                f"{metric}: {value:.4f} < {threshold} (umbral mínimo)"
-            )
+        if np.isnan(value):
+            failures.append(f"{metric}: NaN (métrica no calculada correctamente)")
+        elif value < threshold:
+            failures.append(f"{metric}: {value:.4f} < {threshold} (umbral mínimo)")
     return failures
