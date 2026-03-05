@@ -47,6 +47,11 @@ _AUGMENT_CSV = _DATA_DIR / "annex3_aumentacion.csv"
 # Ejemplos contrastivos inaceptable/alto_riesgo (cargados si existen)
 _CONTRASTIVA_CSV = _DATA_DIR / "aumentacion_contrastiva.csv"
 
+# ── Dimensionalidad SVD ───────────────────────────────────────────────────────
+# Centralizado aquí para que el JSON de selección y el código usen el mismo valor.
+# Si se cambia, main.py lo leerá desde svd_transformer.joblib via _svd.n_components.
+_SVD_N_COMPONENTS = 100
+
 # ── Hiperparámetros (best_params del experimento 2) ───────────────────────────
 _BEST_PARAMS = {
     "n_estimators": 300,
@@ -57,59 +62,19 @@ _BEST_PARAMS = {
     "eval_metric": "mlogloss",
 }
 
-# ── Stopwords básicas (sin spaCy) ──────────────────────────────────────────────
-_STOPWORDS_ES = {
-    "a", "al", "algo", "algunas", "algunos", "ante", "antes", "como",
-    "con", "contra", "cual", "cuando", "de", "del", "desde", "donde",
-    "durante", "e", "el", "ella", "ellos", "en", "entre", "era", "es",
-    "esa", "esas", "ese", "eso", "esos", "esta", "estas", "este", "esto",
-    "estos", "fue", "ha", "han", "hasta", "hay", "he", "la", "las", "le",
-    "les", "lo", "los", "me", "mi", "mis", "muy", "ni", "no", "nos",
-    "o", "os", "otro", "para", "pero", "por", "que", "quien", "quienes",
-    "se", "si", "sin", "sobre", "son", "su", "sus", "también", "tanto",
-    "te", "todo", "todos", "tu", "tus", "un", "una", "unas", "uno",
-    "unos", "ya", "yo",
-}
-
-# ── Keywords de dominio (sincronizadas con main.py / functions.py) ─────────────
-_KEYWORDS_DOMINIO = {
-    "inaceptable": [
-        "inferir", "vender", "manipular", "subconsciente", "biométrico",
-        "facial", "vigilancia", "sindical", "racial", "etnia",
-        "religioso", "discriminar", "coerción", "prohibido",
-    ],
-    "alto_riesgo": [
-        "penitenciario", "juez", "reincidencia", "crediticio",
-        "diagnóstico", "sanitario", "migración", "asilo",
-        "policial", "empleabilidad", "infraestructura", "vinculante",
-        "medicación", "autónomamente",
-        "reclamación", "subsidio", "escolar", "triage",
-        "urgencia", "aeronave", "piloto", "laboral",
-        "curricular", "candidato", "reclutamiento", "curriculum",
-        "solvencia", "préstamo", "crédito", "hipoteca",
-        "recidiva", "reincidente",
-        "frontera", "visado", "refugiado",
-        "sentencia", "judicial",
-        "admisión", "matriculación",
-    ],
-    "riesgo_limitado": [
-        "chatbot", "revelar", "transparencia", "deepfake",
-        "sintético", "notificar", "asesoramiento", "asistente",
-        "informar", "advertir", "indicar",
-    ],
-    "riesgo_minimo": [
-        "sugerir", "borrador", "juego", "spam", "entretenimiento",
-        "filtro", "aficionado", "hobby", "receta",
-        "avería", "maquinaria", "logística", "mantenimiento",
-        "sensor", "industrial", "gestión",
-    ],
-}
-
-_PALABRAS_SUPERVISION = [
-    "supervisión", "supervisar", "revisar", "revisión", "garantía",
-    "confirmación", "criterio", "auditoría", "humano",
-    "pediatra", "médico", "piloto", "pedagógico",
-]
+# ── Constantes de dominio (fuente única: _constants.py) ───────────────────────
+try:
+    from src.classifier._constants import (
+        KEYWORDS_DOMINIO as _KEYWORDS_DOMINIO,
+        PALABRAS_SUPERVISION as _PALABRAS_SUPERVISION,
+        STOPWORDS_ES as _STOPWORDS_ES,
+    )
+except ImportError:
+    from ._constants import (  # type: ignore[no-redef]
+        KEYWORDS_DOMINIO as _KEYWORDS_DOMINIO,
+        PALABRAS_SUPERVISION as _PALABRAS_SUPERVISION,
+        STOPWORDS_ES as _STOPWORDS_ES,
+    )
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -226,7 +191,7 @@ def main(*, force_promote: bool = False) -> None:
     logger.info("TF-IDF vocabulario: %d términos", len(tfidf.vocabulary_))
 
     # 6. SVD(100)
-    svd = TruncatedSVD(n_components=100, random_state=42)
+    svd = TruncatedSVD(n_components=_SVD_N_COMPONENTS, random_state=42)
     X_train_svd = svd.fit_transform(X_train_tfidf)
     X_test_svd = svd.transform(X_test_tfidf)
     logger.info(
@@ -284,6 +249,7 @@ def main(*, force_promote: bool = False) -> None:
             "model_file": "model/modelo_xgboost.joblib",
             "tfidf_file": "model/tfidf_vectorizer.joblib",
             "model_type": "XGBClassifier",
+            "pipeline_type": "tfidf_svd_manual",
             "experimento": "2",
             "needs_manual_features": True,
             "test_f1_macro": round(f1_macro, 4),
