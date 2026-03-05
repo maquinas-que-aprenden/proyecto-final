@@ -203,6 +203,45 @@ class TestExplicabilidad:
         assert isinstance(resultado_facial["shap_explanation"], str)
         assert len(resultado_facial["shap_explanation"]) > 0
 
+    def test_shap_top_features_contiene_al_menos_un_feature_interpretable(self, resultado_facial):
+        """shap_top_features puede incluir features SVD (internos del modelo XGBoost+SVD),
+        pero debe existir al menos uno interpretable para que shap_explanation tenga
+        contenido significativo.
+
+        Los svd_N son componentes de reducción de dimensionalidad — representan
+        combinaciones lineales del vocabulario, no palabras. Si todos los top features
+        son SVD, el usuario no recibiría ninguna explicación legible.
+        La explicabilidad final (shap_explanation) excluye svd_* via filtrado,
+        por lo que este test verifica que el filtrado tiene "algo con qué trabajar".
+        """
+        if "shap_top_features" not in resultado_facial:
+            pytest.skip("Explicabilidad no disponible para este modelo")
+        _ILEGIBLES = {"num_palabras", "num_caracteres"}
+        features_legibles = [
+            f for f in resultado_facial["shap_top_features"]
+            if not f["feature"].startswith("svd_") and f["feature"] not in _ILEGIBLES
+        ]
+        assert len(features_legibles) > 0, (
+            "Todos los top features son componentes SVD o métricas internas. "
+            "El usuario no recibirá ninguna explicación significativa. "
+            f"Features actuales: {[f['feature'] for f in resultado_facial['shap_top_features']]}"
+        )
+
+    def test_shap_explanation_no_contiene_svd(self, resultado_facial):
+        """El string shap_explanation no debe mencionar componentes SVD.
+
+        Bug latente: si el pipeline activo es tfidf_svd, shap_explanation podría
+        decir 'Factores principales para alto_riesgo: svd_3, svd_42' — un string
+        inútil que el LLM recibiría como explicación. El fix filtra estos términos
+        antes de construir el string.
+        """
+        if "shap_explanation" not in resultado_facial:
+            pytest.skip("Explicabilidad no disponible para este modelo")
+        assert "svd_" not in resultado_facial["shap_explanation"], (
+            "shap_explanation contiene nombres de componentes SVD ilegibles: "
+            f"'{resultado_facial['shap_explanation']}'"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Grupo 4: Validación de entrada (Pydantic)
@@ -330,6 +369,56 @@ class TestAnnex3Override:
         nivel = override_biometrico["risk_level"]
         probs = override_biometrico["probabilities"]
         assert probs[nivel] == max(probs.values())
+
+    def test_shap_features_no_en_nivel_superior_tras_override(self, override_recidiva):
+        """shap_top_features no debe estar en el nivel raíz del resultado tras override.
+
+        Cuando el override actúa, los features SHAP pertenecen a la predicción ML
+        (clase equivocada). Exponerlos al nivel raíz causaría al LLM recibir algo como
+        'Inaceptable: características para alto_riesgo: kw_algo' — inputs contradictorios.
+        _annex3_override mueve shap_top_features a ml_prediction para evitar esto.
+        """
+        assert "shap_top_features" not in override_recidiva, (
+            "shap_top_features no debe estar en nivel raíz tras override: "
+            "los features ML se mueven a ml_prediction para evitar explicaciones contradictorias."
+        )
+
+    def test_ml_prediction_contiene_shap_features_originales(self, override_recidiva):
+        """ml_prediction debe conservar shap_top_features del modelo ML para trazabilidad.
+
+        Aunque los features ML no son válidos para explicar el nivel determinado por
+        la ley, deben preservarse en ml_prediction para debugging y auditoría.
+        """
+        ml = override_recidiva.get("ml_prediction", {})
+        assert "shap_top_features" in ml, (
+            "ml_prediction debe contener shap_top_features del modelo ML original"
+        )
+        features = ml["shap_top_features"]
+        assert isinstance(features, list)
+        assert len(features) > 0
+        feature_names = {f["feature"] for f in features}
+        assert "chatbot" in feature_names, (
+            f"El feature 'chatbot' del mock debería estar en ml_prediction.shap_top_features, "
+            f"pero se encontraron: {feature_names}"
+        )
+
+    def test_shap_explanation_es_referencia_legal_tras_override(self, override_recidiva):
+        """shap_explanation tras override debe ser la referencia legal, no nombres de features ML.
+
+        Bug: sin el fix, shap_explanation podía decir
+        'Factores principales para inaceptable: kw_alto_riesgo, svd_3'
+        — inputs contradictorios que el LLM no puede interpretar correctamente.
+        Con el fix, el override produce una explicación legal como
+        'Clasificación determinada por Anexo III cat. 6 EU AI Act.'
+        """
+        expl = override_recidiva.get("shap_explanation", "")
+        assert "EU AI Act" in expl, (
+            f"shap_explanation tras override debe mencionar EU AI Act: '{expl}'"
+        )
+        for prefijo in ("svd_", "kw_", "num_palabras", "num_caracteres"):
+            assert prefijo not in expl, (
+                f"shap_explanation tras override menciona un término ML ('{prefijo}'): '{expl}'"
+            )
 
     def test_best_level_incluido_si_faltaba_en_probabilities_originales(self):
         """Si best_level no estaba en el dict original, debe aparecer en el resultado."""

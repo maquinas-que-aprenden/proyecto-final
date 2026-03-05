@@ -44,6 +44,8 @@ _MODEL_DIR = _FUSIONADO / "model"
 _TRAIN_JSONL = _DATA_DIR / "finetune" / "train.jsonl"
 _TEST_JSONL = _DATA_DIR / "finetune" / "test.jsonl"
 _AUGMENT_CSV = _DATA_DIR / "annex3_aumentacion.csv"
+# Ejemplos contrastivos inaceptable/alto_riesgo (cargados si existen)
+_CONTRASTIVA_CSV = _DATA_DIR / "aumentacion_contrastiva.csv"
 
 # ── Hiperparámetros (best_params del experimento 2) ───────────────────────────
 _BEST_PARAMS = {
@@ -175,15 +177,24 @@ def main(*, force_promote: bool = False) -> None:
     df_train = _cargar_jsonl(_TRAIN_JSONL)
     logger.info("train.jsonl: %d ejemplos", len(df_train))
 
-    # 2. Leer annex3_aumentacion.csv
-    if not _AUGMENT_CSV.exists():
-        logger.error("No se encuentra annex3_aumentacion.csv: %s", _AUGMENT_CSV)
-        sys.exit(1)
-    df_aug = pd.read_csv(_AUGMENT_CSV)
-    logger.info("annex3_aumentacion.csv: %d ejemplos", len(df_aug))
+    # 2. Leer ficheros de augmentación (ambos opcionales)
+    dfs_aug = []
+    if _AUGMENT_CSV.exists():
+        df_aug = pd.read_csv(_AUGMENT_CSV)
+        dfs_aug.append(df_aug)
+        logger.info("annex3_aumentacion.csv: %d ejemplos", len(df_aug))
+    else:
+        logger.warning("annex3_aumentacion.csv no encontrado, se omite: %s", _AUGMENT_CSV)
+
+    if _CONTRASTIVA_CSV.exists():
+        df_contrastiva = pd.read_csv(_CONTRASTIVA_CSV)
+        dfs_aug.append(df_contrastiva)
+        logger.info("aumentacion_contrastiva.csv: %d ejemplos", len(df_contrastiva))
+    else:
+        logger.warning("aumentacion_contrastiva.csv no encontrado, se omite: %s", _CONTRASTIVA_CSV)
 
     # 3. Concatenar y limpiar
-    df_all = pd.concat([df_train, df_aug], ignore_index=True)
+    df_all = pd.concat([df_train, *dfs_aug], ignore_index=True)
     df_all = df_all.dropna(subset=["descripcion", "etiqueta"])
     df_all["texto_limpio"] = df_all["descripcion"].apply(_limpiar_texto)
     logger.info("Dataset augmentado total: %d ejemplos", len(df_all))
@@ -276,8 +287,8 @@ def main(*, force_promote: bool = False) -> None:
             "experimento": "2",
             "needs_manual_features": True,
             "test_f1_macro": round(f1_macro, 4),
-            "augmented": True,
-            "augmented_examples": len(df_aug),
+            "augmented_examples": sum(len(d) for d in dfs_aug),
+            "augmented": bool(sum(len(d) for d in dfs_aug)),
             "fecha_reentrenamiento": datetime.now().isoformat(),
         })
         seleccion_path.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")

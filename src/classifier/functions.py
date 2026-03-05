@@ -420,8 +420,8 @@ def extraer_entidades(df, text_column):
 
     nlp_ner = _get_nlp_ner()
     if nlp_ner is None:
-        print("⚠ spaCy no disponible — columna 'entidades' vacía (fallback sin NER).")
         df["entidades"] = [[] for _ in range(len(df))]
+        df["ner_failed"] = True
         return df
 
     import spacy

@@ -256,6 +256,57 @@ class TestClassifyRiskTool:
         result = classify_risk.invoke({"system_description": "filtro de spam"})
         assert "Informe preliminar generado por IA" in result
 
+    @patch.object(orch_module, "predict_risk")
+    def test_svd_features_excluidas_de_factores_clave(self, mock_predict):
+        """Cuando el modelo devuelve features SVD, la respuesta al LLM no las incluye.
+
+        Las componentes SVD (svd_0, svd_42) no tienen significado legal para el usuario
+        ni para el LLM. Si se incluyeran, la respuesta sería: 'Factores clave: svd_3,
+        svd_17' — completamente inútil. El orquestador filtra estos términos.
+        """
+        mock_predict.return_value = {
+            "risk_level": "alto_riesgo",
+            "confidence": 0.88,
+            "shap_top_features": [
+                {"feature": "svd_3", "contribution": 0.42},
+                {"feature": "svd_17", "contribution": 0.31},
+                {"feature": "num_palabras", "contribution": 0.15},
+            ],
+        }
+        result = classify_risk.invoke({"system_description": "sistema de scoring crediticio"})
+        assert "svd_" not in result
+        assert "num_palabras" not in result
+        # Al no haber features interpretables, la sección entera debe omitirse
+        assert "Factores clave" not in result
+
+    @patch.object(orch_module, "predict_risk")
+    def test_override_activo_no_incluye_factores_clave_ml(self, mock_predict):
+        """Con override activo, la respuesta no incluye features ML de la clase equivocada.
+
+        Scenario: ML predijo 'riesgo_minimo' pero Anexo III fuerza 'inaceptable'.
+        Los features ML (para riesgo_minimo) no deben aparecer junto a 'INACEPTABLE'
+        porque producirían inputs contradictorios: el LLM recibiría una explicación
+        para la clase incorrecta.
+        _annex3_override mueve shap_top_features a ml_prediction — por eso
+        result.get("shap_top_features", []) devuelve [] y "Factores clave" se omite.
+        """
+        mock_predict.return_value = {
+            "risk_level": "inaceptable",
+            "confidence": 0.85,
+            "annex3_override": True,
+            "annex3_ref": "Art. 5.1.d",
+            # shap_top_features ausente en nivel raíz (movido a ml_prediction)
+            "ml_prediction": {
+                "risk_level": "riesgo_minimo",
+                "confidence": 0.62,
+                "shap_top_features": [{"feature": "filtro", "contribution": 0.3}],
+            },
+        }
+        result = classify_risk.invoke({"system_description": "reconocimiento facial en espacios públicos"})
+        assert "INACEPTABLE" in result
+        # Features del ML (que clasificó mal) no deben contaminar la respuesta
+        assert "Factores clave" not in result
+
 
 # ---------------------------------------------------------------------------
 # Grupo 4: search_legal_docs propaga el pipeline RAG
