@@ -134,8 +134,8 @@ def _get_nlp():
                     import spacy
                     _nlp = spacy.load("es_core_news_sm", disable=["parser", "ner"])
                 except Exception:
-                    _nlp = False  # centinela: cachea el fallo, evita reintentos en cada llamada
-    return _nlp or None  # False → None para el caller
+                    return None
+    return _nlp
 
 
 def _get_nlp_ner():
@@ -149,8 +149,14 @@ def _get_nlp_ner():
                     import spacy
                     _nlp_ner = spacy.load("es_core_news_sm")
                 except Exception:
-                    _nlp_ner = False  # centinela: cachea el fallo, evita reintentos
-    return _nlp_ner or None  # False → None para el caller
+                    return None
+    return _nlp_ner
+
+
+# Stopwords, keywords y etiquetas — fuente única: _constants.py
+from ._constants import STOPWORDS_ES as _STOPWORDS_ES
+from ._constants import KEYWORDS_DOMINIO, PALABRAS_SUPERVISION as _PALABRAS_SUPERVISION
+from ._constants import LEAKAGE_COLUMNS as _LEAKAGE_COLUMNS
 
 
 def _limpiar_texto_fallback(texto, lemmatize=False):
