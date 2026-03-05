@@ -64,7 +64,14 @@ _SEVERITY: dict[str, int] = {
 
 
 def _build_annex3_patterns() -> list:
-    """Compila los patrones del Anexo III EU AI Act (llamada lazy, una sola vez)."""
+    """Compila los patrones del Anexo III EU AI Act (llamada lazy, una sola vez).
+
+    IMPORTANTE — SINCRONIZACIÓN CON create_normative_features.py:
+    Ese módulo define patrones equivalentes para Art. 5.1.a–5.1.e usados al
+    enriquecer el dataset de entrenamiento. Si se modifica algún patrón aquí,
+    revisar create_normative_features.py para mantener coherencia entre
+    entrenamiento e inferencia. Ver [I1] en audit_errores_classifier.md.
+    """
     raw = [
         # ALTO RIESGO — Anexo III
         (r"(cv|curr[ií]culum|curricular).{0,60}(screening|selecci[oó]n|filtr|evaluaci[oó]n|clasificaci[oó]n)",
@@ -177,62 +184,22 @@ def _annex3_override(text: str, result: dict) -> dict:
     return result
 
 
-# Keywords de dominio (replica de functions.py para inferencia sin spaCy)
-_KEYWORDS_DOMINIO = {
-    "inaceptable": [
-        "inferir", "vender", "manipular", "subconsciente", "biométrico",
-        "facial", "vigilancia", "sindical", "racial", "etnia",
-        "religioso", "discriminar", "coerción", "prohibido",
-    ],
-    "alto_riesgo": [
-        "penitenciario", "juez", "reincidencia", "crediticio",
-        "diagnóstico", "sanitario", "migración", "asilo",
-        "policial", "empleabilidad", "infraestructura", "vinculante",
-        "medicación", "autónomamente",
-        "reclamación", "subsidio", "escolar", "triage",
-        "urgencia", "aeronave", "piloto", "laboral",
-        # Anexo III cat. 4 — selección de personal (CV screening)
-        "curricular", "candidato", "reclutamiento", "curriculum",
-        # Anexo III cat. 5 — servicios financieros esenciales
-        "solvencia", "préstamo", "crédito", "hipoteca",
-        # Anexo III cat. 6 — justicia penal
-        "recidiva", "reincidente",
-        # Anexo III cat. 7 — migración
-        "frontera", "visado", "refugiado",
-        # Anexo III cat. 8 — administración de justicia
-        "sentencia", "judicial",
-        # Anexo III cat. 3 — educación
-        "admisión", "matriculación",
-    ],
-    "riesgo_limitado": [
-        "chatbot", "revelar", "transparencia", "deepfake",
-        "sintético", "notificar", "asesoramiento", "asistente",
-        "informar", "advertir", "indicar",
-    ],
-    "riesgo_minimo": [
-        "sugerir", "borrador", "juego", "spam", "entretenimiento",
-        "filtro", "aficionado", "hobby", "receta",
-        "avería", "maquinaria", "logística", "mantenimiento",
-        "sensor", "industrial", "gestión",
-    ],
-}
-_PALABRAS_SUPERVISION = [
-    "supervisión", "supervisar", "revisar", "revisión", "garantía",
-    "confirmación", "criterio", "auditoría", "humano",
-    "pediatra", "médico", "piloto", "pedagógico",
-]
+# _KEYWORDS_DOMINIO y _PALABRAS_SUPERVISION importados desde _constants (ver bloque _RISK_LABELS arriba)
 
 # Ruta al mejor modelo (dataset fusionado)
 _MODEL_DIR = Path(__file__).parent / "classifier_dataset_fusionado" / "model"
 
 # Mapping canónico de etiquetas numéricas → textuales (EU AI Act)
-# Fallback cuando el modelo no incluye label_encoder.joblib
-_RISK_LABELS = {
-    "0": "inaceptable",
-    "1": "alto",
-    "2": "limitado",
-    "3": "mínimo",
-}
+# Fallback cuando el modelo no incluye label_encoder.joblib.
+# Fuente de verdad: src/classifier/_constants.py
+try:
+    from src.classifier._constants import RISK_LABELS as _RISK_LABELS
+    from src.classifier._constants import KEYWORDS_DOMINIO as _KEYWORDS_DOMINIO
+    from src.classifier._constants import PALABRAS_SUPERVISION as _PALABRAS_SUPERVISION
+except ImportError:
+    from ._constants import RISK_LABELS as _RISK_LABELS
+    from ._constants import KEYWORDS_DOMINIO as _KEYWORDS_DOMINIO
+    from ._constants import PALABRAS_SUPERVISION as _PALABRAS_SUPERVISION
 
 # Singletons — se cargan en el primer uso (thread-safe)
 _modelo = None
@@ -283,9 +250,13 @@ def _load_artifacts():
         explicit_pipeline: str | None = None
         meta_path = _MODEL_DIR / "mejor_modelo_seleccion.json"
         if meta_path.exists():
-            meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            model_file = _MODEL_DIR.parent / meta["model_file"]
-            tfidf_file = _MODEL_DIR.parent / meta["tfidf_file"]
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.warning("mejor_modelo_seleccion.json ilegible (%s); usando rutas por defecto.", exc)
+                meta = {}
+            model_file = _MODEL_DIR.parent / meta.get("model_file", "model/modelo_xgboost.joblib")
+            tfidf_file = _MODEL_DIR.parent / meta.get("tfidf_file", "model/tfidf_vectorizer.joblib")
             needs_manual_features = meta.get("needs_manual_features", False)
             explicit_pipeline = meta.get("pipeline_type")
             logger.info("Cargando modelo desde metadata: %s", meta.get("nombre", ""))
@@ -488,8 +459,11 @@ def predict_risk(text: str) -> dict:
     # 4. Explicabilidad — top features por contribucion
     try:
         if hasattr(_modelo, "coef_"):
-            # LogReg: contribuciones lineales
-            pred_idx = list(_modelo.classes_).index(risk_level)
+            # LogReg: contribuciones lineales.
+            # Se usa raw_pred (valor numérico original) en lugar de risk_level
+            # (string ya decodificado) para evitar ValueError cuando el modelo
+            # fue entrenado con LabelEncoder y _modelo.classes_ son integers.
+            pred_idx = list(_modelo.classes_).index(raw_pred)
             coefs = _modelo.coef_[pred_idx]
             X_dense = X_final.toarray().flatten() if hasattr(X_final, "toarray") else X_final.flatten()
             contributions = coefs * X_dense
