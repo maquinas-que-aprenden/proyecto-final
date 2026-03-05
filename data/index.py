@@ -11,6 +11,7 @@ from pathlib import Path
 import json
 
 import chromadb
+import numpy as np
 from sentence_transformers import SentenceTransformer
 
 # ── Rutas ───────────────────────────────────────────────────────────
@@ -39,7 +40,7 @@ def load_chunks(path: Path) -> tuple[list[str], list[dict]]:
     return texts, metadata
 
 
-def generate_embeddings(texts: list[str], model: SentenceTransformer) -> list:
+def generate_embeddings(texts: list[str], model: SentenceTransformer) -> np.ndarray:
     """Genera embeddings para todos los textos (con prefijo 'passage: ' para e5)."""
     prefixed = [f"passage: {t}" for t in texts]
     return model.encode(
@@ -53,7 +54,7 @@ def generate_embeddings(texts: list[str], model: SentenceTransformer) -> list:
 
 def populate_chroma(
     texts: list[str],
-    embeddings,
+    embeddings: np.ndarray,
     metadata: list[dict],
 ) -> None:
     """Puebla ChromaDB desde cero (re-indexación completa)."""
