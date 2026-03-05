@@ -31,11 +31,12 @@ import joblib
 import numpy as np
 from pydantic import BaseModel, Field
 from src.checklist.main import SEVERITY
-from src.classifier._constants import (
+from ._constants import (
     KEYWORDS_DOMINIO as _KEYWORDS_DOMINIO,
     PALABRAS_SUPERVISION as _PALABRAS_SUPERVISION,
     RISK_LABELS as _RISK_LABELS,
 )
+from .functions import limpiar_texto as _limpiar_texto
 from src.observability.langfuse_compat import observe, langfuse_context
 
 logger = logging.getLogger(__name__)
@@ -171,22 +172,8 @@ def _annex3_override(text: str, result: dict) -> dict:
     return result
 
 
-# _KEYWORDS_DOMINIO y _PALABRAS_SUPERVISION importados desde _constants (ver bloque _RISK_LABELS arriba)
-
 # Ruta al mejor modelo (dataset fusionado)
 _MODEL_DIR = Path(__file__).parent / "classifier_dataset_fusionado" / "model"
-
-# Mapping canónico de etiquetas numéricas → textuales (EU AI Act)
-# Fallback cuando el modelo no incluye label_encoder.joblib.
-# Fuente de verdad: src/classifier/_constants.py
-try:
-    from src.classifier._constants import RISK_LABELS as _RISK_LABELS
-    from src.classifier._constants import KEYWORDS_DOMINIO as _KEYWORDS_DOMINIO
-    from src.classifier._constants import PALABRAS_SUPERVISION as _PALABRAS_SUPERVISION
-except ImportError:
-    from ._constants import RISK_LABELS as _RISK_LABELS
-    from ._constants import KEYWORDS_DOMINIO as _KEYWORDS_DOMINIO
-    from ._constants import PALABRAS_SUPERVISION as _PALABRAS_SUPERVISION
 
 # Singletons — se cargan en el primer uso (thread-safe)
 _modelo = None
@@ -291,37 +278,6 @@ def _load_artifacts():
             _MODEL_DIR,
         )
 
-
-def _limpiar_texto_fallback(texto: str) -> str:
-    """Limpieza basica con regex (misma logica que functions._limpiar_texto_fallback)."""
-    import re
-
-    if not texto or not isinstance(texto, str):
-        return ""
-
-    _stopwords = {
-        "a", "al", "algo", "algunas", "algunos", "ante", "antes", "como",
-        "con", "contra", "cual", "cuando", "de", "del", "desde", "donde",
-        "durante", "e", "el", "ella", "ellos", "en", "entre", "era", "es",
-        "esa", "esas", "ese", "eso", "esos", "esta", "estas", "este", "esto",
-        "estos", "fue", "ha", "han", "hasta", "hay", "he", "la", "las", "le",
-        "les", "lo", "los", "me", "mi", "mis", "muy", "ni", "no", "nos",
-        "o", "os", "otro", "para", "pero", "por", "que", "quien", "quienes",
-        "se", "si", "sin", "sobre", "son", "su", "sus", "también", "tanto",
-        "te", "todo", "todos", "tu", "tus", "un", "una", "unas", "uno",
-        "unos", "ya", "yo",
-    }
-    tokens = re.findall(r"\b[a-záéíóúüñ]{3,}\b", texto.lower())
-    return " ".join(t for t in tokens if t not in _stopwords)
-
-
-def _limpiar_texto(texto: str) -> str:
-    """Limpia texto para inferencia, usando spaCy si esta disponible."""
-    try:
-        from src.classifier.functions import limpiar_texto
-        return limpiar_texto(texto)
-    except ImportError:
-        return _limpiar_texto_fallback(texto)
 
 
 def _crear_features_manuales(text: str) -> np.ndarray:

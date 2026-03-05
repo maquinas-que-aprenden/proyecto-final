@@ -27,11 +27,11 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import classification_report, f1_score
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils.class_weight import compute_sample_weight
-from src.classifier._constants import (
+from ._constants import (
     KEYWORDS_DOMINIO as _KEYWORDS_DOMINIO,
     PALABRAS_SUPERVISION as _PALABRAS_SUPERVISION,
-    STOPWORDS_ES as _STOPWORDS_ES,
 )
+from .functions import limpiar_texto as _limpiar_texto
 try:
     from xgboost import XGBClassifier
 except ImportError:  # pragma: no cover
@@ -69,14 +69,6 @@ _BEST_PARAMS = {
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
-
-def _limpiar_texto(texto: str) -> str:
-    """Limpieza básica con regex (fallback sin spaCy)."""
-    if not texto or not isinstance(texto, str):
-        return ""
-    tokens = re.findall(r"\b[a-záéíóúüñ]{3,}\b", texto.lower())
-    return " ".join(t for t in tokens if t not in _STOPWORDS_ES)
-
 
 def _extraer_descripcion(text: str) -> str:
     """Extrae el fragmento entre '### Descripción:' y '### Clasificación:' del JSONL."""
