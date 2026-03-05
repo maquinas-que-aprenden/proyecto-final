@@ -11,7 +11,6 @@ from pathlib import Path
 import json
 
 import chromadb
-import numpy as np
 from sentence_transformers import SentenceTransformer
 
 # ── Rutas ───────────────────────────────────────────────────────────
@@ -19,8 +18,6 @@ from sentence_transformers import SentenceTransformer
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_PATH = PROJECT_ROOT / "data" / "processed" / "chunks_legal" / "chunks_final_all_sources.jsonl"
 VSTORE_DIR = PROJECT_ROOT / "data" / "processed" / "vectorstore"
-EMB_PATH = VSTORE_DIR / "embeddings.npy"
-META_PATH = VSTORE_DIR / "chunks_meta.jsonl"
 CHROMA_DIR = VSTORE_DIR / "chroma"
 
 MODEL_NAME = "intfloat/multilingual-e5-base"
@@ -42,7 +39,7 @@ def load_chunks(path: Path) -> tuple[list[str], list[dict]]:
     return texts, metadata
 
 
-def generate_embeddings(texts: list[str], model: SentenceTransformer) -> np.ndarray:
+def generate_embeddings(texts: list[str], model: SentenceTransformer) -> list:
     """Genera embeddings para todos los textos (con prefijo 'passage: ' para e5)."""
     prefixed = [f"passage: {t}" for t in texts]
     return model.encode(
@@ -54,28 +51,19 @@ def generate_embeddings(texts: list[str], model: SentenceTransformer) -> np.ndar
     )
 
 
-def save_embeddings(embeddings: np.ndarray, metadata: list[dict]) -> None:
-    """Guarda embeddings (.npy) y metadata (.jsonl) en disco."""
-    VSTORE_DIR.mkdir(parents=True, exist_ok=True)
-    np.save(EMB_PATH, embeddings)
-    with META_PATH.open("w", encoding="utf-8") as f:
-        for rec in metadata:
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-
-
 def populate_chroma(
     texts: list[str],
-    embeddings: np.ndarray,
+    embeddings,
     metadata: list[dict],
 ) -> None:
-    """Puebla ChromaDB con upsert en batches."""
+    """Puebla ChromaDB desde cero (re-indexación completa)."""
     CHROMA_DIR.mkdir(parents=True, exist_ok=True)
     client = chromadb.PersistentClient(path=str(CHROMA_DIR))
-    # Recrear colección para reflejar nueva dimensión de embeddings
+    # Re-indexación completa: borrar colección anterior si existe
     try:
         client.delete_collection(name=COLLECTION_NAME)
-    except Exception:
-        pass
+    except ValueError:
+        pass  # Primera ejecución: no existe colección anterior
     col = client.create_collection(name=COLLECTION_NAME)
 
     ids = []
@@ -124,13 +112,7 @@ def main() -> None:
     embeddings = generate_embeddings(texts, model)
     print(f"  Shape: {embeddings.shape}")
 
-    # 3) Guardar a disco
-    print("\n-- Guardando embeddings --")
-    save_embeddings(embeddings, metadata)
-    print(f"  {EMB_PATH.name}: {embeddings.shape}")
-    print(f"  {META_PATH.name}: {len(metadata)} registros")
-
-    # 4) Poblar ChromaDB
+    # 3) Poblar ChromaDB
     print("\n-- Poblando ChromaDB --")
     populate_chroma(texts, embeddings, metadata)
 

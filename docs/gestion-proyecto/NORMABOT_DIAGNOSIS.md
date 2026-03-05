@@ -51,7 +51,7 @@ Fecha: 2026-02-27 (rama: `docs/improve-ideas`, commit: `4c101f83`)
 | LLM (Report) | Amazon Bedrock Nova Lite v1 | ✓ Integrado en `src/report/main.py:41-127` |
 | Agentes | LangGraph `create_react_agent` | ✓ Funcional |
 | Vector store | ChromaDB PersistentClient | ✓ Funcional en `src/retrieval/retriever.py` |
-| Embeddings | sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2 | ✓ Usado en indexación y retrieval |
+| Embeddings | intfloat/multilingual-e5-base | ✓ Usado en indexación y retrieval |
 | ML Classifier | scikit-learn 1.5.2, XGBoost 3.2.0 | ✓ Funcional (3 variantes) |
 | NLP text cleaning | spaCy 3.8.2 (es_core_news_sm) | ✓ Funcional + fallback regex |
 | Explicabilidad | SHAP 0.46.0 + TreeExplainer | ✓ Funcional (real con XGBoost) |
