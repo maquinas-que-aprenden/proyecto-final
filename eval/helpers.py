@@ -50,9 +50,9 @@ def get_agent_answers(dataset: list[dict]) -> list[dict]:
     try:
         from src.rag.main import retrieve, grade
         use_retriever = True
-    except Exception as e:
+    except ImportError:
         use_retriever = False
-        logger.warning("Retriever no disponible (%s) — usando contextos estáticos del dataset", e)
+        logger.warning("Módulo src.rag.main no disponible — usando contextos estáticos del dataset")
 
     rows = []
     for item in dataset:
@@ -79,8 +79,8 @@ def get_agent_answers(dataset: list[dict]) -> list[dict]:
                 relevant = grade(question, docs)
                 if relevant:
                     contexts = [d["doc"] for d in relevant]
-            except Exception as e:
-                logger.warning("Error en retrieval para '%s': %s — usando contextos estáticos", question[:50], e)
+            except Exception:
+                logger.exception("Error en retrieval para '%s' — usando contextos estáticos", question[:50])
 
         rows.append({
             "question": question,
