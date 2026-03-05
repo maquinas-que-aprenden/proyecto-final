@@ -62,7 +62,7 @@ def main(ci_mode: bool = False) -> int:
         logger.error("Error en la evaluación RAGAS: %s", e)
         if ci_mode:
             return 1
-        metrics = {"faithfulness": 0.0, "answer_relevancy": 0.0}
+        metrics = {"faithfulness": 0.0, "answer_relevancy": 0.0, "context_precision": 0.0, "context_recall": 0.0}
 
     # 5. Mostrar resultados
     logger.info("─" * 40)
