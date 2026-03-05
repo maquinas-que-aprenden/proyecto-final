@@ -29,9 +29,14 @@ from pathlib import Path
 
 import joblib
 import numpy as np
-from src.checklist.main import SEVERITY
-from src.observability.langfuse_compat import observe, langfuse_context
 from pydantic import BaseModel, Field
+from src.checklist.main import SEVERITY
+from src.classifier._constants import (
+    KEYWORDS_DOMINIO as _KEYWORDS_DOMINIO,
+    PALABRAS_SUPERVISION as _PALABRAS_SUPERVISION,
+    RISK_LABELS as _RISK_LABELS,
+)
+from src.observability.langfuse_compat import observe, langfuse_context
 
 logger = logging.getLogger(__name__)
 
@@ -171,18 +176,6 @@ def _annex3_override(text: str, result: dict) -> dict:
 # Ruta al mejor modelo (dataset fusionado)
 _MODEL_DIR = Path(__file__).parent / "classifier_dataset_fusionado" / "model"
 
-# Mapping canónico de etiquetas numéricas → textuales (EU AI Act)
-# Fallback cuando el modelo no incluye label_encoder.joblib.
-# Fuente de verdad: src/classifier/_constants.py
-try:
-    from src.classifier._constants import RISK_LABELS as _RISK_LABELS
-    from src.classifier._constants import KEYWORDS_DOMINIO as _KEYWORDS_DOMINIO
-    from src.classifier._constants import PALABRAS_SUPERVISION as _PALABRAS_SUPERVISION
-except ImportError:
-    from ._constants import RISK_LABELS as _RISK_LABELS
-    from ._constants import KEYWORDS_DOMINIO as _KEYWORDS_DOMINIO
-    from ._constants import PALABRAS_SUPERVISION as _PALABRAS_SUPERVISION
-
 # Singletons — se cargan en el primer uso (thread-safe)
 _modelo = None
 _tfidf = None
@@ -233,8 +226,11 @@ def _load_artifacts():
         meta_path = _MODEL_DIR / "mejor_modelo_seleccion.json"
         if meta_path.exists():
             try:
-                meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError) as exc:
+                parsed = json.loads(meta_path.read_text(encoding="utf-8"))
+                if not isinstance(parsed, dict):
+                    raise ValueError(f"Se esperaba un objeto JSON, se obtuvo {type(parsed).__name__}")
+                meta = parsed
+            except (json.JSONDecodeError, OSError, ValueError) as exc:
                 logger.warning("mejor_modelo_seleccion.json ilegible (%s); usando rutas por defecto.", exc)
                 meta = {}
             model_file = _MODEL_DIR.parent / meta.get("model_file", "model/modelo_xgboost.joblib")

@@ -27,6 +27,11 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import classification_report, f1_score
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils.class_weight import compute_sample_weight
+from src.classifier._constants import (
+    KEYWORDS_DOMINIO as _KEYWORDS_DOMINIO,
+    PALABRAS_SUPERVISION as _PALABRAS_SUPERVISION,
+    STOPWORDS_ES as _STOPWORDS_ES,
+)
 try:
     from xgboost import XGBClassifier
 except ImportError:  # pragma: no cover
@@ -61,21 +66,6 @@ _BEST_PARAMS = {
     "random_state": 42,
     "eval_metric": "mlogloss",
 }
-
-# ── Constantes de dominio (fuente única: _constants.py) ───────────────────────
-try:
-    from src.classifier._constants import (
-        KEYWORDS_DOMINIO as _KEYWORDS_DOMINIO,
-        PALABRAS_SUPERVISION as _PALABRAS_SUPERVISION,
-        STOPWORDS_ES as _STOPWORDS_ES,
-    )
-except ImportError:
-    from ._constants import (  # type: ignore[no-redef]
-        KEYWORDS_DOMINIO as _KEYWORDS_DOMINIO,
-        PALABRAS_SUPERVISION as _PALABRAS_SUPERVISION,
-        STOPWORDS_ES as _STOPWORDS_ES,
-    )
-
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -195,7 +185,8 @@ def main(*, force_promote: bool = False) -> None:
     X_train_svd = svd.fit_transform(X_train_tfidf)
     X_test_svd = svd.transform(X_test_tfidf)
     logger.info(
-        "SVD(100): varianza explicada acumulada = %.3f",
+        "SVD(%d): varianza explicada acumulada = %.3f",
+        _SVD_N_COMPONENTS,
         svd.explained_variance_ratio_.sum(),
     )
 
