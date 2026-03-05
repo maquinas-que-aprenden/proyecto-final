@@ -7,7 +7,7 @@ botocore==1.42.49
 
 # Observabilidad
 langfuse>=2.7.3,<3.0.0
-ragas==0.2.0
+ragas==0.2.15
 
 # Instalaciones manuales:
 # AWS CLI se tiene que instalar manualmente:

@@ -22,8 +22,8 @@ xgboost>=3.0.0
 langchain-ollama>=0.3.0
 sentence-transformers==3.3.1
 
-# Evaluación RAG
-ragas==0.2.0
+# Evaluación RAG (requerido por eval.yml — se ejecuta dentro del Docker)
+ragas==0.2.15
 
 # Observabilidad
 langfuse>=2.7.3,<3.0.0
