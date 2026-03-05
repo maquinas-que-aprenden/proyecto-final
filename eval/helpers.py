@@ -165,12 +165,16 @@ def run_ragas(ragas_dataset) -> dict:
     except Exception as e:
         raise RuntimeError(f"Fallo crítico en Bedrock/Ragas: {e}")
 
-    return {
+    metrics = {
         "faithfulness": round(float(np.nanmean(results["faithfulness"])), 4),
         "answer_relevancy": round(float(np.nanmean(results["answer_relevancy"])), 4),
         "context_precision": round(float(np.nanmean(results["context_precision"])), 4),
         "context_recall": round(float(np.nanmean(results["context_recall"])), 4),
     }
+    nan_metrics = [k for k, v in metrics.items() if np.isnan(v)]
+    if nan_metrics:
+        raise RuntimeError(f"Métricas con NaN tras evaluación RAGAS: {nan_metrics}")
+    return metrics
 
 # Cuando se apruebe PR#36 lo añado a observabilidad
 def log_to_mlflow(metrics: dict, n_examples: int, git_sha: str) -> None:
@@ -272,8 +276,8 @@ def check_thresholds(metrics: dict) -> list[str]:
     failures = []
     for metric, threshold in THRESHOLDS.items():
         value = metrics.get(metric, 0.0)
-        if value < threshold:
-            failures.append(
-                f"{metric}: {value:.4f} < {threshold} (umbral mínimo)"
-            )
+        if np.isnan(value):
+            failures.append(f"{metric}: NaN (métrica no calculada correctamente)")
+        elif value < threshold:
+            failures.append(f"{metric}: {value:.4f} < {threshold} (umbral mínimo)")
     return failures
