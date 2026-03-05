@@ -148,10 +148,18 @@ def run_ragas(ragas_dataset) -> dict:
         ContextRecall(llm=ragas_llm),
     ]
 
+    column_map = {
+        "user_input": "question",
+        "response": "answer",
+        "retrieved_contexts": "contexts",
+        "reference": "ground_truth",
+    }
+
     try:
         results = evaluate(
             dataset=ragas_dataset,
             metrics=metrics,
+            column_map=column_map,
         )
     except Exception as e:
         raise RuntimeError(f"Fallo crítico en Bedrock/Ragas: {e}")
