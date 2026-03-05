@@ -153,11 +153,6 @@ def _get_nlp_ner():
     return _nlp_ner
 
 
-# Stopwords, keywords y etiquetas — fuente única: _constants.py
-from ._constants import STOPWORDS_ES as _STOPWORDS_ES
-from ._constants import KEYWORDS_DOMINIO, PALABRAS_SUPERVISION as _PALABRAS_SUPERVISION
-from ._constants import LEAKAGE_COLUMNS as _LEAKAGE_COLUMNS
-
 
 def _limpiar_texto_fallback(texto, lemmatize=False):
     """Limpieza básica con regex cuando spaCy no está disponible."""
