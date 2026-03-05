@@ -229,6 +229,12 @@ def _load_artifacts():
             except (json.JSONDecodeError, OSError) as exc:
                 logger.warning("mejor_modelo_seleccion.json ilegible (%s); usando rutas por defecto.", exc)
                 meta = {}
+            if not isinstance(meta, dict):
+                logger.warning(
+                    "mejor_modelo_seleccion.json contiene %s en lugar de un objeto JSON; usando rutas por defecto.",
+                    type(meta).__name__,
+                )
+                meta = {}
             model_file = _MODEL_DIR.parent / meta.get("model_file", "model/modelo_xgboost.joblib")
             tfidf_file = _MODEL_DIR.parent / meta.get("tfidf_file", "model/tfidf_vectorizer.joblib")
             needs_manual_features = meta.get("needs_manual_features", False)
