@@ -68,7 +68,7 @@ _mock_lg_checkpoint = _inject_module_mock("langgraph.checkpoint")
 _mock_lg_checkpoint_sqlite = _inject_module_mock("langgraph.checkpoint.sqlite")
 _mock_lg_checkpoint_sqlite.SqliteSaver = MagicMock()
 _mock_lg_checkpoint_memory = _inject_module_mock("langgraph.checkpoint.memory")
-_mock_lg_checkpoint_memory.InMemorySaver = MagicMock()
+_mock_lg_checkpoint_memory.MemorySaver = MagicMock()
 
 # langgraph.store (memoria cross-thread)
 _mock_lg_store = _inject_module_mock("langgraph.store")
@@ -514,3 +514,90 @@ class TestMemoriaConversacional:
         input_data = call_args[0][0]
         assert len(input_data["messages"]) == 1
         assert input_data["messages"][0] == ("user", "segunda pregunta")
+
+
+# ---------------------------------------------------------------------------
+# Grupo 9: Inicialización del checkpointer
+# ---------------------------------------------------------------------------
+
+class TestCheckpointerInit:
+    """_get_checkpointer() inicializa SQLite o degrada a MemorySaver."""
+
+    def setup_method(self):
+        orch_module._checkpointer = None
+
+    def teardown_method(self):
+        orch_module._checkpointer = None
+
+    @patch("sqlite3.connect")
+    def test_sqlite_inicializa_correctamente(self, mock_connect, tmp_path):
+        """Con SQLite disponible, crea SqliteSaver con conexión directa."""
+        mock_conn = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_saver = MagicMock()
+        original_sqlite = orch_module._SQLITE_AVAILABLE
+        original_dir = orch_module.MEMORY_DIR
+
+        try:
+            orch_module._SQLITE_AVAILABLE = True
+            orch_module.MEMORY_DIR = str(tmp_path / "memory")
+            orch_module.SqliteSaver = MagicMock(return_value=mock_saver)
+
+            result = orch_module._get_checkpointer()
+
+            mock_connect.assert_called_once()
+            mock_saver.setup.assert_called_once()
+            assert result is mock_saver
+        finally:
+            orch_module._SQLITE_AVAILABLE = original_sqlite
+            orch_module.MEMORY_DIR = original_dir
+
+    def test_fallback_a_memory_cuando_sqlite_falla(self, tmp_path):
+        """Si SQLite falla en runtime, degrada a MemorySaver sin error."""
+        original_sqlite = orch_module._SQLITE_AVAILABLE
+        original_dir = orch_module.MEMORY_DIR
+        mock_memory = MagicMock()
+
+        try:
+            orch_module._SQLITE_AVAILABLE = True
+            orch_module.MEMORY_DIR = str(tmp_path / "memory")
+            orch_module.SqliteSaver = MagicMock(side_effect=RuntimeError("db error"))
+            orch_module.MemorySaver = MagicMock(return_value=mock_memory)
+
+            result = orch_module._get_checkpointer()
+
+            assert result is mock_memory
+        finally:
+            orch_module._SQLITE_AVAILABLE = original_sqlite
+            orch_module.MEMORY_DIR = original_dir
+
+    def test_usa_memory_cuando_sqlite_no_disponible(self):
+        """Sin langgraph-checkpoint-sqlite, usa MemorySaver directamente."""
+        original_sqlite = orch_module._SQLITE_AVAILABLE
+        mock_memory = MagicMock()
+
+        try:
+            orch_module._SQLITE_AVAILABLE = False
+            orch_module.MemorySaver = MagicMock(return_value=mock_memory)
+
+            result = orch_module._get_checkpointer()
+
+            assert result is mock_memory
+        finally:
+            orch_module._SQLITE_AVAILABLE = original_sqlite
+
+    def test_singleton_devuelve_misma_instancia(self, tmp_path):
+        """Llamar _get_checkpointer() dos veces devuelve la misma instancia."""
+        original_sqlite = orch_module._SQLITE_AVAILABLE
+        mock_memory = MagicMock()
+
+        try:
+            orch_module._SQLITE_AVAILABLE = False
+            orch_module.MemorySaver = MagicMock(return_value=mock_memory)
+
+            first = orch_module._get_checkpointer()
+            second = orch_module._get_checkpointer()
+
+            assert first is second
+        finally:
+            orch_module._SQLITE_AVAILABLE = original_sqlite

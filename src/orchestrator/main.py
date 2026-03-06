@@ -28,13 +28,14 @@ from pydantic import BaseModel, Field
 from src.memory.hooks import pre_model_hook
 
 # Checkpointer: SQLite persistente si está disponible, sino en memoria
+from langgraph.checkpoint.memory import MemorySaver
+
 try:
     from langgraph.checkpoint.sqlite import SqliteSaver
 
     _SQLITE_AVAILABLE = True
 except ImportError:
-    from langgraph.checkpoint.memory import InMemorySaver
-
+    SqliteSaver = None
     _SQLITE_AVAILABLE = False
 
 from src.observability.langfuse_compat import observe, langfuse_context
@@ -336,7 +337,7 @@ _lock = threading.Lock()
 def _get_checkpointer():
     """Singleton thread-safe del checkpointer (double-checked locking).
 
-    Intenta SQLite si está disponible; degrada a InMemorySaver si falla
+    Intenta SQLite si está disponible; degrada a MemorySaver si falla
     la creación del directorio o la inicialización de la base de datos.
     """
     global _checkpointer
@@ -349,10 +350,13 @@ def _get_checkpointer():
 
         if _SQLITE_AVAILABLE:
             try:
+                import sqlite3
+
                 memory_dir = Path(MEMORY_DIR)
                 memory_dir.mkdir(parents=True, exist_ok=True)
                 db_path = str(memory_dir / "conversations.db")
-                saver = SqliteSaver.from_conn_string(db_path)
+                conn = sqlite3.connect(db_path, check_same_thread=False)
+                saver = SqliteSaver(conn)
                 saver.setup()
                 _checkpointer = saver
                 logger.info("Checkpointer SQLite inicializado: %s", db_path)
@@ -361,9 +365,9 @@ def _get_checkpointer():
                     "SQLite checkpointer falló, degradando a memoria",
                     exc_info=True,
                 )
-                _checkpointer = InMemorySaver()
+                _checkpointer = MemorySaver()
         else:
-            _checkpointer = InMemorySaver()
+            _checkpointer = MemorySaver()
             logger.info(
                 "Checkpointer en memoria (langgraph-checkpoint-sqlite no instalado)"
             )

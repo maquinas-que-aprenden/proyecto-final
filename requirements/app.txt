@@ -5,11 +5,11 @@
 streamlit>=1.40.0
 
 # Agentes y orquestación
-langgraph>=0.2.0
-langchain>=0.3.0
-langchain-aws>=0.2.0
-langchain-core>=0.3.0
-langgraph-checkpoint-sqlite>=2.0.0
+langgraph>=0.2.0,<0.4.0
+langchain>=0.3.0,<0.4.0
+langchain-aws>=0.2.0,<0.3.0
+langchain-core>=0.3.0,<0.4.0
+langgraph-checkpoint-sqlite>=2.0.0,<3.0.0
 chromadb==1.5.1
 
 # Classifier runtime (deserializar modelo + matrices TF-IDF)
@@ -19,7 +19,7 @@ scikit-learn>=1.5.0
 xgboost>=3.0.0
 
 # LLM providers
-langchain-ollama>=0.3.0
+langchain-ollama>=0.3.0,<0.4.0
 sentence-transformers==3.3.1
 
 # Evaluación RAG (requerido por eval.yml — se ejecuta dentro del Docker)
