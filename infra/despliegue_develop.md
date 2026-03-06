@@ -200,7 +200,9 @@ docker run -d --name normabot \
   -e HOME=/home/appuser \
   -p 8080:8080 --env-file .env \
   -v $(pwd)/data/processed/vectorstore:/app/data/processed/vectorstore \
+  -v $(pwd)/eval:/app/eval \
   -v ollama_models:/home/appuser/.ollama \
+  -v normabot_memory:/app/data/memory \
   --entrypoint sh \
   ghcr.io/maquinas-que-aprenden/proyecto-final:develop \
   -c "/ollama-entrypoint.sh"
@@ -221,3 +223,26 @@ docker logs -f normabot
 ```
 
 > `docker logs -f` se queda siguiendo los logs en tiempo real. Pulsa **Ctrl+C** para salir — esto solo cierra la vista de logs, no para el contenedor.
+
+---
+
+## 5. Ejecutar la evaluación RAGAS manualmente
+
+La forma recomendada es lanzar el workflow desde GitHub Actions (_Actions → NormaBot RAGAS Eval → Run workflow_). Si quieres ejecutarlo a mano desde el servidor:
+
+```bash
+# Conéctate al servidor
+ssh -i ~/.ssh/normabot ubuntu@<IP>
+
+# Actualiza los ficheros de eval desde git (el contenedor los ve vía bind mount)
+cd /home/ubuntu/normabot
+git pull
+
+# Lanza la evaluación en el contenedor en marcha
+docker exec \
+  -e PYTHONPATH=/app:/app/eval \
+  normabot \
+  python eval/run_ragas.py --ci
+```
+
+El script tarda varios minutos (llama a Bedrock por cada pregunta del dataset). Los resultados se registran en MLflow (experimento `ragas_eval`) y en Langfuse etiquetados con el SHA del commit actual.
