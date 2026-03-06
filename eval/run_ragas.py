@@ -28,6 +28,8 @@ from helpers import (
     log_to_mlflow,
     log_to_langfuse,
     check_thresholds,
+    save_answers_cache,
+    load_answers_cache,
     THRESHOLDS,
 )
 
@@ -50,7 +52,10 @@ def main(ci_mode: bool = False) -> int:
     dataset = load_dataset()
 
     # 2. Obtener respuestas del agente
-    rows = get_agent_answers(dataset)
+    rows = load_answers_cache(git_sha)
+    if rows is None:
+        rows = get_agent_answers(dataset)
+        save_answers_cache(rows, git_sha)
 
     # 3. Construir dataset RAGAS
     ragas_dataset = build_ragas_dataset(rows)

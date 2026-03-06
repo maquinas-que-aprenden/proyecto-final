@@ -7,7 +7,7 @@ jobs:
   ragas-eval:
     name: RAGAS Eval (on EC2)
     runs-on: ubuntu-latest
-    timeout-minutes: 200
+    timeout-minutes: 300
 
     steps:
       - name: Run RAGAS eval via SSH
@@ -16,7 +16,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          command_timeout: 180m
+          command_timeout: 260m
           script: |
             cd /home/ubuntu/normabot
             git pull
