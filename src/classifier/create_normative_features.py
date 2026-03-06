@@ -48,6 +48,13 @@ _DEFAULT_OUTPUT = (
 # ---------------------------------------------------------------------------
 # Patrones regex — Art. 5 EU AI Act (prácticas prohibidas)
 # Nota: se aplican sobre texto en minúsculas (str.lower())
+#
+# IMPORTANTE — SINCRONIZACIÓN CON main.py:
+# main.py._build_annex3_patterns() define patrones equivalentes para los mismos
+# artículos (Art. 5.1.a–5.1.e), usados en tiempo de inferencia para el override
+# determinista. Si se modifica algún patrón aquí, debe revisarse y actualizarse
+# también en main.py (y viceversa) para que entrenamiento e inferencia detecten
+# los mismos casos. Diferencias actuales documentadas en audit_errores_classifier.md [I1].
 # ---------------------------------------------------------------------------
 
 # Art. 5.1.a — Manipulación subliminal o engañosa del comportamiento

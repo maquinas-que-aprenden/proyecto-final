@@ -1,3 +1,12 @@
+import threading
+
+from ._constants import (
+    KEYWORDS_DOMINIO,
+    LEAKAGE_COLUMNS as _LEAKAGE_COLUMNS,
+    PALABRAS_SUPERVISION as _PALABRAS_SUPERVISION,
+    STOPWORDS_ES as _STOPWORDS_ES,
+)
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -94,11 +103,14 @@ def configure_mlflow():
     print(f"MLflow configurado correctamente → {MLFLOW_TRACKING_URI}")
 
 # ──────────────────────────────────────────────
-# Pipelines de spaCy (carga diferida bajo demanda)
+# Pipelines de spaCy (carga diferida bajo demanda, thread-safe)
 # ──────────────────────────────────────────────
 _nlp = None
 _nlp_ner = None
 _spacy_available = None  # None = no comprobado aún
+_spacy_lock = threading.Lock()  # protege la inicialización concurrente
+_nlp_load_failed = False      # True tras primer fallo de spacy.load() — evita reintentos
+_nlp_ner_load_failed = False  # ídem para el pipeline NER
 
 
 def _check_spacy():
@@ -114,44 +126,40 @@ def _check_spacy():
 
 
 def _get_nlp():
-    global _nlp
-    if not _check_spacy():
+    global _nlp, _nlp_load_failed
+    if not _check_spacy() or _nlp_load_failed:
         return None
     if _nlp is None:
-        try:
-            import spacy
-            _nlp = spacy.load("es_core_news_sm", disable=["parser", "ner"])
-        except Exception:
-            return None
+        with _spacy_lock:
+            if _nlp is None:  # double-check tras adquirir el lock
+                if _nlp_load_failed:
+                    return None
+                try:
+                    import spacy
+                    _nlp = spacy.load("es_core_news_sm", disable=["parser", "ner"])
+                except Exception:
+                    _nlp_load_failed = True
+                    return None
     return _nlp
 
 
 def _get_nlp_ner():
-    global _nlp_ner
-    if not _check_spacy():
+    global _nlp_ner, _nlp_ner_load_failed
+    if not _check_spacy() or _nlp_ner_load_failed:
         return None
     if _nlp_ner is None:
-        try:
-            import spacy
-            _nlp_ner = spacy.load("es_core_news_sm")
-        except Exception:
-            return None
+        with _spacy_lock:
+            if _nlp_ner is None:  # double-check tras adquirir el lock
+                if _nlp_ner_load_failed:
+                    return None
+                try:
+                    import spacy
+                    _nlp_ner = spacy.load("es_core_news_sm")
+                except Exception:
+                    _nlp_ner_load_failed = True
+                    return None
     return _nlp_ner
 
-
-# Stopwords básicas en español para el fallback sin spaCy
-_STOPWORDS_ES = {
-    "a", "al", "algo", "algunas", "algunos", "ante", "antes", "como",
-    "con", "contra", "cual", "cuando", "de", "del", "desde", "donde",
-    "durante", "e", "el", "ella", "ellos", "en", "entre", "era", "es",
-    "esa", "esas", "ese", "eso", "esos", "esta", "estas", "este", "esto",
-    "estos", "fue", "ha", "han", "hasta", "hay", "he", "la", "las", "le",
-    "les", "lo", "los", "me", "mi", "mis", "muy", "ni", "no", "nos",
-    "o", "os", "otro", "para", "pero", "por", "que", "quien", "quienes",
-    "se", "si", "sin", "sobre", "son", "su", "sus", "también", "tanto",
-    "te", "todo", "todos", "tu", "tus", "un", "una", "unas", "uno",
-    "unos", "ya", "yo",
-}
 
 
 def _limpiar_texto_fallback(texto, lemmatize=False):
@@ -216,70 +224,8 @@ def limpiar_texto_preprocess(texto):
 # 2. FUNCIONES DE FEATURES MANUALES
 # ══════════════════════════════════════════════
 
-# Palabras clave discriminativas por clase, basadas en el EU AI Act y
-# análisis de errores del clasificador (confusión riesgo_minimo→inaceptable
-# y riesgo_limitado→alto_riesgo).
-# NOTA: Se usan palabras únicas (no frases) porque el matching es token-exacto
-# sobre texto lematizado (kw in t.split()).
-KEYWORDS_DOMINIO = {
-    # Sistemas prohibidos: biometría masiva en espacios públicos, venta de
-    # datos sensibles, manipulación subconsciente, puntuación social,
-    # categorización por etnia/religión/sindicato. Verbos en forma lematizada.
-    "inaceptable": [
-        "inferir", "vender", "manipular", "subconsciente", "biométrico",
-        "facial", "vigilancia", "sindical", "racial", "etnia",
-        "religioso", "discriminar", "coerción", "prohibido",
-    ],
-    # Anexo III EU AI Act: infraestructura crítica, acceso educativo/laboral,
-    # servicios esenciales, aplicación ley, migración/asilo, justicia.
-    # Incluye contextos de sector que distinguen de inaceptable:
-    # seguros/reclamaciones, triaje médico, aviación, subsidios sociales.
-    "alto_riesgo": [
-        "penitenciario", "juez", "reincidencia", "crediticio",
-        "diagnóstico", "sanitario", "migración", "asilo",
-        "policial", "empleabilidad", "infraestructura", "vinculante",
-        "medicación", "autónomamente",
-        "reclamación", "subsidio", "escolar", "triage",
-        "urgencia", "aeronave", "piloto", "laboral",
-        # Anexo III cat. 4 — selección de personal (CV screening)
-        "curricular", "candidato", "reclutamiento", "curriculum",
-        # Anexo III cat. 5 — servicios financieros esenciales
-        "solvencia", "préstamo", "crédito", "hipoteca",
-        # Anexo III cat. 6 — justicia penal
-        "recidiva", "reincidente",
-        # Anexo III cat. 7 — migración
-        "frontera", "visado", "refugiado",
-        # Anexo III cat. 8 — administración de justicia
-        "sentencia", "judicial",
-        # Anexo III cat. 3 — educación
-        "admisión", "matriculación",
-    ],
-    # Obligaciones de transparencia: chatbots, deepfakes, contenido sintético
-    # deben identificarse como IA.
-    "riesgo_limitado": [
-        "chatbot", "revelar", "transparencia", "deepfake",
-        "sintético", "notificar", "asesoramiento", "asistente",
-        "informar", "advertir", "indicar",
-    ],
-    # Sin obligaciones específicas: herramientas de sugerencia/asistencia,
-    # juegos, spam, optimización industrial, IoT de mantenimiento.
-    "riesgo_minimo": [
-        "sugerir", "borrador", "juego", "spam", "entretenimiento",
-        "filtro", "aficionado", "hobby", "receta",
-        "avería", "maquinaria", "logística", "mantenimiento",
-        "sensor", "industrial", "gestión",
-    ],
-}
-
-
-# Palabras que indican supervisión humana o propósito legítimo en sector regulado.
-# Su presencia es señal de alto_riesgo (no de inaceptable): los sistemas prohibidos
-# no tienen supervisión humana posible porque el daño es el propósito mismo.
-_PALABRAS_SUPERVISION = [
-    "supervisión", "supervisar", "revisar", "revisión", "garantía",
-    "confirmación", "criterio", "auditoría", "humano",
-    "pediatra", "médico", "piloto", "pedagógico",
-]
+# KEYWORDS_DOMINIO y _PALABRAS_SUPERVISION importados desde _constants.py (ver cabecera del módulo).
+# Palabras clave en forma lematizada; matching token-exacto sobre texto lematizado (kw in t.split()).
 
 
 def crear_features_manuales(X_texts):
@@ -535,6 +481,13 @@ def preparar_dataset(df, text_column, label_column, extra_columns=None):
 
     cols_output = ["text_final", label_column]
     if extra_columns:
+        leakage_solicitadas = _LEAKAGE_COLUMNS & set(extra_columns)
+        if leakage_solicitadas:
+            raise ValueError(
+                f"extra_columns contiene columnas con data leakage: {sorted(leakage_solicitadas)}. "
+                f"Estas columnas tienen correspondencia directa con la etiqueta o no existen en "
+                f"producción. Elimínalas de extra_columns."
+            )
         for col in extra_columns:
             if col in df.columns and col not in cols_output:
                 cols_output.append(col)
@@ -1010,10 +963,18 @@ def analisis_errores(modelo, X_test_features, y_test, X_test_text=None):
     Returns:
     df_errores : pd.DataFrame con las predicciones incorrectas.
     """
+    import warnings
+
     y_pred = modelo.predict(X_test_features)
     if hasattr(modelo, "label_encoder"):
         y_pred = modelo.label_encoder.inverse_transform(y_pred)
 
+    if X_test_text is None:
+        warnings.warn(
+            "analisis_errores llamado sin X_test_text: los ejemplos de error se mostrarán "
+            "sin texto original. Pasa X_test_text=X_test['text_final'] para análisis completo.",
+            stacklevel=2,
+        )
     textos = X_test_text.values if X_test_text is not None else ["[texto no disponible]"] * len(y_test)
     df_resultado = pd.DataFrame({
         "texto": textos,

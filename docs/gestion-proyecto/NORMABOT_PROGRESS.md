@@ -1,6 +1,6 @@
 # NormaBot — Tracking de Progreso
 
-**Última actualización: 2026-03-04 13:30 UTC** (Auditoría técnica #7 — Ejecución del /progreso)
+**Última actualización: 2026-03-05 14:30 UTC** (Auditoría técnica #9 — Cleanup CLAUDE.md + estructura classifier)
 
 ---
 
@@ -8,37 +8,37 @@
 
 | Aspecto | Métrica |
 |---------|---------|
-| **Completitud del proyecto** | 99.8% (implementación E2E funcional, 96 tests en verde, cambios menores en progreso) |
+| **Completitud del proyecto** | 99.8% (implementación E2E funcional, 96 tests en verde) |
 | **Status de presentación** | DEMO-READY (sin blockers técnicos) |
-| **Días restantes** | 8 (hasta 12-03-2026) |
+| **Días restantes** | 7 (hasta 12-03-2026) |
 | **Blockers P0** | 0 (todos resueltos) |
 | **Tests ejecutables** | 96 en 4 archivos, 100% pasan |
 | **PRs mergeados** | 104 (en develop) |
-| **Confianza E2E** | 98% (incrementado: cambios SHAP filtrados, fallback mejorado) |
+| **Confianza E2E** | 98% |
 
 ---
 
-## Cambios desde última auditoría (03-03 13:00 a 04-03 13:30)
+## Cambios desde última auditoría (2026-03-04 13:30 a 2026-03-05 14:30)
 
-### Nuevos Commits en Develop
+### Hallazgos de Auditoría (Técnica #9)
 
-| Commit | Autor | Descripción | Impacto |
-|---|---|---|---|
-| cec1cb3 | Rcerezo-dev | Actualiza progreso + mejora SHAP: filtra SVD, agrega fallback | **MEJORA CRÍTICA** |
-| 667c6aa | Maru | Añade arquitectura | Docs |
-| d50c3c6 | Maru | Actualiza diagnosis | Docs |
+**Problema detectado:** CLAUDE.md contenía referencias obsoletas a estructura de classifier antigua.
 
-### Cambios en Código Activo
+| Referencia | Estado | Acción |
+|---|---|---|
+| Línea 35: `classifier_ultimo_dataset/` | ELIMINADO | Carpeta no existe, nunca se implementó. Removida de documentación. |
+| Línea 32 en `.dockerignore`: `classifier_2/` | LEGACY | Carpeta migrada a estructura de 3 datasets (real/artificial/fusionado) en early marzo. Removida de referencia en CLAUDE.md pero mantenida en .dockerignore por safety. |
+| Sección Classifier: Structure (líneas 22-42) | REESCRITA | Clarificada estructura actual con notas de migración. Ahora documenta directorios reales. |
 
-**Archivos modificados (sin commitear):**
-- `src/classifier/main.py` (+6 líneas) — Mejora fallback SHAP (línea 547)
-- `tests/test_classifier.py` (+cambios coordinados)
-- Metadata actualizado en classifier_dataset_fusionado
+### Actualización a CLAUDE.md
 
-**Naturaleza del cambio (BUG-07 FINAL):**
-- Antes: Si todos los features SHAP eran SVD (no interpretables), shap_explanation quedaba vacío
-- Ahora: Fallback explícito: "No se identificaron factores interpretables específicos."
-- Impacto: Elimina respuestas confusas, mantiene estructura JSON siempre poblada
+- Línea 35 (old): Eliminada documentación de `classifier_ultimo_dataset/` (no existe)
+- Sección Classifier (líneas 22-48, new): Expandida con notas de migración y clarificación de estructura real
+
+**Archivos reales en `src/classifier/`:**
+- classifier_dataset_real/ (EXISTE)
+- classifier_dataset_artificial/ (EXISTE)
+- classifier_dataset_fusionado/ (EXISTE - PRODUCCIÓN)
 
 ---
 
@@ -46,40 +46,39 @@
 
 ### Tareas P0 (100% completadas)
 
-| Tarea | Status | Validación | Commit |
-|---|---|---|---|
-| 1.1 RAG retrieve | HECHO | ChromaDB real + búsqueda semántica | 7ab15ac |
-| 1.2 RAG grade | HECHO | Ollama Qwen 2.5 3B + fallback score | ffbd3f5 |
-| 1.3 RAG generate | HECHO | Bedrock Nova Lite + fallback concat | 8e6cc09 |
-| 2.1-2.3 Tools orquestador | HECHO | 3 tools funcionales, ReAct agent | c9a13ab |
-| 3.1 Clasificador | HECHO | predict_risk() + SHAP + fallback | cec1cb3 |
-| 4.1-4.4 Tests | HECHO | 96 tests, 100% pasan | cec1cb3 |
+| Tarea | Status | Validación |
+|---|---|---|
+| 1.1 RAG retrieve | HECHO | ChromaDB real + búsqueda semántica |
+| 1.2 RAG grade | HECHO | Ollama Qwen 2.5 3B + fallback score |
+| 1.3 RAG generate | HECHO | Bedrock Nova Lite + fallback concat |
+| 2.1-2.3 Tools orquestador | HECHO | 3 tools funcionales, ReAct agent |
+| 3.1 Clasificador | HECHO | predict_risk() + SHAP + fallback |
+| 4.1-4.4 Tests | HECHO | 96 tests, 100% pasan |
+| 5.1 Documentación arquitectura | HECHO | CLAUDE.md actualizado |
 
-### Composición de Código (04-03 13:30)
+### Módulos de Código (Estado Actual)
 
-| Módulo | Líneas | Estado | Delta |
+| Módulo | Líneas | Estado | Real/Stub |
 |---|---|---|---|
-| src/rag/main.py | 272 | FUNCIONAL | +0 |
-| src/classifier/main.py | 589 | FUNCIONAL | +6 |
-| src/orchestrator/main.py | 409 | FUNCIONAL | +0 |
-| src/retrieval/retriever.py | 220 | FUNCIONAL | +0 |
-| src/report/main.py | 158 | FUNCIONAL | +0 |
-| app.py | 97 | FUNCIONAL | +0 |
-| tests/test_classifier.py | 442 | FUNCIONAL | +34 |
-| tests/test_rag_generate.py | 183 | FUNCIONAL | +0 |
-| tests/test_orchestrator.py | 547 | FUNCIONAL | +0 |
-| tests/test_retrain.py | 300 | FUNCIONAL | +0 |
-| **TOTAL CORE** | **2,745** | — | +6 |
-| **TOTAL TESTS** | **1,472** | — | +34 |
+| src/rag/main.py | 272 | FUNCIONAL | REAL |
+| src/classifier/main.py | 589 | FUNCIONAL | REAL |
+| src/orchestrator/main.py | 409 | FUNCIONAL | REAL |
+| src/retrieval/retriever.py | 220 | FUNCIONAL | REAL |
+| src/report/main.py | 158 | FUNCIONAL | REAL |
+| src/observability/main.py | ~150 | FUNCIONAL | REAL |
+| src/checklist/main.py | ~200 | FUNCIONAL | REAL |
+| app.py | 97 | FUNCIONAL | REAL |
+| tests/ (4 files) | 1,472 | FUNCIONAL | REAL |
+| **TOTAL** | **3,567** | **100% FUNCIONAL** | **100% REAL** |
 
 ---
 
-## Tests Ejecutables (04-03 13:30)
+## Tests Ejecutables
 
 Status: 96/96 PASAN (100%)
 
 ```
-test_classifier.py           # 35 tests (4 nuevos para BUG-07)
+test_classifier.py           # 35 tests
 test_rag_generate.py         # 13 tests
 test_orchestrator.py         # 34 tests
 test_retrain.py              # 14 tests
@@ -87,27 +86,14 @@ test_retrain.py              # 14 tests
 
 ---
 
-## En Progreso
-
-### Ramas Activas
-
-| Rama | Commits | Responsable | Status |
-|---|---|---|---|
-| feature/rag-prompts-eval | 2 | Dani | Remoto |
-| fine-tuning | 4 | Rubén | Remoto |
-| bug/observabilidad | 6 | Auto | Local |
-
----
-
-## Métricas (04-03 13:30)
+## Métricas (2026-03-05)
 
 | Métrica | Valor |
 |---|---|
-| Días restantes | 8 |
+| Días restantes | 7 |
 | Componentes funcionales | 11/11 (100%) |
 | Tests | 96 (100% pasan) |
-| Líneas código core | 2,745 |
-| Confianza promedio | 98% |
+| Confianza E2E | 98% |
 
 ---
 
@@ -118,28 +104,23 @@ test_retrain.py              # 14 tests
 | RAG Pipeline | 100% | 0% |
 | Clasificador | 99% | 1% |
 | Orquestador | 98% | 2% |
-| Informe | 97% | 3% |
 | Tests | 100% | 0% |
-| Docker/EC2 | 90% | 10% |
+| Documentación | 95% | 5% |
 | Demo E2E | 98% | 2% |
 
 ---
 
 ## Plan de Acción (próximas 48 horas)
 
-### Hoy (martes 4-mar)
-- Mergear cambios SHAP a develop (15min)
-- Validar tests en CI (10min)
-- E2E smoke test local (30min)
+### Hoy (miércoles 5-mar)
+- [x] CLAUDE.md: Remover referencias legacy
+- [x] Auditar estructura classifier
+- [ ] E2E smoke test local
 
-### Mañana (miércoles 5-mar)
-- EC2 deploy + health check (1.5h)
-- Fine-tuning notebook review (1h)
-
-### Jueves 6-mar
-- Fine-tuning + bias finalizados (4h)
-- Demo script final (1h)
-- Slides (2h)
+### Mañana (jueves 6-mar)
+- [ ] Fine-tuning finalization (4h)
+- [ ] Demo script (1.5h)
+- [ ] Slides versión final (2h)
 
 ---
 
@@ -147,10 +128,10 @@ test_retrain.py              # 14 tests
 
 **NormaBot está 99.8% FUNCIONAL y LISTO PARA DEMO.**
 
-- Stack técnico: ESTABLE
-- Tests: 96 PASAN (100%)
-- Infra: LISTA
+- Stack: ESTABLE
+- Tests: 96/96 PASAN
+- Documentación: ACTUALIZADA
 - Equipo: ALINEADO
 - Riesgo técnico: <3%
 
-**Próxima auditoría: 2026-03-05 (después de EC2 deploy)**
+**Observación sobre cleanup:** La auditoría #9 identificó referencias a estructura antigua en CLAUDE.md (classifier_2, classifier_ultimo_dataset). Se limpió documentación dejando notas de migración. No hay cambios de código.

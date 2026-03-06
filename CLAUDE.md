@@ -19,13 +19,26 @@ A **ReAct agent** (LangGraph `create_react_agent`) orchestrates two tools:
 
 **Entry point**: `app.py` — Streamlit chat UI that calls `src.orchestrator.main.run(query)`.
 
-## Classifier: Two Parallel Experiments
+## Classifier: Structure
 
-There are two classifier variants under `src/classifier/`:
-- **Root level** (`functions.py`, `feature.py`, `main.py`) — trained on real manually-labeled dataset. MLflow experiment: `clasificador_riesgo_ia`.
-- **`classifier_2/`** — trained on synthetic/augmented dataset (`eu_ai_act_flagged`). MLflow experiment: `clasificador_riesgo_ia_artificial`. Has extended `preparar_dataset()` supporting `extra_columns` with leakage-safe features.
+Files under `src/classifier/`:
+- **`functions.py`** — ML pipeline library: spaCy text cleaning, TF-IDF, Grid Search, SHAP, MLflow. MLflow experiment: `clasificador_riesgo_dataset_fusionado`.
+- **`main.py`** — Inference service: `predict_risk(text) -> dict`. Loads XGBoost + SVD + LabelEncoder from `classifier_dataset_fusionado/model/`. Includes Annex III deterministic override and Langfuse observability.
+- **`retrain.py`** — Incremental retraining with augmented data (Annex III examples). Promotes artefacts only if F1-macro improves by ≥ 0.005.
+- **`create_normative_features.py`** — Enriches training dataset with 5 binary features (Art. 5 EU AI Act patterns). CLI: `python -m src.classifier.create_normative_features`.
+- **`_constants.py`** — Single source of truth for `KEYWORDS_DOMINIO`, `PALABRAS_SUPERVISION`, `STOPWORDS_ES`, `RISK_LABELS`, `LEAKAGE_COLUMNS`. All other modules import from here.
+- **`classifier_dataset_real/`** — Experiments on the original hand-labelled real dataset. MLflow experiment: `clasificador_riesgo_dataset_real`.
+  - `model/` — Serialized models from experiments
+  - `data/finetune/` — `train.jsonl`, `test.jsonl` used for fine-tuning evaluation
+- **`classifier_dataset_artificial/`** — Experiments on a purely synthetic dataset. MLflow experiment: `clasificador_riesgo_dataset_artificial`.
+  - `model/` — Serialized models from experiments
+  - `data/finetune/` — `train.jsonl`, `test.jsonl` used for fine-tuning evaluation
+- **`classifier_dataset_fusionado/`** — **Production model.** Experiments on the merged dataset (real + synthetic). MLflow experiment: `clasificador_riesgo_dataset_fusionado`. **Artefacts loaded by `main.py` at runtime.**
+  - `model/` — `modelo_xgboost.joblib`, `tfidf_vectorizer.joblib`, `svd_transformer.joblib`, `label_encoder.joblib`, `mejor_modelo_seleccion.json`
+  - `data/finetune/` — `train.jsonl`, `test.jsonl`
 
-Both share similar function signatures but differ in: `evaluar_modelo()` (root takes `tfidf` param and transforms internally; `classifier_2` expects pre-transformed features), `preparar_dataset()` (classifier_2 supports `extra_columns` and auto-derives `num_articles`), and `analisis_errores()` (classifier_2 takes separate `X_test_text` param).
+**Migration Note**: `classifier_2/` was the original experimental directory during initial development. Since early March 2026, the structure has been consolidated into three experiment folders (real, artificial, fusionado) for better organization and clarity. References to `classifier_2/` in legacy config files (e.g., `.dockerignore` line 32) are kept for safety but point to non-existent paths and have no functional impact.
+
 
 ## Commands
 
