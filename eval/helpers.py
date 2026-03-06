@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import uuid
 from pathlib import Path
 import numpy as np
 
@@ -61,7 +62,7 @@ def get_agent_answers(dataset: list[dict]) -> list[dict]:
 
         if use_agent:
             try:
-                result = agent_run(question)
+                result = agent_run(question, session_id=f"eval-{uuid.uuid4().hex[:8]}")
                 # El agente ReAct devuelve messages; cogemos el último
                 answer = result["messages"][-1].content
             except Exception as e:
