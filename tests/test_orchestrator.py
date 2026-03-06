@@ -537,6 +537,7 @@ class TestCheckpointerInit:
         mock_saver = MagicMock()
         original_sqlite = orch_module._SQLITE_AVAILABLE
         original_dir = orch_module.MEMORY_DIR
+        original_saver_class = orch_module.SqliteSaver
 
         try:
             orch_module._SQLITE_AVAILABLE = True
@@ -551,11 +552,14 @@ class TestCheckpointerInit:
         finally:
             orch_module._SQLITE_AVAILABLE = original_sqlite
             orch_module.MEMORY_DIR = original_dir
+            orch_module.SqliteSaver = original_saver_class
 
     def test_fallback_a_memory_cuando_sqlite_falla(self, tmp_path):
         """Si SQLite falla en runtime, degrada a MemorySaver sin error."""
         original_sqlite = orch_module._SQLITE_AVAILABLE
         original_dir = orch_module.MEMORY_DIR
+        original_saver_class = orch_module.SqliteSaver
+        original_memory_class = orch_module.MemorySaver
         mock_memory = MagicMock()
 
         try:
@@ -570,10 +574,13 @@ class TestCheckpointerInit:
         finally:
             orch_module._SQLITE_AVAILABLE = original_sqlite
             orch_module.MEMORY_DIR = original_dir
+            orch_module.SqliteSaver = original_saver_class
+            orch_module.MemorySaver = original_memory_class
 
     def test_usa_memory_cuando_sqlite_no_disponible(self):
         """Sin langgraph-checkpoint-sqlite, usa MemorySaver directamente."""
         original_sqlite = orch_module._SQLITE_AVAILABLE
+        original_memory_class = orch_module.MemorySaver
         mock_memory = MagicMock()
 
         try:
@@ -585,10 +592,12 @@ class TestCheckpointerInit:
             assert result is mock_memory
         finally:
             orch_module._SQLITE_AVAILABLE = original_sqlite
+            orch_module.MemorySaver = original_memory_class
 
     def test_singleton_devuelve_misma_instancia(self, tmp_path):
         """Llamar _get_checkpointer() dos veces devuelve la misma instancia."""
         original_sqlite = orch_module._SQLITE_AVAILABLE
+        original_memory_class = orch_module.MemorySaver
         mock_memory = MagicMock()
 
         try:
@@ -601,3 +610,4 @@ class TestCheckpointerInit:
             assert first is second
         finally:
             orch_module._SQLITE_AVAILABLE = original_sqlite
+            orch_module.MemorySaver = original_memory_class
