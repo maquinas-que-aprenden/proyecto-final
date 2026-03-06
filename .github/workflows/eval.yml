@@ -19,7 +19,7 @@ jobs:
           script: |
             cd /home/ubuntu/normabot
             ACTUAL_SHA=$(git rev-parse --verify HEAD)
-            docker run --rm \
+            docker run --rm --pull never \
               -v "$(pwd)/eval:/app/eval" \
               -v "$(pwd)/data/processed/vectorstore:/app/data/processed/vectorstore:ro" \
               --env-file .env \
