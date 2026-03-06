@@ -18,13 +18,10 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/normabot
+            git pull
             ACTUAL_SHA=$(git rev-parse --verify HEAD)
-            docker run --rm --pull never \
-              -v "$(pwd)/eval:/app/eval" \
-              -v "$(pwd)/data/processed/vectorstore:/app/data/processed/vectorstore:ro" \
-              --env-file .env \
+            docker exec \
               -e GITHUB_SHA="$ACTUAL_SHA" \
               -e PYTHONPATH=/app:/app/eval \
-              -w /app \
-              ghcr.io/maquinas-que-aprenden/proyecto-final:latest \
+              normabot \
               python eval/run_ragas.py --ci
