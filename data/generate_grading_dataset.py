@@ -1470,7 +1470,7 @@ def main():
     n_no_rel    = n_total - n_relevante
     n_queries   = len(QUERY_PAIRS)
 
-    print(f"Dataset generado:")
+    print("Dataset generado:")
     print(f"  Queries:       {n_queries}")
     print(f"  Ejemplos:      {n_total}")
     print(f"  Relevantes:    {n_relevante} ({n_relevante/n_total*100:.1f}%)")

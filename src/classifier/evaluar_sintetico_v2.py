@@ -25,7 +25,7 @@ sys.path.insert(0, str(ROOT))
 os.environ.setdefault("LANGFUSE_PUBLIC_KEY", "")
 os.environ.setdefault("LANGFUSE_SECRET_KEY", "")
 
-from src.classifier.main import predict_risk
+from src.classifier.main import predict_risk  # noqa: E402
 
 # --- Cargar dataset ----------------------------------------------------------
 DATASET = Path(__file__).parent / "dataset_sintetico_v2.csv"
