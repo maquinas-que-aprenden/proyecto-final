@@ -22,8 +22,9 @@ ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(ROOT))
 
 # Silenciar Langfuse/MLflow que no son necesarios aqui
-os.environ.setdefault("LANGFUSE_PUBLIC_KEY", "")
-os.environ.setdefault("LANGFUSE_SECRET_KEY", "")
+# Asignación directa para sobreescribir cualquier valor previo (setdefault no lo haría)
+os.environ["LANGFUSE_PUBLIC_KEY"] = ""
+os.environ["LANGFUSE_SECRET_KEY"] = ""
 
 from src.classifier.main import predict_risk  # noqa: E402
 
@@ -65,18 +66,24 @@ for i, row in df.iterrows():
 df_res = pd.DataFrame(resultados)
 
 # --- Metricas ----------------------------------------------------------------
+n_errors = (df_res["prediccion"] == "ERROR").sum()
 validas = df_res[df_res["prediccion"] != "ERROR"]
 y_true = validas["etiqueta_real"]
 y_pred = validas["prediccion"]
 clases = sorted(y_true.unique())
 
-accuracy = (validas["acierto"].sum()) / len(validas)
+# Denominador incluye filas con error (cuentan como incorrectas)
+n_total = len(df_res)
+n_ok = validas["acierto"].sum()
+accuracy = n_ok / n_total
 overrides = validas["override_anexo3"].sum()
 
 print(f"\n{'='*60}")
-print(f"RESULTADOS — dataset_sintetico_v2.csv  ({len(validas)} muestras)")
+print(f"RESULTADOS — dataset_sintetico_v2.csv  ({n_total} muestras)")
+if n_errors:
+    print(f"  ⚠ Filas con error de pipeline: {n_errors} (cuentan como incorrectas)")
 print(f"{'='*60}")
-print(f"Accuracy          : {accuracy:.4f}  ({validas['acierto'].sum()}/{len(validas)} correctas)")
+print(f"Accuracy          : {accuracy:.4f}  ({n_ok}/{n_total} correctas)")
 print(f"Overrides Anexo III: {overrides} predicciones modificadas por reglas deterministas")
 print()
 print("--- Classification Report ---")
