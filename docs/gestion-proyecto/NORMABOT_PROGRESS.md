@@ -52,7 +52,7 @@ build_compliance_checklist(result, system_description) → dict
 - Ahora: 159 líneas (46% más compacto)
 - **Causa**: Eliminación de `generate()` (fue a orchestrator)
 - **Componentes restantes:**
-  - `retrieve(query, k=5)` → ChromaDB soft search
+  - `retrieve(query, k=9)` → ChromaDB soft search
   - `grade(query, docs)` → Ollama Qwen 2.5 3B + fallback score
   - `format_context(docs)` → Helper para formato
 
@@ -123,7 +123,7 @@ build_compliance_checklist(result, system_description) → dict
 
 | Bug | PR | Status | Fecha |
 |-----|----|----|-------|
-| BUG-05: Grader descarta todo → fallback mínimo | #105 | MERGED | 2026-03-03 |
+| BUG-05: Grader descarta todo → fallback mínimo | #105 | OPEN | 2026-03-03 |
 | BUG-04: Artículo explícito no priorizado | FIXED | MERGED | 2026-03-02 |
 | Double classification en generate_report | #101 | MERGED | 2026-02-28 |
 | SQLite checkpointer init en orchestrator | #114 | MERGED | 2026-02-27 |
