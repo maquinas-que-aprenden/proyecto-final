@@ -87,7 +87,7 @@ test_retrain.py              # 14 tests
 
 ---
 
-## En Progreso
+## En Progreso (Sprint 2 — 2 de 10 días)
 
 ### Ramas Activas
 
