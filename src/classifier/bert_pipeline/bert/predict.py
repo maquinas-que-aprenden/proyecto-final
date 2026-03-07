@@ -52,6 +52,11 @@ def _load() -> None:
                 "Ejecuta primero:\n"
                 "  python -m src.classifier.bert_pipeline.bert.train"
             )
+        if not LE_PATH.exists():
+            raise FileNotFoundError(
+                f"Label encoder no encontrado en {LE_PATH}.\n"
+                "Ejecuta primero: python -m src.classifier.bert_pipeline.bert.train"
+            )
         _tokenizer = AutoTokenizer.from_pretrained(str(MODEL_PATH))
         _model = AutoModelForSequenceClassification.from_pretrained(str(MODEL_PATH))
         _model.eval()
@@ -79,7 +84,7 @@ def predict(text: str) -> dict:
     _load()
 
     inputs = _tokenizer(
-        text, truncation=True, max_length=512, return_tensors="pt"
+        text, truncation=True, max_length=256, return_tensors="pt"
     ).to(_device)
 
     with torch.no_grad():

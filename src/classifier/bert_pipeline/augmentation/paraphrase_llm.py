@@ -41,7 +41,7 @@ def paraphrase(text: str, n: int = 3, label: str = "") -> list[str]:
     Returns
     -------
     list[str]
-        Lista de hasta n paráfrasis. En caso de error devuelve el texto original repetido.
+        Lista de hasta n paráfrasis. En caso de error devuelve lista vacía [].
     """
     label_hint = f" (categoría EU AI Act: {label})" if label else ""
     prompt = (

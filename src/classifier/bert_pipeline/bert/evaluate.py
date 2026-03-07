@@ -47,6 +47,16 @@ def evaluate() -> dict:
             f"Modelo no encontrado en {MODEL_PATH}. Ejecuta train.py primero:\n"
             "  python -m src.classifier.bert_pipeline.bert.train"
         )
+    if not LE_PATH.exists():
+        raise FileNotFoundError(
+            f"Label encoder no encontrado en {LE_PATH}.\n"
+            "Ejecuta primero: python -m src.classifier.bert_pipeline.bert.train"
+        )
+    if not TEST_PATH.exists():
+        raise FileNotFoundError(
+            f"Test split no encontrado en {TEST_PATH}.\n"
+            "Ejecuta primero: python -m src.classifier.bert_pipeline.bert.train"
+        )
 
     le = joblib.load(LE_PATH)
     df_test = joblib.load(TEST_PATH)
@@ -64,7 +74,7 @@ def evaluate() -> dict:
 
     for text in df_test["descripcion"].tolist():
         inputs = tokenizer(
-            text, truncation=True, max_length=512, return_tensors="pt"
+            text, truncation=True, max_length=256, return_tensors="pt"
         ).to(device)
         with torch.no_grad():
             logits = model(**inputs).logits

@@ -322,9 +322,11 @@ def main():
 
     print("\nDistribución DESPUÉS del balanceo:")
     print(df_final["etiqueta_normalizada"].value_counts().to_string())
-    df_final.to_csv(CSV_PATH, index=False)
+    OUTPUT_PATH = CSV_PATH.parent / "eu_ai_act_flagged_es_balanceado.csv"
+    df_final.to_csv(OUTPUT_PATH, index=False)
     print(f"\nTotal filas: {len(df)} -> {len(df_final)} (+{len(df_final) - len(df)})")
-    print(f"\nCSV guardado en: {CSV_PATH}")
+    print(f"\nCSV balanceado guardado en : {OUTPUT_PATH}")
+    print(f"CSV original NO modificado : {CSV_PATH}")
 
 
 if __name__ == "__main__":
