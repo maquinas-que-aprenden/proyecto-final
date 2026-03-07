@@ -3,26 +3,25 @@
 Carga el modelo serializado entrenado en el dataset fusionado y expone
 ``predict_risk(text) -> dict`` para que el orquestador lo invoque como tool.
 
-Seleccion de modelo: Se entrenaron y evaluaron tres variantes (LogReg,
-LogReg+features manuales, XGBoost+SVD) con Grid Search + StratifiedKFold.
-Los tres experimentos estan registrados en MLflow. El modelo seleccionado
-se determina por ``mejor_modelo_seleccion.json``. Actualmente:
-Exp 2 (XGBoost + SVD + GS) con F1-macro test 0.8822.
+Backends disponibles (seleccionable via variable de entorno CLASSIFIER_BACKEND):
 
-Pipeline de inferencia: texto → TF-IDF → SVD(100) + 7 keywords → XGBoost.
+- ``xgboost`` (por defecto): XGBoost + TF-IDF + SVD(100) + 7 keywords.
+  F1-macro test 0.8822. Artefactos en ``classifier_dataset_fusionado/model/``.
 
-Artefactos requeridos en ``classifier_dataset_fusionado/model/``:
-- mejor_modelo_seleccion.json  (metadatos del experimento ganador)
-- modelo_xgboost.joblib        (XGBClassifier seleccionado)
-- tfidf_vectorizer.joblib      (TfidfVectorizer, vocab ~3773, bigramas)
-- svd_transformer.joblib       (TruncatedSVD, 100 componentes)
-- label_encoder.joblib         (LabelEncoder, opcional)
+- ``bert``: BERT fine-tuneado (dccuchile/bert-base-spanish-wwm-cased).
+  F1-macro val 0.7289 (entrenado en dataset sintético aumentado ~4000 ejemplos).
+  Captura relaciones semánticas y contexto, superior en generalización.
+  Artefactos en ``bert_pipeline/models/bert_model/``.
+
+En ambos casos se aplica el override determinista del Anexo III EU AI Act
+tras la predicción del modelo ML.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import os
 import re as _re
 import threading
 from pathlib import Path
@@ -40,6 +39,69 @@ from .functions import limpiar_texto as _limpiar_texto
 from src.observability.langfuse_compat import observe, langfuse_context
 
 logger = logging.getLogger(__name__)
+
+# Backend seleccionable via variable de entorno.
+# "bert"    → BERT fine-tuneado (dccuchile/bert-base-spanish-wwm-cased)
+# "xgboost" → XGBoost + TF-IDF + SVD (por defecto, siempre disponible)
+_CLASSIFIER_BACKEND = os.environ.get("CLASSIFIER_BACKEND", "xgboost").lower()
+
+# ---------------------------------------------------------------------------
+# Singletons BERT (cargados lazy en el primer uso)
+# ---------------------------------------------------------------------------
+_BERT_DIR = Path(__file__).parent / "bert_pipeline" / "models" / "bert_model"
+_bert_model     = None
+_bert_tokenizer = None
+_bert_id2label: dict | None = None
+_bert_lock = threading.Lock()
+
+
+def _load_bert_artifacts() -> None:
+    """Carga lazy del tokenizer y modelo BERT (thread-safe, double-check locking)."""
+    global _bert_model, _bert_tokenizer, _bert_id2label
+    if _bert_model is not None:
+        return
+    with _bert_lock:
+        if _bert_model is not None:
+            return
+        if not _BERT_DIR.exists():
+            raise FileNotFoundError(
+                f"Modelo BERT no encontrado en {_BERT_DIR}. "
+                "Ejecuta: python src/classifier/bert_pipeline/train.py"
+            )
+        try:
+            os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+            import torch
+            from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+            _bert_tokenizer = AutoTokenizer.from_pretrained(str(_BERT_DIR))
+            _m = AutoModelForSequenceClassification.from_pretrained(str(_BERT_DIR))
+            _m.eval()
+            _device = "cuda" if torch.cuda.is_available() else "cpu"
+            _m.to(_device)
+            _bert_model    = _m
+            _bert_id2label = {int(k): v for k, v in _m.config.id2label.items()}
+            logger.info("BERT classifier cargado en %s desde %s", _device, _BERT_DIR)
+        except Exception:
+            _bert_model = _bert_tokenizer = _bert_id2label = None
+            raise
+
+
+def _predict_bert_raw(text_cleaned: str) -> tuple[str, float, dict]:
+    """Inferencia BERT sobre texto ya limpiado. Devuelve (label, confidence, probs)."""
+    import torch
+    _load_bert_artifacts()
+    device = next(_bert_model.parameters()).device
+    inputs = _bert_tokenizer(
+        text_cleaned, truncation=True, max_length=256, return_tensors="pt"
+    ).to(device)
+    with torch.no_grad():
+        logits = _bert_model(**inputs).logits
+    proba   = torch.softmax(logits, dim=-1)[0]
+    pred_id = int(logits.argmax(-1).item())
+    label   = _bert_id2label[pred_id]
+    conf    = float(proba[pred_id].item())
+    probs   = {_bert_id2label[i]: round(float(proba[i].item()), 4) for i in range(len(_bert_id2label))}
+    return label, conf, probs
 
 
 class _TextInput(BaseModel):
@@ -361,19 +423,28 @@ def _build_features(cleaned_text: str) -> tuple[object, list[str]]:
 def predict_risk(text: str) -> dict:
     """Clasifica un sistema de IA por nivel de riesgo EU AI Act.
 
+    Despacha al backend configurado en CLASSIFIER_BACKEND:
+    - "bert"    → predict_risk_bert() (semántico, lazy-load)
+    - "xgboost" → pipeline TF-IDF+SVD+XGBoost (por defecto)
+
+    En caso de error con BERT, hace fallback automático a XGBoost.
+
     Parameters
     ----------
-    text : str
-        Descripcion del sistema de IA en lenguaje natural.
+    text : str  Descripcion del sistema de IA en lenguaje natural.
 
     Returns
     -------
-    dict
-        risk_level: str (alto_riesgo | inaceptable | riesgo_limitado | riesgo_minimo)
-        confidence: float (0-1)
-        shap_top_features: list[dict] (top 5 features por contribucion)
-        shap_explanation: str (resumen textual)
+    dict  risk_level, confidence, probabilities, shap_explanation[, shap_top_features]
     """
+    if _CLASSIFIER_BACKEND == "bert":
+        try:
+            return predict_risk_bert(text)
+        except Exception as exc:
+            logger.warning(
+                "BERT backend falló (%s) — usando XGBoost como fallback", exc
+            )
+
     _TextInput(text=text)
     _load_artifacts()
 
@@ -490,6 +561,61 @@ def predict_risk(text: str) -> dict:
             result["confidence"],
             e,
         )
+    return result
+
+
+@observe(name="classifier.predict_risk_bert")
+def predict_risk_bert(text: str) -> dict:
+    """Clasifica un sistema de IA con BERT + override Anexo III.
+
+    Mismo contrato de salida que ``predict_risk()`` para ser intercambiable.
+    Usa el modelo BERT fine-tuneado (dccuchile/bert-base-spanish-wwm-cased)
+    entrenado en dataset sintético aumentado (~4000 ejemplos).
+
+    Parameters
+    ----------
+    text : str  Descripcion del sistema de IA en lenguaje natural.
+
+    Returns
+    -------
+    dict  risk_level, confidence, probabilities, shap_explanation, backend
+    """
+    _TextInput(text=text)
+
+    # 1. Limpiar texto (mismo preprocesado que en entrenamiento BERT)
+    cleaned = _limpiar_texto(text)
+
+    # 2. Inferencia BERT
+    risk_level, confidence, probabilities = _predict_bert_raw(cleaned)
+
+    result = {
+        "risk_level"   : risk_level,
+        "confidence"   : confidence,
+        "probabilities": probabilities,
+        "backend"      : "bert",
+    }
+
+    # 3. Override Anexo III (sobre texto original, igual que XGBoost)
+    result = _annex3_override(text, result)
+
+    # 4. Explicación simplificada (BERT no tiene SHAP; se indica el backend)
+    if not result.get("shap_explanation"):
+        result["shap_explanation"] = (
+            f"Clasificación BERT (semántica): '{result['risk_level']}' "
+            f"con confianza {confidence:.0%}."
+        )
+
+    try:
+        langfuse_context.update_current_observation(
+            metadata={
+                "risk_level": result["risk_level"],
+                "confidence": round(result["confidence"], 4),
+                "backend"   : "bert",
+            },
+        )
+    except Exception as e:
+        logger.warning("Langfuse no disponible: %s", e)
+
     return result
 
 
