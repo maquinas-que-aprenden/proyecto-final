@@ -154,6 +154,49 @@ Notebooks:
 
 ---
 
+## Tests unitarios
+
+El módulo de fine-tuning cuenta con una suite de tests en `tests/test_finetuning.py`
+que no requieren GPU ni descargar los artefactos del modelo. Se ejecutan con:
+
+```bash
+pytest tests/test_finetuning.py -v
+```
+
+**Resultado:** 45 tests passing (~9s, sin GPU).
+
+### Cobertura por área
+
+| Clase de test | Nº tests | Qué verifica |
+|---|---|---|
+| `TestConstants` | 4 | Valores de `LABEL_RELEVANTE`/`LABEL_NO_RELEVANTE`, `LABELS`, `GRADING_SYSTEM_PROMPT`, `MLFLOW_EXPERIMENT_NAME`; coherencia entre `grader.py` y `functions.py` |
+| `TestLoadGradingDataset` | 4 | Carga de JSONL válido, error si falta el fichero (`AssertionError`), ignora líneas vacías, conteo correcto de etiquetas |
+| `TestSplitDataset` | 5 | Proporciones 70/15/15, ausencia de solapamiento entre splits, total conservado, estratificación balanceada (±10%), reproducibilidad con misma seed |
+| `TestBuildGradingMessages` | 5 | Estructura system/user del chat template, query y document presentes en el mensaje de usuario, inputs vacíos no fallan |
+| `TestFormatTrainingPrompt` | 3 | El prompt de entrenamiento termina en `label + eos_token`, incluye el template del tokenizador, llama a `apply_chat_template` con `add_generation_prompt=True` |
+| `TestPredictRelevanceFunctions` | 5 | Parseo de respuestas del LLM en `functions.py`: "relevante", "no relevante", "no es relevante", respuesta ambigua → conservador (`no relevante`), prioridad `no relevante` sobre `relevante` en texto mixto |
+| `TestPrintComparison` | 4 | Cálculo correcto de deltas, delta negativo, delta cero, tabla impresa en stdout |
+| `TestGetMlflowPassword` | 2 | Lectura desde variable de entorno, `EnvironmentError` si no está definida |
+| `TestGraderIsAvailable` | 3 | `False` si el directorio del adaptador no existe, `False` si existe el directorio pero falta `adapter_model.safetensors`, `True` si el fichero está presente |
+| `TestGraderPredictRelevanceParsing` | 6 | Parseo de respuestas en `grader.py` (con `_load_model` mockeado): "relevante", "no relevante", "no es relevante", ambigua → conservadora, mayúsculas normalizadas con `.lower()`, texto extra tras la etiqueta |
+| `TestGraderLoadModelErrors` | 2 | `FileNotFoundError` cuando el adaptador no existe en disco, `ImportError` cuando `transformers`/`peft` no están instalados |
+| `TestDatasetStructure` | 2 | Campos obligatorios (`query`, `document`, `label`) y valores no vacíos en el JSONL real; se saltan automáticamente si no hay `dvc pull` |
+
+### Decisiones de diseño
+
+- **Sin GPU ni modelo real:** todos los tests de inferencia usan `unittest.mock` para aislar
+  la lógica de parseo del peso del modelo (>6 GB). Esto permite ejecutarlos en CI sin coste.
+- **`@pytest.mark.skipif` para artefactos DVC:** los tests de `TestDatasetStructure` se
+  saltan si `data/processed/grading_dataset.jsonl` no existe, evitando fallos en entornos
+  sin DVC configurado.
+- **Fixtures de `tmp_path`:** los tests de carga de dataset usan el directorio temporal de
+  pytest para no dejar ficheros en el repositorio.
+- **Singleton reset en `TestGraderLoadModelErrors`:** los tests que prueban la carga del
+  modelo restauran `_model`/`_tokenizer`/`_ADAPTER_PATH` a sus valores originales en el
+  bloque `finally`, evitando contaminación entre tests.
+
+---
+
 ## Experimento MLflow
 
 - **Nombre del experimento**: `grader_relevancia_qwen25_3b` (valor de `MLFLOW_EXPERIMENT_NAME` en `04_metricas_mlflow.ipynb`)

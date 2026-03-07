@@ -11,9 +11,7 @@ Los tests de lógica usan mocks para aislar el código de esas deps.
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -43,7 +41,7 @@ def _minimal_dataset(n: int = 20) -> list[dict]:
         })
     for i in range(n - half):
         data.append({
-            "query": f"¿Cuál es la definición de IA?",
+            "query": "¿Cuál es la definición de IA?",
             "document": f"Receta de cocina número {i + 1}.",
             "label": "no relevante",
         })
@@ -556,7 +554,6 @@ class TestGraderLoadModelErrors:
         """_load_model lanza ImportError si transformers/peft no están instalados."""
         import src.finetuning.grader as grader_module
         import builtins
-        import importlib
 
         original_path  = grader_module._ADAPTER_PATH
         original_model = grader_module._model
