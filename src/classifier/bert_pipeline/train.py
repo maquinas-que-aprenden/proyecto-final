@@ -6,6 +6,7 @@ Prerequisito: haber ejecutado 03_preparacion_datos.ipynb
 Uso: python src/classifier/bert_pipeline/train.py
 """
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -141,6 +142,11 @@ else:
 mlflow.set_experiment("bert_clasificador_riesgo_ia")
 
 CHECKPOINTS_DIR = MODEL_DIR / "checkpoints"
+# Limpiar checkpoints anteriores para evitar que trainer_state.json quede
+# contaminado con runs previos (el notebook 06 lee el último checkpoint).
+if CHECKPOINTS_DIR.exists():
+    shutil.rmtree(CHECKPOINTS_DIR)
+CHECKPOINTS_DIR.mkdir(parents=True, exist_ok=True)
 
 training_args = TrainingArguments(
     output_dir                  = str(CHECKPOINTS_DIR),
