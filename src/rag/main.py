@@ -40,7 +40,9 @@ BEDROCK_REGION = os.environ.get("BEDROCK_REGION") or os.environ.get("AWS_REGION"
 
 GRADING_PROMPT = (
     "Dado el siguiente documento y la pregunta, "
-    "¿el documento contiene información útil para responder la pregunta?\n\n"
+    "¿el documento contiene información parcial o totalmente útil para responder la pregunta?\n\n"
+    "Sé permisivo: responde 'si' si el documento toca el tema aunque no lo responda completamente.\n"
+    "Solo responde 'no' si el documento es completamente irrelevante.\n\n"
     "Documento: {document}\n"
     "Pregunta: {query}\n\n"
     'Responde solo con "si" o "no":'
@@ -65,7 +67,7 @@ def _get_grading_llm():
 
 
 @observe(name="rag.retrieve")
-def retrieve(query: str, k: int = 5) -> list[dict]:
+def retrieve(query: str, k: int = 9) -> list[dict]:
     """Recupera documentos de ChromaDB y los formatea para grade()."""
     try:
         results = search(query, k=k, mode="soft")
