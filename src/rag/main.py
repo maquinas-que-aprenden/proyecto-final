@@ -119,7 +119,8 @@ def _grade_with_ollama(query: str, docs: list[dict], threshold: float) -> list[d
         try:
             response = llm.invoke(prompt)
             answer = response.content.strip().lower()
-            if answer.startswith("si") or answer.startswith("sí"):
+            answer_first = answer.split()[0] if answer.split() else ""
+            if answer_first in ("si", "sí"):
                 relevant.append(doc)
         except Exception:
             logger.warning("Error en grading Ollama, incluyendo doc por score")

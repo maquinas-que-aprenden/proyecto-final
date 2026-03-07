@@ -17,8 +17,9 @@ scipy==1.14.1
 #   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 # CPU-only (sin GPU):
 #   pip install torch --index-url https://download.pytorch.org/whl/cpu
---extra-index-url https://download.pytorch.org/whl/cu128
-torch
+# GPU (CUDA): pip install torch --index-url https://download.pytorch.org/whl/cu128
+# CPU/CI:    pip install torch --index-url https://download.pytorch.org/whl/cpu
+torch>=2.1.0
 # CVE-2024-11392/11393/11394: versión mínima segura
 transformers>=4.48.0
 peft==0.14.0

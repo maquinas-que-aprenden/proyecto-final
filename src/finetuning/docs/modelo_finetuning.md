@@ -156,5 +156,7 @@ Notebooks:
 
 ## Experimento MLflow
 
-- **Experimento**: registrado en MLflow via `04_metricas_mlflow.ipynb`
-- **URI**: configurada en `src/finetuning/.env` → `MLFLOW_TRACKING_URI`
+- **Nombre del experimento**: `grader_relevancia_qwen25_3b` (valor de `MLFLOW_EXPERIMENT_NAME` en `04_metricas_mlflow.ipynb`)
+- **Tracking URI**: variable de entorno `MLFLOW_TRACKING_URI` (definida en `.env`)
+- **Registro**: `mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)` → `mlflow.set_experiment("grader_relevancia_qwen25_3b")`
+- **Referencia código**: celda `mlflow-log-27` de `04_metricas_mlflow.ipynb`

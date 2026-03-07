@@ -13,7 +13,7 @@ __pycache__/
 .env
 .aws/
 aws.pem
-src\finetuning\.env
+src/finetuning/.env
 # ── Data ───────────────────────────────────────
 *.csv
 !*.dvc
@@ -61,5 +61,5 @@ src/classifier/bert_pipeline/models/bert_model/*.pt
 # ── Archivos locales / personales ──────────────
 src/classifier/tareas/
 .venv_rag/
-proyecto-final\src\finetuning\tareas
-src\classifier\classifier_ultimo_dataset
+src/finetuning/tareas/
+src/classifier/classifier_ultimo_dataset/

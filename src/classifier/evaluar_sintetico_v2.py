@@ -87,7 +87,10 @@ print("--- Aciertos por clase ---")
 for clase in clases:
     sub = validas[validas["etiqueta_real"] == clase]
     n_ok = sub["acierto"].sum()
-    print(f"  {clase:<20} {n_ok:>3}/{len(sub):>3}  ({n_ok/len(sub)*100:.0f}%)")
+    if len(sub) == 0:
+        print(f"  {clase:<20}   0/  0  (N/A)")
+    else:
+        print(f"  {clase:<20} {n_ok:>3}/{len(sub):>3}  ({n_ok/len(sub)*100:.0f}%)")
 
 # --- Confusiones frecuentes --------------------------------------------------
 errores = validas[~validas["acierto"]]

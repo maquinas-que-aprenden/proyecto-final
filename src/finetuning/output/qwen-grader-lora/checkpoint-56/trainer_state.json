@@ -1,7 +1,7 @@
 {
   "best_global_step": 56,
   "best_metric": 0.3851969242095947,
-  "best_model_checkpoint": "src/finetuning/output/qwen-grader-lora\\checkpoint-56",
+  "best_model_checkpoint": "src/finetuning/output/qwen-grader-lora/checkpoint-56",
   "epoch": 2.0,
   "eval_steps": 500,
   "global_step": 56,
