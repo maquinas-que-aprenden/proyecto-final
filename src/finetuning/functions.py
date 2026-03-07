@@ -301,7 +301,7 @@ def run_training(model, training_args, train_dataset, val_dataset, tokenizer,
     )
     print(f"Iniciando entrenamiento QLoRA... ({steps} pasos estimados)")
     result = trainer.train()
-    print(f"\nEntrenamiento completado.")
+    print("\nEntrenamiento completado.")
     print(f"  Loss final:    {result.training_loss:.4f}")
     print(f"  Tiempo total:  {result.metrics.get('train_runtime', 0):.1f}s")
     return result
