@@ -26,6 +26,7 @@ import pandas as pd
 from datasets import Dataset, DatasetDict
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
+import torch
 from sklearn.utils.class_weight import compute_class_weight
 from transformers import (
     AutoModelForSequenceClassification,
@@ -38,6 +39,22 @@ from sklearn.metrics import f1_score, accuracy_score
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
+
+
+class WeightedTrainer(Trainer):
+    """Trainer personalizado que aplica class_weights en la función de pérdida."""
+
+    def __init__(self, *args, class_weights=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.class_weights = class_weights
+
+    def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
+        labels = inputs.pop("labels")
+        outputs = model(**inputs)
+        loss = torch.nn.CrossEntropyLoss(
+            weight=self.class_weights.to(model.device)
+        )(outputs.logits, labels)
+        return (loss, outputs) if return_outputs else loss
 
 _HERE = Path(__file__).parent
 _PIPELINE_DIR = _HERE.parent
@@ -54,6 +71,7 @@ MODEL_DIR = _PIPELINE_DIR / "models"
 MODEL_NAME = "dccuchile/bert-base-spanish-wwm-cased"
 MLFLOW_EXPERIMENT = "bert_clasificador_riesgo_ia"
 LABELS = ["inaceptable", "alto_riesgo", "riesgo_limitado", "riesgo_minimo"]
+MAX_SEQ_LEN = 256  # cubre >95% de los textos del corpus (ver notebook 03)
 SEED = 42
 
 
@@ -102,6 +120,9 @@ def train(
 
     le = LabelEncoder()
     le.fit(LABELS)
+    # labels_ordered garantiza que id2label/label2id coincide con el orden
+    # real del LabelEncoder (alfabético), no el del hardcode de LABELS
+    labels_ordered = le.classes_.tolist()
     df["label"] = le.transform(df["etiqueta_normalizada"])
 
     # Split estratificado: 80% train, 10% val, 10% test
@@ -126,7 +147,7 @@ def train(
         )
 
     def _tokenize(batch):
-        return tokenizer(batch["text"], truncation=True, max_length=512)
+        return tokenizer(batch["text"], truncation=True, max_length=MAX_SEQ_LEN)
 
     ds = DatasetDict(
         {
@@ -138,16 +159,17 @@ def train(
 
     model = AutoModelForSequenceClassification.from_pretrained(
         model_name,
-        num_labels=len(LABELS),
-        id2label={i: lbl for i, lbl in enumerate(LABELS)},
-        label2id={lbl: i for i, lbl in enumerate(LABELS)},
+        num_labels=len(labels_ordered),
+        id2label={i: lbl for i, lbl in enumerate(labels_ordered)},
+        label2id={lbl: i for i, lbl in enumerate(labels_ordered)},
     )
 
     # Pesos de clase para manejar el desbalanceo
     class_weights = compute_class_weight(
-        "balanced", classes=np.arange(len(LABELS)), y=df_train["label"].values
+        "balanced", classes=np.arange(len(labels_ordered)), y=df_train["label"].values
     )
-    logger.info("Class weights: %s", dict(zip(LABELS, class_weights.round(3))))
+    class_weights_tensor = torch.tensor(class_weights, dtype=torch.float32)
+    logger.info("Class weights: %s", dict(zip(labels_ordered, class_weights.round(3))))
 
     # MLflow
     mlflow_uri = os.getenv("MLFLOW_TRACKING_URI")
@@ -185,7 +207,7 @@ def train(
             logging_steps=50,
         )
 
-        trainer = Trainer(
+        trainer = WeightedTrainer(
             model=model,
             args=training_args,
             train_dataset=ds["train"],
@@ -193,6 +215,7 @@ def train(
             tokenizer=tokenizer,
             data_collator=DataCollatorWithPadding(tokenizer),
             compute_metrics=_compute_metrics,
+            class_weights=class_weights_tensor,
         )
 
         trainer.train()

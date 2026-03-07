@@ -59,6 +59,13 @@ print(f"Epochs : {EPOCHS}, Batch: {BATCH_SIZE}, LR: {LEARNING_RATE}")
 # 1. Cargar splits
 # ---------------------------------------------------------------------------
 print("\n[1/5] Cargando splits...")
+for _fname in ["train_split.joblib", "val_split.joblib", "test_split.joblib", "label_encoder.joblib"]:
+    if not (MODEL_DIR / _fname).exists():
+        raise FileNotFoundError(
+            f"Falta {_fname} en {MODEL_DIR}.\n"
+            "Ejecuta primero: jupyter nbconvert --to notebook --execute "
+            "src/classifier/bert_pipeline/notebooks/03_preparacion_datos.ipynb"
+        )
 df_train = joblib.load(MODEL_DIR / "train_split.joblib")
 df_val   = joblib.load(MODEL_DIR / "val_split.joblib")
 df_test  = joblib.load(MODEL_DIR / "test_split.joblib")
