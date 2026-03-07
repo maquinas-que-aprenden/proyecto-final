@@ -7,7 +7,7 @@ jobs:
   ragas-eval:
     name: RAGAS Eval (on EC2)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 300
 
     steps:
       - name: Run RAGAS eval via SSH
@@ -16,15 +16,13 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 260m
           script: |
             cd /home/ubuntu/normabot
+            git fetch origin ${{ github.ref_name }} && git reset --hard FETCH_HEAD
             ACTUAL_SHA=$(git rev-parse --verify HEAD)
-            docker run --rm \
-              -v "$(pwd)/eval:/app/eval" \
-              -v "$(pwd)/data/processed/vectorstore:/app/data/processed/vectorstore:ro" \
-              --env-file .env \
+            docker exec \
               -e GITHUB_SHA="$ACTUAL_SHA" \
               -e PYTHONPATH=/app:/app/eval \
-              -w /app \
-              ghcr.io/maquinas-que-aprenden/proyecto-final:latest \
+              normabot \
               python eval/run_ragas.py --ci

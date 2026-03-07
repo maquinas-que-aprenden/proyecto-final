@@ -68,5 +68,61 @@
     "contexts": [
       "Artículo 11. Los proveedores de sistemas de IA de alto riesgo elaborarán la documentación técnica del sistema antes de que este se introduzca en el mercado o se ponga en servicio, y la mantendrán actualizada. La documentación técnica se elaborará de modo que demuestre que el sistema de IA de alto riesgo cumple los requisitos establecidos en el presente capítulo."
     ]
+  },
+  {
+    "question": "¿Qué obligaciones tiene un sistema de IA de alto riesgo según el EU AI Act?",
+    "ground_truth": "Los sistemas de IA de alto riesgo deben cumplir las obligaciones de los artículos 9 a 15 del EU AI Act: establecer un sistema de gestión de riesgos iterativo (art. 9), aplicar prácticas de gobernanza de datos en los conjuntos de entrenamiento, validación y prueba (art. 10), elaborar y mantener documentación técnica (art. 11), mantener registros automáticos de eventos (art. 12), garantizar transparencia e información suficiente a los usuarios (art. 13), posibilitar la supervisión humana efectiva con posibilidad de intervención (art. 14), y alcanzar niveles adecuados de exactitud, robustez y ciberseguridad (art. 15).",
+    "contexts": [
+      "Artículo 9. Se establecerá un sistema de gestión de riesgos en relación con los sistemas de IA de alto riesgo. Consistirá en un proceso iterativo continuo planificado y ejecutado durante todo el ciclo de vida del sistema.",
+      "Artículo 10. Los conjuntos de datos de entrenamiento, validación y prueba estarán sujetos a prácticas de gobernanza y gestión de datos adecuadas al fin previsto del sistema de IA de alto riesgo.",
+      "Artículo 13. Los sistemas de IA de alto riesgo se diseñarán y desarrollarán de manera que su funcionamiento sea suficientemente transparente para que los usuarios puedan interpretar la producción del sistema.",
+      "Artículo 14. Los sistemas de IA de alto riesgo se diseñarán y desarrollarán de modo que puedan ser vigilados de manera efectiva por personas físicas durante su período de utilización, incluida la posibilidad de intervención humana.",
+      "Artículo 15. Los sistemas de IA de alto riesgo se diseñarán y desarrollarán de modo que alcancen un nivel adecuado de exactitud, solidez y ciberseguridad."
+    ]
+  },
+  {
+    "question": "Tengo un sistema que analiza currículums automáticamente para filtrar candidatos en procesos de selección. ¿En qué nivel de riesgo lo clasificarías?",
+    "ground_truth": "Un sistema que analiza currículums automáticamente para filtrar candidatos es de alto riesgo según el Anexo III, punto 4 del EU AI Act, que incluye expresamente los sistemas destinados a filtrar solicitudes de empleo. Está sujeto a las obligaciones de los artículos 9 a 15: gestión de riesgos, gobernanza de datos, documentación técnica, transparencia y supervisión humana efectiva. Las decisiones de filtrado deben poder ser revisadas e impugnadas por personas.",
+    "contexts": [
+      "Anexo III, punto 4. Sistemas de IA de alto riesgo en el ámbito del empleo, gestión de trabajadores y acceso al trabajo por cuenta propia: a) sistemas destinados a filtrar solicitudes de empleo o a evaluar a los candidatos en el transcurso de entrevistas o pruebas.",
+      "Artículo 6. Un sistema de IA se considerará de alto riesgo cuando esté comprendido en alguno de los ámbitos del Anexo III y presente un riesgo significativo de perjuicio para la salud, la seguridad o los derechos fundamentales.",
+      "Artículo 14. Los sistemas de IA de alto riesgo se diseñarán y desarrollarán de modo que puedan ser vigilados de manera efectiva por personas físicas durante su período de utilización, incluida la posibilidad de intervención humana."
+    ]
+  },
+  {
+    "question": "Genera un informe de cumplimiento para un sistema de scoring crediticio automático.",
+    "ground_truth": "Un sistema de scoring crediticio automático es de alto riesgo según el Anexo III, punto 5 del EU AI Act, que incluye sistemas de IA usados para evaluar la solvencia de personas físicas o establecer su calificación crediticia. El informe de cumplimiento debe contemplar: sistema de gestión de riesgos (art. 9), gobernanza de los datos de entrenamiento para evitar sesgos (art. 10), documentación técnica actualizada (art. 11), mecanismos de supervisión humana con posibilidad de impugnar decisiones (art. 14), y niveles adecuados de exactitud y robustez (art. 15). Se recomienda además realizar una evaluación de impacto conforme a la LOPD-GDD dado el tratamiento de datos personales de carácter financiero.",
+    "contexts": [
+      "Anexo III, punto 5. Sistemas de IA de alto riesgo en el ámbito del acceso a servicios privados esenciales y servicios públicos: b) sistemas de IA destinados a evaluar la solvencia de las personas físicas o a establecer su calificación crediticia.",
+      "Artículo 9. Se establecerá un sistema de gestión de riesgos en relación con los sistemas de IA de alto riesgo. Consistirá en un proceso iterativo continuo planificado y ejecutado durante todo el ciclo de vida del sistema.",
+      "Artículo 14. Los sistemas de IA de alto riesgo se diseñarán y desarrollarán de modo que puedan ser vigilados de manera efectiva por personas físicas durante su período de utilización, incluida la posibilidad de intervención humana.",
+      "Artículo 80 bis de la LOPD-GDD. El responsable del tratamiento deberá realizar una evaluación de impacto cuando el tratamiento entrañe un alto riesgo para los derechos y libertades de las personas físicas."
+    ]
+  },
+  {
+    "question": "Tengo un sistema de IA que evalúa el riesgo de recidiva de presos para recomendar libertad condicional. Clasifícalo, busca los artículos aplicables y genera un informe de cumplimiento.",
+    "ground_truth": "Un sistema de IA que evalúa el riesgo de reincidencia para recomendar libertad condicional es de alto riesgo según el Anexo III, punto 8 del EU AI Act, que incluye expresamente los sistemas usados por autoridades competentes para evaluar el riesgo de que una persona cometa delitos o reincida. Son aplicables los artículos 9 (gestión de riesgos), 10 (gobernanza de datos de entrenamiento para evitar sesgos en perfiles delictivos), 13 (transparencia), 14 (supervisión humana obligatoria: las decisiones finales sobre libertad condicional deben recaer en personas, no en el sistema) y 15 (exactitud y robustez). Dado el impacto sobre derechos fundamentales, se requiere evaluación de impacto conforme a la LOPD-GDD.",
+    "contexts": [
+      "Anexo III, punto 8. Sistemas de IA de alto riesgo en el ámbito de la administración de justicia y los procesos democráticos: a) sistemas destinados a ser utilizados por las autoridades competentes para evaluar el riesgo de que una persona física cometa delitos o reincida.",
+      "Artículo 14. Los sistemas de IA de alto riesgo se diseñarán y desarrollarán de modo que puedan ser vigilados de manera efectiva por personas físicas durante su período de utilización, incluida la posibilidad de intervención humana.",
+      "Artículo 9. Se establecerá un sistema de gestión de riesgos en relación con los sistemas de IA de alto riesgo. Consistirá en un proceso iterativo continuo planificado y ejecutado durante todo el ciclo de vida del sistema.",
+      "Artículo 80 bis de la LOPD-GDD. El responsable del tratamiento deberá realizar una evaluación de impacto cuando el tratamiento entrañe un alto riesgo para los derechos y libertades de las personas físicas."
+    ]
+  },
+  {
+    "question": "Un chatbot de atención al cliente no informa a los usuarios de que es una IA. ¿Está incumpliendo alguna normativa?",
+    "ground_truth": "Sí. El artículo 52 del EU AI Act obliga a los proveedores de sistemas de IA destinados a interactuar con personas físicas a garantizar que los usuarios sean informados de que están interactuando con un sistema de IA, salvo que sea evidente por el contexto. Adicionalmente, la LOPD-GDD y el RGPD exigen transparencia en el tratamiento automatizado de datos personales. El incumplimiento del artículo 52 puede conllevar multas de hasta 15.000.000 EUR o el 3% del volumen de negocios anual mundial según el artículo 71.",
+    "contexts": [
+      "Artículo 52. Los proveedores garantizarán que los sistemas de IA destinados a interactuar con personas físicas se diseñen de modo que las personas sean informadas de que están interactuando con un sistema de IA, a menos que resulte evidente habida cuenta de las circunstancias y el contexto de uso.",
+      "Artículo 71. Las infracciones de las obligaciones de transparencia del artículo 52 estarán sujetas a multas administrativas de hasta 15 000 000 EUR o el 3% del volumen de negocios total anual mundial."
+    ]
+  },
+  {
+    "question": "¿Un sistema de reconocimiento facial usado por la policía para identificar sospechosos en tiempo real en espacios públicos es legal según el EU AI Act?",
+    "ground_truth": "Con carácter general, no. El artículo 5 del EU AI Act prohíbe los sistemas de identificación biométrica remota en tiempo real en espacios de acceso público con fines de aplicación de la ley. Existen excepciones muy limitadas y sujetas a autorización judicial previa, como la búsqueda de víctimas de secuestro o la prevención de atentados terroristas inminentes. Fuera de esas excepciones, el uso de reconocimiento facial en tiempo real por fuerzas del orden en espacios públicos constituye una práctica prohibida bajo el artículo 5.",
+    "contexts": [
+      "Artículo 5. Quedan prohibidas las siguientes prácticas de IA: f) la utilización de sistemas de identificación biométrica remota en tiempo real en espacios de acceso público con fines de aplicación de la ley, salvo que dicha utilización sea estrictamente necesaria para alguno de los objetivos siguientes y esté sujeta a autorización judicial previa.",
+      "Artículo 5. Las excepciones a la prohibición de identificación biométrica remota en tiempo real incluyen: búsqueda específica de víctimas de secuestro, trata o explotación sexual; prevención de una amenaza específica, real y actual o previsible de atentado terrorista; localización de personas sospechosas de haber cometido delitos graves."
+    ]
   }
 ]

@@ -29,9 +29,15 @@ from pathlib import Path
 
 import joblib
 import numpy as np
-from src.checklist.main import SEVERITY
-from src.observability.langfuse_compat import observe, langfuse_context
 from pydantic import BaseModel, Field
+from src.checklist.main import SEVERITY
+from ._constants import (
+    KEYWORDS_DOMINIO as _KEYWORDS_DOMINIO,
+    PALABRAS_SUPERVISION as _PALABRAS_SUPERVISION,
+    RISK_LABELS as _RISK_LABELS,
+)
+from .functions import limpiar_texto as _limpiar_texto
+from src.observability.langfuse_compat import observe, langfuse_context
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +52,14 @@ _ANNEX3_PATTERNS: list | None = None
 
 
 def _build_annex3_patterns() -> list:
-    """Compila los patrones del Anexo III EU AI Act (llamada lazy, una sola vez)."""
+    """Compila los patrones del Anexo III EU AI Act (llamada lazy, una sola vez).
+
+    IMPORTANTE — SINCRONIZACIÓN CON create_normative_features.py:
+    Ese módulo define patrones equivalentes para Art. 5.1.a–5.1.e usados al
+    enriquecer el dataset de entrenamiento. Si se modifica algún patrón aquí,
+    revisar create_normative_features.py para mantener coherencia entre
+    entrenamiento e inferencia. Ver [I1] en audit_errores_classifier.md.
+    """
     raw = [
         # ALTO RIESGO — Anexo III
         (r"(cv|curr[ií]culum|curricular).{0,60}(screening|selecci[oó]n|filtr|evaluaci[oó]n|clasificaci[oó]n)",
@@ -159,62 +172,8 @@ def _annex3_override(text: str, result: dict) -> dict:
     return result
 
 
-# Keywords de dominio (replica de functions.py para inferencia sin spaCy)
-_KEYWORDS_DOMINIO = {
-    "inaceptable": [
-        "inferir", "vender", "manipular", "subconsciente", "biométrico",
-        "facial", "vigilancia", "sindical", "racial", "etnia",
-        "religioso", "discriminar", "coerción", "prohibido",
-    ],
-    "alto_riesgo": [
-        "penitenciario", "juez", "reincidencia", "crediticio",
-        "diagnóstico", "sanitario", "migración", "asilo",
-        "policial", "empleabilidad", "infraestructura", "vinculante",
-        "medicación", "autónomamente",
-        "reclamación", "subsidio", "escolar", "triage",
-        "urgencia", "aeronave", "piloto", "laboral",
-        # Anexo III cat. 4 — selección de personal (CV screening)
-        "curricular", "candidato", "reclutamiento", "curriculum",
-        # Anexo III cat. 5 — servicios financieros esenciales
-        "solvencia", "préstamo", "crédito", "hipoteca",
-        # Anexo III cat. 6 — justicia penal
-        "recidiva", "reincidente",
-        # Anexo III cat. 7 — migración
-        "frontera", "visado", "refugiado",
-        # Anexo III cat. 8 — administración de justicia
-        "sentencia", "judicial",
-        # Anexo III cat. 3 — educación
-        "admisión", "matriculación",
-    ],
-    "riesgo_limitado": [
-        "chatbot", "revelar", "transparencia", "deepfake",
-        "sintético", "notificar", "asesoramiento", "asistente",
-        "informar", "advertir", "indicar",
-    ],
-    "riesgo_minimo": [
-        "sugerir", "borrador", "juego", "spam", "entretenimiento",
-        "filtro", "aficionado", "hobby", "receta",
-        "avería", "maquinaria", "logística", "mantenimiento",
-        "sensor", "industrial", "gestión",
-    ],
-}
-_PALABRAS_SUPERVISION = [
-    "supervisión", "supervisar", "revisar", "revisión", "garantía",
-    "confirmación", "criterio", "auditoría", "humano",
-    "pediatra", "médico", "piloto", "pedagógico",
-]
-
 # Ruta al mejor modelo (dataset fusionado)
 _MODEL_DIR = Path(__file__).parent / "classifier_dataset_fusionado" / "model"
-
-# Mapping canónico de etiquetas numéricas → textuales (EU AI Act)
-# Fallback cuando el modelo no incluye label_encoder.joblib
-_RISK_LABELS = {
-    "0": "inaceptable",
-    "1": "alto",
-    "2": "limitado",
-    "3": "mínimo",
-}
 
 # Singletons — se cargan en el primer uso (thread-safe)
 _modelo = None
@@ -265,9 +224,19 @@ def _load_artifacts():
         explicit_pipeline: str | None = None
         meta_path = _MODEL_DIR / "mejor_modelo_seleccion.json"
         if meta_path.exists():
-            meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            model_file = _MODEL_DIR.parent / meta["model_file"]
-            tfidf_file = _MODEL_DIR.parent / meta["tfidf_file"]
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.warning("mejor_modelo_seleccion.json ilegible (%s); usando rutas por defecto.", exc)
+                meta = {}
+            if not isinstance(meta, dict):
+                logger.warning(
+                    "mejor_modelo_seleccion.json contiene %s en lugar de un objeto JSON; usando rutas por defecto.",
+                    type(meta).__name__,
+                )
+                meta = {}
+            model_file = _MODEL_DIR.parent / meta.get("model_file", "model/modelo_xgboost.joblib")
+            tfidf_file = _MODEL_DIR.parent / meta.get("tfidf_file", "model/tfidf_vectorizer.joblib")
             needs_manual_features = meta.get("needs_manual_features", False)
             explicit_pipeline = meta.get("pipeline_type")
             logger.info("Cargando modelo desde metadata: %s", meta.get("nombre", ""))
@@ -315,37 +284,6 @@ def _load_artifacts():
             _MODEL_DIR,
         )
 
-
-def _limpiar_texto_fallback(texto: str) -> str:
-    """Limpieza basica con regex (misma logica que functions._limpiar_texto_fallback)."""
-    import re
-
-    if not texto or not isinstance(texto, str):
-        return ""
-
-    _stopwords = {
-        "a", "al", "algo", "algunas", "algunos", "ante", "antes", "como",
-        "con", "contra", "cual", "cuando", "de", "del", "desde", "donde",
-        "durante", "e", "el", "ella", "ellos", "en", "entre", "era", "es",
-        "esa", "esas", "ese", "eso", "esos", "esta", "estas", "este", "esto",
-        "estos", "fue", "ha", "han", "hasta", "hay", "he", "la", "las", "le",
-        "les", "lo", "los", "me", "mi", "mis", "muy", "ni", "no", "nos",
-        "o", "os", "otro", "para", "pero", "por", "que", "quien", "quienes",
-        "se", "si", "sin", "sobre", "son", "su", "sus", "también", "tanto",
-        "te", "todo", "todos", "tu", "tus", "un", "una", "unas", "uno",
-        "unos", "ya", "yo",
-    }
-    tokens = re.findall(r"\b[a-záéíóúüñ]{3,}\b", texto.lower())
-    return " ".join(t for t in tokens if t not in _stopwords)
-
-
-def _limpiar_texto(texto: str) -> str:
-    """Limpia texto para inferencia, usando spaCy si esta disponible."""
-    try:
-        from src.classifier.functions import limpiar_texto
-        return limpiar_texto(texto)
-    except ImportError:
-        return _limpiar_texto_fallback(texto)
 
 
 def _crear_features_manuales(text: str) -> np.ndarray:
@@ -470,8 +408,11 @@ def predict_risk(text: str) -> dict:
     # 4. Explicabilidad — top features por contribucion
     try:
         if hasattr(_modelo, "coef_"):
-            # LogReg: contribuciones lineales
-            pred_idx = list(_modelo.classes_).index(risk_level)
+            # LogReg: contribuciones lineales.
+            # Se usa raw_pred (valor numérico original) en lugar de risk_level
+            # (string ya decodificado) para evitar ValueError cuando el modelo
+            # fue entrenado con LabelEncoder y _modelo.classes_ son integers.
+            pred_idx = list(_modelo.classes_).index(raw_pred)
             coefs = _modelo.coef_[pred_idx]
             X_dense = X_final.toarray().flatten() if hasattr(X_final, "toarray") else X_final.flatten()
             contributions = coefs * X_dense

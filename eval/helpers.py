@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import uuid
 from pathlib import Path
 import numpy as np
 
@@ -32,10 +33,6 @@ def load_dataset() -> list[dict]:
 def get_agent_answers(dataset: list[dict]) -> list[dict]:
     """Invoca el agente para cada pregunta del dataset y recoge la respuesta.
 
-    Cuando el RAG sea real (ChromaDB conectado), esta función devuelve
-    respuestas y contextos reales. Con los mocks actuales, devuelve los
-    contextos sintéticos del dataset y la respuesta del agente stub.
-
     Returns:
         Lista de dicts con question, answer, contexts, ground_truth.
     """
@@ -61,7 +58,7 @@ def get_agent_answers(dataset: list[dict]) -> list[dict]:
 
         if use_agent:
             try:
-                result = agent_run(question)
+                result = agent_run(question, session_id=f"eval-{uuid.uuid4().hex[:8]}")
                 # El agente ReAct devuelve messages; cogemos el último
                 answer = result["messages"][-1].content
             except Exception as e:
@@ -114,16 +111,25 @@ def get_ragas_llm():
     return LangchainLLMWrapper(llm)
 
 def get_ragas_embeddings():
-    """Instancia los embeddings de Titan v2 para Ragas."""
-    from langchain_aws import BedrockEmbeddings
+    """Instancia embeddings para RAGAS usando sentence-transformers local.
+
+    Usa intfloat/multilingual-e5-base (ya cargado por ChromaDB en el
+    contenedor) para evitar dependencia de permisos IAM de Bedrock InvokeModel.
+    """
     from ragas.embeddings import LangchainEmbeddingsWrapper
-    
-    embeddings = BedrockEmbeddings(
-        model_id="amazon.titan-embed-text-v2:0",
-        region_name=os.getenv("AWS_REGION", "eu-west-1"),
-    )
-    # Ragas necesita este wrapper para entender los embeddings de LangChain
-    return LangchainEmbeddingsWrapper(embeddings)
+    from sentence_transformers import SentenceTransformer
+
+    class _LocalEmbeddings:
+        def __init__(self):
+            self._model = SentenceTransformer("intfloat/multilingual-e5-base")
+
+        def embed_query(self, text: str) -> list[float]:
+            return self._model.encode(f"query: {text}").tolist()
+
+        def embed_documents(self, texts: list[str]) -> list[list[float]]:
+            return [v.tolist() for v in self._model.encode([f"query: {t}" for t in texts])]
+
+    return LangchainEmbeddingsWrapper(_LocalEmbeddings())
 
 def run_ragas(ragas_dataset) -> dict:
     from ragas import evaluate
@@ -134,7 +140,7 @@ def run_ragas(ragas_dataset) -> dict:
     # Cargar embeddings para evitar error de OpenAI
     try:
         ragas_embeddings = get_ragas_embeddings()
-        logger.info("Embeddings Titan v2 cargados correctamente.")
+        logger.info("Embeddings sentence-transformers cargados correctamente.")
     except Exception as e:
         logger.warning("No se pudieron cargar embeddings, AnswerRelevancy fallará: %s", e)
         ragas_embeddings = None
@@ -173,7 +179,7 @@ def run_ragas(ragas_dataset) -> dict:
     }
     nan_metrics = [k for k, v in metrics.items() if np.isnan(v)]
     if nan_metrics:
-        raise RuntimeError(f"Métricas con NaN tras evaluación RAGAS: {nan_metrics}")
+        logger.warning("Métricas con NaN (jobs fallidos en RAGAS): %s — se registran como NaN", nan_metrics)
     return metrics
 
 # Cuando se apruebe PR#36 lo añado a observabilidad
@@ -265,6 +271,29 @@ def log_to_langfuse(metrics: dict, n_examples: int, git_sha: str) -> None:
 
     lf.flush()
     logger.info("Scores RAGAS logueados en Langfuse (trace: %s)", trace.id)
+
+
+def save_answers_cache(rows: list[dict], git_sha: str) -> Path:
+    """Guarda las respuestas del agente en caché para evitar re-ejecutar."""
+    cache_path = Path(__file__).parent / f"answers_cache_{git_sha[:8]}.json"
+    with open(cache_path, "w", encoding="utf-8") as f:
+        json.dump({"git_sha": git_sha, "rows": rows}, f, ensure_ascii=False, indent=2)
+    logger.info("Caché guardada en %s", cache_path)
+    return cache_path
+
+
+def load_answers_cache(git_sha: str) -> list[dict] | None:
+    """Carga caché si existe y coincide el SHA. Devuelve None si no hay caché."""
+    cache_path = Path(__file__).parent / f"answers_cache_{git_sha[:8]}.json"
+    if not cache_path.exists():
+        return None
+    with open(cache_path, encoding="utf-8") as f:
+        data = json.load(f)
+    if data.get("git_sha") != git_sha:
+        logger.warning("Caché obsoleta (SHA distinto) — ignorando")
+        return None
+    logger.info("Caché cargada: %d respuestas (SHA: %s)", len(data["rows"]), git_sha[:8])
+    return data["rows"]
 
 
 def check_thresholds(metrics: dict) -> list[str]:

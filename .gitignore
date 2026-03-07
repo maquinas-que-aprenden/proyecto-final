@@ -7,6 +7,7 @@ venv/
 __pycache__/
 *.pyc
 .ruff_cache/
+.pytest_cache/
 
 # ── Credenciales y configuración local ─────────
 .env
@@ -61,3 +62,4 @@ src/classifier/bert_pipeline/models/bert_model/*.pt
 src/classifier/tareas/
 .venv_rag/
 proyecto-final\src\finetuning\tareas
+src\classifier\classifier_ultimo_dataset

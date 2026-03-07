@@ -209,19 +209,23 @@ En pytest, Langfuse se desactiva automáticamente mediante `LANGFUSE_ENABLED=fal
 
 Para más información, consultar la documentación oficial: [Langfuse: get started](https://langfuse.com/docs/observability/get-started)
 
-### Evaluación RAGAS (pendiente de implementación y tests)
+### Evaluación RAGAS
 
 El workflow `eval.yml` ejecuta una evaluación RAGAS sobre NormaBot. Se lanza manualmente desde _Actions → NormaBot RAGAS Eval → Run workflow_.
 
-Lo que hace: se conecta por SSH al servidor EC2, levanta un contenedor con la imagen `:latest` ya desplegada y ejecuta `python eval/run_ragas.py --ci`. El script:
+Lo que hace: se conecta por SSH al servidor EC2, hace `git pull` para tener los últimos ficheros de `eval/`, y ejecuta `docker exec` sobre el contenedor `normabot` ya en marcha. El script `eval/run_ragas.py --ci`:
 
-1. Carga el dataset de evaluación (`eval/`).
-2. Obtiene respuestas del agente para cada pregunta.
+1. Carga el dataset de evaluación (`eval/dataset.json`).
+2. Obtiene respuestas reales del agente para cada pregunta y captura los contextos devueltos por el retriever.
 3. Calcula las métricas RAGAS. Los umbrales actuales son:
    - `faithfulness` ≥ 0.80
    - `answer_relevancy` ≥ 0.85
+   - `context_precision` ≥ 0.70
+   - `context_recall` ≥ 0.70
 4. Registra los resultados en MLflow (experimento `ragas_eval`) y anota scores en Langfuse.
 5. Si alguna métrica no supera el umbral, sale con código 1 (en local solo avisa, no bloquea).
+
+El directorio `eval/` está montado en el contenedor como bind mount (`./eval:/app/eval` en `docker-compose.yml`), por lo que el `git pull` en EC2 basta para que el contenedor vea los ficheros actualizados sin necesitar un redeploy.
 
 Para ver los resultados, consultar el experimento en MLflow o las trazas en Langfuse etiquetadas con el SHA del commit.
 
@@ -313,11 +317,11 @@ pytest tests/ -v
 pytest tests/ -v -s
 ```
 
-Hay cinco suites de smoke tests (88 tests en total):
-- `test_classifier.py` — 29 tests: estructura de `predict_risk()`, robustez, explicabilidad SHAP, validación de entrada, coherencia de campos tras el override del Anexo III (`TestAnnex3Override`).
+Hay cinco suites de smoke tests (115 tests en total):
+- `test_classifier.py` — 35 tests: estructura de `predict_risk()`, robustez, explicabilidad SHAP, validación de entrada, coherencia de campos tras el override del Anexo III (`TestAnnex3Override`).
+- `test_checklist.py` — 27 tests: obligaciones por nivel de riesgo, recomendaciones SHAP, construcción del checklist de cumplimiento y detección de casos borderline.
 - `test_memory.py` — 5 tests: hook `pre_model_hook` de truncación del historial de conversación para no exceder la ventana de contexto del LLM.
-- `test_orchestrator.py` — 30 tests: SYSTEM_PROMPT con requisitos legales (incluida instrucción anti-doble-clasificación), nombres y descripciones de las 3 tools, validación de entrada, comportamiento de `classify_risk`, `search_legal_docs` y `generate_report`, ausencia de doble llamada al clasificador (`TestNoDobleClasificacion`), side-channel de metadatos, contrato de `run()`, y memoria conversacional.
-- `test_rag_generate.py` — 13 tests: prompt, singleton `_get_generate_llm()`, flujo `generate()` con fallback.
+- `test_orchestrator.py` — 34 tests: SYSTEM_PROMPT con requisitos legales (incluida instrucción anti-doble-clasificación), nombres y descripciones de las 3 tools, validación de entrada, comportamiento de `classify_risk`, `search_legal_docs` y `generate_report`, ausencia de doble llamada al clasificador (`TestNoDobleClasificacion`), side-channel de metadatos, contrato de `run()`, y memoria conversacional.
 - `test_retrain.py` — 14 tests: limpieza de texto, carga de JSONL, features manuales e integración de `main()` con `monkeypatch` de rutas y stub `_FakeXGB` (sin entrenamiento real).
 
 Los tests de orchestrator y RAG mockean `langchain_aws` (Bedrock), `langchain_core` y `langchain_ollama` (Ollama) a nivel de módulo para no depender de servicios externos. Langfuse se desactiva automáticamente durante la ejecución de pytest.
