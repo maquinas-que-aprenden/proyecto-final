@@ -19,7 +19,7 @@ jobs:
           command_timeout: 260m
           script: |
             cd /home/ubuntu/normabot
-            git pull
+            git fetch origin ${{ github.ref_name }} && git reset --hard FETCH_HEAD
             ACTUAL_SHA=$(git rev-parse --verify HEAD)
             docker exec \
               -e GITHUB_SHA="$ACTUAL_SHA" \

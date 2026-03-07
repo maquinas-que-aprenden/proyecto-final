@@ -33,10 +33,6 @@ def load_dataset() -> list[dict]:
 def get_agent_answers(dataset: list[dict]) -> list[dict]:
     """Invoca el agente para cada pregunta del dataset y recoge la respuesta.
 
-    Cuando el RAG sea real (ChromaDB conectado), esta función devuelve
-    respuestas y contextos reales. Con los mocks actuales, devuelve los
-    contextos sintéticos del dataset y la respuesta del agente stub.
-
     Returns:
         Lista de dicts con question, answer, contexts, ground_truth.
     """
@@ -128,10 +124,10 @@ def get_ragas_embeddings():
             self._model = SentenceTransformer("intfloat/multilingual-e5-base")
 
         def embed_query(self, text: str) -> list[float]:
-            return self._model.encode(text).tolist()
+            return self._model.encode(f"query: {text}").tolist()
 
         def embed_documents(self, texts: list[str]) -> list[list[float]]:
-            return [v.tolist() for v in self._model.encode(texts)]
+            return [v.tolist() for v in self._model.encode([f"query: {t}" for t in texts])]
 
     return LangchainEmbeddingsWrapper(_LocalEmbeddings())
 
@@ -144,7 +140,7 @@ def run_ragas(ragas_dataset) -> dict:
     # Cargar embeddings para evitar error de OpenAI
     try:
         ragas_embeddings = get_ragas_embeddings()
-        logger.info("Embeddings Titan v2 cargados correctamente.")
+        logger.info("Embeddings sentence-transformers cargados correctamente.")
     except Exception as e:
         logger.warning("No se pudieron cargar embeddings, AnswerRelevancy fallará: %s", e)
         ragas_embeddings = None
