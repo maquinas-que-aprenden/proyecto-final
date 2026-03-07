@@ -29,21 +29,15 @@ from pathlib import Path
 
 import joblib
 import numpy as np
-try:
-    from langfuse.decorators import observe, langfuse_context
-except ImportError:
-    # langfuse opcional: el clasificador funciona sin observabilidad instalada
-    def observe(name=None):  # type: ignore[misc]
-        def decorator(func):
-            return func
-        return decorator
-
-    class _NoOpLangfuse:
-        def update_current_observation(self, **kwargs): pass
-        def score_current_trace(self, **kwargs): pass
-
-    langfuse_context = _NoOpLangfuse()  # type: ignore[assignment]
 from pydantic import BaseModel, Field
+from src.checklist.main import SEVERITY
+from ._constants import (
+    KEYWORDS_DOMINIO as _KEYWORDS_DOMINIO,
+    PALABRAS_SUPERVISION as _PALABRAS_SUPERVISION,
+    RISK_LABELS as _RISK_LABELS,
+)
+from .functions import limpiar_texto as _limpiar_texto
+from src.observability.langfuse_compat import observe, langfuse_context
 
 logger = logging.getLogger(__name__)
 
@@ -55,16 +49,17 @@ class _TextInput(BaseModel):
 # Patrones del Anexo III para override determinista post-predicción ML.
 # Se compilan una sola vez y se aplican sobre el texto ORIGINAL (sin limpiar).
 _ANNEX3_PATTERNS: list | None = None
-_SEVERITY: dict[str, int] = {
-    "inaceptable": 3,
-    "alto_riesgo": 2,
-    "riesgo_limitado": 1,
-    "riesgo_minimo": 0,
-}
 
 
 def _build_annex3_patterns() -> list:
-    """Compila los patrones del Anexo III EU AI Act (llamada lazy, una sola vez)."""
+    """Compila los patrones del Anexo III EU AI Act (llamada lazy, una sola vez).
+
+    IMPORTANTE — SINCRONIZACIÓN CON create_normative_features.py:
+    Ese módulo define patrones equivalentes para Art. 5.1.a–5.1.e usados al
+    enriquecer el dataset de entrenamiento. Si se modifica algún patrón aquí,
+    revisar create_normative_features.py para mantener coherencia entre
+    entrenamiento e inferencia. Ver [I1] en audit_errores_classifier.md.
+    """
     raw = [
         # ALTO RIESGO — Anexo III
         (r"(cv|curr[ií]culum|curricular).{0,60}(screening|selecci[oó]n|filtr|evaluaci[oó]n|clasificaci[oó]n)",
@@ -86,12 +81,33 @@ def _build_annex3_patterns() -> list:
         (r"(apoyo|asistencia).{0,40}(juez|tribunal|sentencia|resoluc.{0,10}judicial)",
          "alto_riesgo", "Anexo III cat. 8"),
         # INACEPTABLE — Art. 5 EU AI Act
-        (r"puntuaci[oó]n.{0,30}social.{0,30}ciudadano",
-         "inaceptable", "Art. 5.1.c"),
+        # Art. 5.1.a — Manipulación subliminal o engañosa
         (r"(manipulaci[oó]n|t[eé]cnica).{0,20}subliminal",
          "inaceptable", "Art. 5.1.a"),
+        (r"subliminal.{0,40}(comportamiento|conducta|decisi[oó]n)",
+         "inaceptable", "Art. 5.1.a"),
+        # Art. 5.1.b — Explotación de vulnerabilidades
+        (r"(exploit|explot\w*|explotaci[oó]n|aprovech).{0,30}(vulnerabilidad|discapacidad|menor.{0,10}edad|tercera.{0,10}edad)",
+         "inaceptable", "Art. 5.1.b"),
+        (r"(menor.{0,15}edad|persona.{0,15}(vulnerabl|discapacidad)).{0,50}(manipul|influenc|coacci|engañ)",
+         "inaceptable", "Art. 5.1.b"),
+        # Art. 5.1.c — Puntuación social ciudadana por autoridades públicas
+        (r"puntuaci[oó]n.{0,30}social.{0,30}ciudadano",
+         "inaceptable", "Art. 5.1.c"),
+        (r"sistema.{0,20}(cr[eé]dito|scoring).{0,20}social.{0,30}(ciudadano|poblaci[oó]n|persona)",
+         "inaceptable", "Art. 5.1.c"),
+        # Art. 5.1.d — Identificación biométrica en tiempo real en espacios públicos
         (r"(reconocimiento|identificaci[oó]n).{0,30}(facial|biom[eé]tric).{0,50}(espacio.{0,10}p[uú]blic|tiempo.{0,10}real|calle|multitud)",
          "inaceptable", "Art. 5.1.d"),
+        (r"vigilancia.{0,30}biom[eé]tric.{0,30}(masiva|tiempo.{0,10}real|p[uú]blic)",
+         "inaceptable", "Art. 5.1.d"),
+        # Art. 5.1.e — Perfilado policial predictivo sin indicios concretos
+        (r"predicci[oó]n.{0,40}(delito|peligrosidad|criminal).{0,40}(sin.{0,20}indicio|sin.{0,20}prueba|preventiv).{0,20}(policial|penal)",
+         "inaceptable", "Art. 5.1.e"),
+        (r"perfilado.{0,30}(racial|[eé]tnico|conductual).{0,40}(policial|delictiv|criminal)",
+         "inaceptable", "Art. 5.1.e"),
+        (r"riesgo.{0,20}delictivo.{0,30}(personalidad|caracter[ií]sticas.{0,20}personal|perfil).{0,30}sin.{0,20}(indicio|hecho|prueba)",
+         "inaceptable", "Art. 5.1.e"),
     ]
     return [(_re.compile(p, _re.IGNORECASE | _re.DOTALL), lvl, ref) for p, lvl, ref in raw]
 
@@ -112,7 +128,7 @@ def _annex3_override(text: str, result: dict) -> dict:
     best_ref: str | None = None
     for pattern, expected_level, legal_ref in _ANNEX3_PATTERNS:
         if pattern.search(text):
-            if best_level is None or _SEVERITY[expected_level] > _SEVERITY[best_level]:
+            if best_level is None or SEVERITY[expected_level] > SEVERITY[best_level]:
                 best_level = expected_level
                 best_ref = legal_ref
 
@@ -142,66 +158,22 @@ def _annex3_override(text: str, result: dict) -> dict:
             "confidence": result["confidence"],
             "probabilities": result.get("probabilities", {}),
         }
+        # Los features SHAP corresponden a la predicción ML, no al nivel legal.
+        # Se mueven a ml_prediction para no contaminar la explicación del override.
+        if "shap_top_features" in overridden:
+            overridden["ml_prediction"]["shap_top_features"] = overridden.pop("shap_top_features")
+        # La explicación legal prevalece: se establece aquí para que esté disponible
+        # tanto cuando se llama predict_risk() como en tests directos de esta función.
+        overridden["shap_explanation"] = (
+            f"Clasificación determinada por {best_ref} EU AI Act. "
+            f"La capa normativa prevalece sobre la predicción del modelo ML."
+        )
         return overridden
     return result
 
 
-# Keywords de dominio (replica de functions.py para inferencia sin spaCy)
-_KEYWORDS_DOMINIO = {
-    "inaceptable": [
-        "inferir", "vender", "manipular", "subconsciente", "biométrico",
-        "facial", "vigilancia", "sindical", "racial", "etnia",
-        "religioso", "discriminar", "coerción", "prohibido",
-    ],
-    "alto_riesgo": [
-        "penitenciario", "juez", "reincidencia", "crediticio",
-        "diagnóstico", "sanitario", "migración", "asilo",
-        "policial", "empleabilidad", "infraestructura", "vinculante",
-        "medicación", "autónomamente",
-        "reclamación", "subsidio", "escolar", "triage",
-        "urgencia", "aeronave", "piloto", "laboral",
-        # Anexo III cat. 4 — selección de personal (CV screening)
-        "curricular", "candidato", "reclutamiento", "curriculum",
-        # Anexo III cat. 5 — servicios financieros esenciales
-        "solvencia", "préstamo", "crédito", "hipoteca",
-        # Anexo III cat. 6 — justicia penal
-        "recidiva", "reincidente",
-        # Anexo III cat. 7 — migración
-        "frontera", "visado", "refugiado",
-        # Anexo III cat. 8 — administración de justicia
-        "sentencia", "judicial",
-        # Anexo III cat. 3 — educación
-        "admisión", "matriculación",
-    ],
-    "riesgo_limitado": [
-        "chatbot", "revelar", "transparencia", "deepfake",
-        "sintético", "notificar", "asesoramiento", "asistente",
-        "informar", "advertir", "indicar",
-    ],
-    "riesgo_minimo": [
-        "sugerir", "borrador", "juego", "spam", "entretenimiento",
-        "filtro", "aficionado", "hobby", "receta",
-        "avería", "maquinaria", "logística", "mantenimiento",
-        "sensor", "industrial", "gestión",
-    ],
-}
-_PALABRAS_SUPERVISION = [
-    "supervisión", "supervisar", "revisar", "revisión", "garantía",
-    "confirmación", "criterio", "auditoría", "humano",
-    "pediatra", "médico", "piloto", "pedagógico",
-]
-
 # Ruta al mejor modelo (dataset fusionado)
 _MODEL_DIR = Path(__file__).parent / "classifier_dataset_fusionado" / "model"
-
-# Mapping canónico de etiquetas numéricas → textuales (EU AI Act)
-# Fallback cuando el modelo no incluye label_encoder.joblib
-_RISK_LABELS = {
-    "0": "inaceptable",
-    "1": "alto",
-    "2": "limitado",
-    "3": "mínimo",
-}
 
 # Singletons — se cargan en el primer uso (thread-safe)
 _modelo = None
@@ -249,12 +221,24 @@ def _load_artifacts():
             return
 
         needs_manual_features = False
+        explicit_pipeline: str | None = None
         meta_path = _MODEL_DIR / "mejor_modelo_seleccion.json"
         if meta_path.exists():
-            meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            model_file = _MODEL_DIR.parent / meta["model_file"]
-            tfidf_file = _MODEL_DIR.parent / meta["tfidf_file"]
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.warning("mejor_modelo_seleccion.json ilegible (%s); usando rutas por defecto.", exc)
+                meta = {}
+            if not isinstance(meta, dict):
+                logger.warning(
+                    "mejor_modelo_seleccion.json contiene %s en lugar de un objeto JSON; usando rutas por defecto.",
+                    type(meta).__name__,
+                )
+                meta = {}
+            model_file = _MODEL_DIR.parent / meta.get("model_file", "model/modelo_xgboost.joblib")
+            tfidf_file = _MODEL_DIR.parent / meta.get("tfidf_file", "model/tfidf_vectorizer.joblib")
             needs_manual_features = meta.get("needs_manual_features", False)
+            explicit_pipeline = meta.get("pipeline_type")
             logger.info("Cargando modelo desde metadata: %s", meta.get("nombre", ""))
         else:
             model_file = _MODEL_DIR / "mejor_modelo.joblib"
@@ -272,8 +256,14 @@ def _load_artifacts():
             if le_path.exists():
                 _label_encoder = joblib.load(le_path)
 
-            # Auto-detectar tipo de pipeline segun artefactos disponibles y metadata
-            if _svd is not None and needs_manual_features:
+            # Determinar tipo de pipeline.
+            # Se usa "pipeline_type" del JSON si está presente (fuente de verdad).
+            # El directorio puede contener artefactos de múltiples experimentos
+            # (svd_transformer.joblib existe aunque el modelo activo no lo use),
+            # por lo que la auto-detección por presencia de archivos no es fiable.
+            if explicit_pipeline in ("tfidf_only", "tfidf_svd", "tfidf_svd_manual"):
+                _pipeline_type = explicit_pipeline
+            elif _svd is not None and needs_manual_features:
                 _pipeline_type = "tfidf_svd_manual"
             elif _svd is not None:
                 _pipeline_type = "tfidf_svd"
@@ -294,37 +284,6 @@ def _load_artifacts():
             _MODEL_DIR,
         )
 
-
-def _limpiar_texto_fallback(texto: str) -> str:
-    """Limpieza basica con regex (misma logica que functions._limpiar_texto_fallback)."""
-    import re
-
-    if not texto or not isinstance(texto, str):
-        return ""
-
-    _stopwords = {
-        "a", "al", "algo", "algunas", "algunos", "ante", "antes", "como",
-        "con", "contra", "cual", "cuando", "de", "del", "desde", "donde",
-        "durante", "e", "el", "ella", "ellos", "en", "entre", "era", "es",
-        "esa", "esas", "ese", "eso", "esos", "esta", "estas", "este", "esto",
-        "estos", "fue", "ha", "han", "hasta", "hay", "he", "la", "las", "le",
-        "les", "lo", "los", "me", "mi", "mis", "muy", "ni", "no", "nos",
-        "o", "os", "otro", "para", "pero", "por", "que", "quien", "quienes",
-        "se", "si", "sin", "sobre", "son", "su", "sus", "también", "tanto",
-        "te", "todo", "todos", "tu", "tus", "un", "una", "unas", "uno",
-        "unos", "ya", "yo",
-    }
-    tokens = re.findall(r"\b[a-záéíóúüñ]{3,}\b", texto.lower())
-    return " ".join(t for t in tokens if t not in _stopwords)
-
-
-def _limpiar_texto(texto: str) -> str:
-    """Limpia texto para inferencia, usando spaCy si esta disponible."""
-    try:
-        from src.classifier.functions import limpiar_texto
-        return limpiar_texto(texto)
-    except ImportError:
-        return _limpiar_texto_fallback(texto)
 
 
 def _crear_features_manuales(text: str) -> np.ndarray:
@@ -449,8 +408,11 @@ def predict_risk(text: str) -> dict:
     # 4. Explicabilidad — top features por contribucion
     try:
         if hasattr(_modelo, "coef_"):
-            # LogReg: contribuciones lineales
-            pred_idx = list(_modelo.classes_).index(risk_level)
+            # LogReg: contribuciones lineales.
+            # Se usa raw_pred (valor numérico original) en lugar de risk_level
+            # (string ya decodificado) para evitar ValueError cuando el modelo
+            # fue entrenado con LabelEncoder y _modelo.classes_ son integers.
+            pred_idx = list(_modelo.classes_).index(raw_pred)
             coefs = _modelo.coef_[pred_idx]
             X_dense = X_final.toarray().flatten() if hasattr(X_final, "toarray") else X_final.flatten()
             contributions = coefs * X_dense
@@ -485,12 +447,28 @@ def predict_risk(text: str) -> dict:
     # Capa de override: patrones deterministas del Anexo III tienen precedencia sobre ML
     result = _annex3_override(text, result)
 
-    # shap_explanation se construye después del override para reflejar el nivel final
+    # shap_explanation con override: ya establecida por _annex3_override().
+    # shap_explanation sin override: basada en features del modelo, filtrando
+    # componentes SVD y métricas de longitud no interpretables legalmente.
     if result.get("shap_top_features"):
-        top_words = ", ".join(f["feature"] for f in result["shap_top_features"][:3])
-        result["shap_explanation"] = (
-            f"Factores principales para '{result['risk_level']}': {top_words}."
-        )
+        # Mismos criterios de filtrado que el orquestador (Bug 7):
+        # svd_N y métricas de longitud no tienen significado legal para el usuario.
+        _NO_INTERPRETAR_EXPL = {"num_palabras", "num_caracteres"}
+        legibles = [
+            f for f in result["shap_top_features"]
+            if not f["feature"].startswith("svd_") and f["feature"] not in _NO_INTERPRETAR_EXPL
+        ]
+        if legibles:
+            top_words = ", ".join(f["feature"] for f in legibles[:3])
+            result["shap_explanation"] = (
+                f"Factores principales para '{result['risk_level']}': {top_words}."
+            )
+        elif not result.get("shap_explanation"):
+            # Todos los features son SVD u otras métricas internas no interpretables.
+            # Se asigna un fallback claro en vez de omitir la explicación por completo.
+            result["shap_explanation"] = (
+                "No se identificaron factores interpretables específicos."
+            )
 
     try:
         langfuse_context.update_current_observation(

@@ -7,6 +7,7 @@ venv/
 __pycache__/
 *.pyc
 .ruff_cache/
+.pytest_cache/
 
 # ── Credenciales y configuración local ─────────
 .env
@@ -21,6 +22,9 @@ aws.pem
 /data/raw/
 /data/processed/vectorstore/
 /data/processed/chunks_legal/*.jsonl
+
+# ── Memoria conversacional ───────────────────
+/data/memory/
 
 # ── IaC (Terraform / Ansible) ──────────────────
 infra/ansible/inventory.ini
@@ -46,3 +50,4 @@ mlruns/
 # ── Archivos locales / personales ──────────────
 src/classifier/tareas/
 .venv_rag/
+src\classifier\classifier_ultimo_dataset

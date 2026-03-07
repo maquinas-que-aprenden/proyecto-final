@@ -1,19 +1,8 @@
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+import re
 import threading
-try:
-    from langfuse.decorators import observe, langfuse_context
-except ImportError:
-    def observe(name=None):  # type: ignore[misc]
-        def decorator(func):
-            return func
-        return decorator
-
-    class _NoOpLangfuse:
-        def update_current_observation(self, **kwargs): pass
-        def score_current_trace(self, **kwargs): pass
-
-    langfuse_context = _NoOpLangfuse()  # type: ignore[assignment]
+from src.observability.langfuse_compat import observe, langfuse_context
 
 # Configuración
 
@@ -80,6 +69,25 @@ def _format_results(results: Dict[str, Any]) -> List[Dict[str, Any]]:
     return formatted
 
 
+def _detect_article_number(query: str) -> Optional[str]:
+    """Detecta si la query menciona un artículo específico por número.
+
+    Soporta: "artículo 5", "articulo 5", "art. 5", "art 5".
+    """
+    m = re.search(r'\bart(?:[íi]culo|\.?)\s+(\d+)\b', query, flags=re.IGNORECASE)
+    if m:
+        return m.group(1)
+    return None
+
+
+def _detect_annex_reference(query: str) -> Optional[str]:
+    """Detecta si la query menciona un anexo específico (ej: 'Anexo III')."""
+    m = re.search(r'\banexo\s+([IVXLC]+|\d+)\b', query, flags=re.IGNORECASE)
+    if m:
+        return m.group(1).upper()
+    return None
+
+
 def _detect_priority_sources(query: str) -> Optional[List[str]]:
     query_lower = query.lower()
 
@@ -93,6 +101,9 @@ def _detect_priority_sources(query: str) -> Optional[List[str]]:
 
     if "ai act" in query_lower or "alto riesgo" in query_lower:
         priority_sources.append("eu_ai_act")
+
+    if "boe" in query_lower or "ley orgánica" in query_lower or "ley organica" in query_lower or "derechos digitales" in query_lower:
+        priority_sources.append("boe")
 
     return priority_sources if priority_sources else None
 
@@ -113,6 +124,8 @@ def search_base(query: str, k: int = DEFAULT_K) -> List[Dict[str, Any]]:
 
 def search_soft(query: str, k: int = DEFAULT_K) -> List[Dict[str, Any]]:
     priority_sources = _detect_priority_sources(query)
+    article_num = _detect_article_number(query)
+    annex_ref = _detect_annex_reference(query)
 
     collection = _get_collection()
     results = collection.query(
@@ -122,23 +135,29 @@ def search_soft(query: str, k: int = DEFAULT_K) -> List[Dict[str, Any]]:
 
     formatted = _format_results(results)
 
-    if not priority_sources:
+    if not priority_sources and not article_num and not annex_ref:
         return formatted[:k]
 
-    priority_hits = []
+    exact_hits = []
+    source_hits = []
     other_hits = []
 
     for hit in formatted:
-        source = hit.get("metadata", {}).get("source", "")
+        meta = hit.get("metadata", {})
+        unit_id = str(meta.get("unit_id", ""))
+        unit_title = str(meta.get("unit_title", ""))
+        source = meta.get("source", "")
 
-        if source in priority_sources:
-            priority_hits.append(hit)
+        if article_num and unit_id == article_num:
+            exact_hits.append(hit)
+        elif annex_ref and annex_ref in unit_title.upper():
+            exact_hits.append(hit)
+        elif priority_sources and source in priority_sources:
+            source_hits.append(hit)
         else:
             other_hits.append(hit)
 
-    ordered = priority_hits + other_hits
-
-    return ordered[:k]
+    return (exact_hits + source_hits + other_hits)[:k]
 
 
 # API principal
@@ -163,58 +182,3 @@ def search(query: str, mode: str = "soft", k: int = DEFAULT_K) -> List[Dict[str,
     except Exception:
         pass
     return results
-
-
-
-    # --- Tool output for Agents / LangGraph ---
-@observe(name="retriever.search_tool")
-def search_tool(query: str, k: int = DEFAULT_K, mode: str = "soft", max_chars: int = 3500) -> str:
-    """
-    Devuelve contexto listo para LLM (string), basado en la búsqueda del vectorstore.
-    - No cambia la API 'search()' (que devuelve hits crudos).
-    - Este wrapper es para agentes: texto limpio + fuentes.
-    """
-    hits = search(query=query, mode=mode, k=k)
-
-    if not hits:
-        return "NO_RESULTS"
-
-    blocks = []
-    sources = []
-
-    for i, h in enumerate(hits, start=1):
-        meta = h.get("metadata", {}) or {}
-        src = meta.get("source", "unknown")
-        file = meta.get("file", "unknown")
-        unit = meta.get("unit_title") or meta.get("unit_id") or meta.get("unit_type") or ""
-
-        sources.append(f"{src}:{file}:{unit}".strip(":"))
-
-        text = (h.get("text") or "").strip()
-        if not text:
-            continue
-
-        blocks.append(f"[{i}] source={src} file={file}\n{text}")
-
-    out = "CONTEXT:\n" + "\n\n".join(blocks)
-    out += "\n\nSOURCES:\n" + "\n".join(sorted(set(sources)))
-
-    truncated = len(out) > max_chars
-    # Recorte por seguridad
-    if truncated:
-        out = out[:max_chars] + "\n\n[TRUNCATED]"
-
-    try:
-        langfuse_context.update_current_observation(
-            metadata={
-                "n_hits": len(hits),
-                "n_blocks": len(blocks),
-                "n_sources": len(set(sources)),
-                "output_chars": len(out),
-                "truncated": truncated,
-            }
-        )
-    except Exception:
-        pass
-
-    return out

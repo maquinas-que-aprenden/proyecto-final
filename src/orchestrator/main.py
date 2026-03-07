@@ -2,8 +2,8 @@
 
 Usa Amazon Bedrock (Nova Lite v1) como LLM con tool calling.
 El agente razona sobre la consulta del usuario y decide qué herramientas
-usar: búsqueda normativa (RAG), clasificación de riesgo, o informe de
-cumplimiento.
+usar: búsqueda normativa (RAG) o clasificación de riesgo con checklist
+de cumplimiento.
 """
 
 from __future__ import annotations
@@ -11,27 +11,34 @@ from __future__ import annotations
 import contextvars
 import logging
 import os
+import threading
 from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
+from typing_extensions import Annotated
+
 from langchain_aws import ChatBedrockConverse
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
-from langgraph.prebuilt import create_react_agent
+from langgraph.prebuilt import create_react_agent, InjectedStore
+from langgraph.store.memory import InMemoryStore
 from pydantic import BaseModel, Field
 
+from src.memory.hooks import pre_model_hook
+
+# Checkpointer: SQLite persistente si está disponible, sino en memoria
+from langgraph.checkpoint.memory import MemorySaver
+
 try:
-    from langfuse.decorators import observe, langfuse_context
+    from langgraph.checkpoint.sqlite import SqliteSaver
+
+    _SQLITE_AVAILABLE = True
 except ImportError:
-    def observe(name=None):  # type: ignore[misc]
-        def decorator(func):
-            return func
-        return decorator
+    SqliteSaver = None
+    _SQLITE_AVAILABLE = False
 
-    class _NoOpLangfuse:
-        def update_current_observation(self, **kwargs): pass
-        def score_current_trace(self, **kwargs): pass
-    langfuse_context = _NoOpLangfuse()  # type: ignore[assignment]
-
+from src.observability.langfuse_compat import observe, langfuse_context
 from src.observability.main import get_langfuse_handler
 from src.classifier.main import predict_risk
 
@@ -68,25 +75,41 @@ def _cached_predict_risk(system_description: str) -> dict:
 
 BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "eu.amazon.nova-lite-v1:0")
 BEDROCK_REGION = os.environ.get("BEDROCK_REGION") or os.environ.get("AWS_REGION", "eu-west-1")
+MEMORY_DIR = os.environ.get("NORMABOT_MEMORY_DIR", "data/memory")
 
 SYSTEM_PROMPT = """\
-Eres NormaBot, un asistente jurídico especializado en el EU AI Act \
-(Reglamento (UE) 2024/1689) y normativa española de inteligencia artificial.
+Eres NormaBot, un asistente juridico especializado en el EU AI Act \
+(Reglamento (UE) 2024/1689) y normativa espanola de inteligencia artificial.
 
-Tu trabajo es ayudar a los usuarios a entender la regulación, clasificar \
-sistemas de IA por nivel de riesgo y generar informes de cumplimiento.
+Tu trabajo es ayudar a los usuarios a entender la regulacion, clasificar \
+sistemas de IA por nivel de riesgo y evaluar sus obligaciones de cumplimiento.
 
 Responde SIEMPRE en el mismo idioma en que el usuario escribe. \
-Por defecto, responde en español.
+Por defecto, responde en espanol.
 
-Usa las herramientas disponibles para responder.
+Dispones de dos herramientas:
 
-Las referencias legales exactas se añadirán automáticamente a la respuesta. \
-No reformules ni modifiques las citas de artículos que devuelvan las herramientas. \
-Limítate a explicar el contenido.
+1. **search_legal_docs**: Busca articulos, definiciones y conceptos legales \
+en el corpus normativo (EU AI Act, BOE). Usala para preguntas sobre contenido \
+de la ley.
 
-Añade siempre al final: "_Informe preliminar generado por IA. Consulte \
-profesional jurídico._"\
+2. **classify_risk**: Clasifica un sistema de IA por nivel de riesgo y genera \
+un checklist completo de cumplimiento. Incluye: clasificacion, obligaciones \
+legales aplicables, advertencias si el caso es borderline, y recomendaciones \
+especificas basadas en las caracteristicas del sistema. Usala cuando el \
+usuario describe un sistema de IA, pide clasificacion, informe, evaluacion \
+o checklist de cumplimiento.
+
+Reglas:
+- Cita unicamente las referencias legales que devuelvan las herramientas. \
+No inventes ni infieras articulos adicionales.
+- Presenta los resultados del checklist de forma clara y estructurada.
+- Si el checklist indica un caso borderline, destaca la advertencia.
+- Si el nivel es 'inaceptable', enfatiza que el sistema esta PROHIBIDO.
+- Para informes completos, combina classify_risk + search_legal_docs.
+
+Anade siempre al final: "_Informe preliminar generado por IA. Consulte \
+profesional juridico._"\
 """
 
 # ---------------------------------------------------------------------------
@@ -101,32 +124,6 @@ class _QueryInput(BaseModel):
 class _SystemDescriptionInput(BaseModel):
     system_description: str = Field(min_length=1, max_length=5000)
 
-
-# ---------------------------------------------------------------------------
-# Queries específicas por nivel de riesgo para el informe de cumplimiento.
-# Cada query busca un artículo concreto del EU AI Act, evitando que la
-# búsqueda semántica genérica favorezca guías AESIA sobre el texto legal.
-# ---------------------------------------------------------------------------
-
-_REPORT_QUERIES: dict[str, list[str]] = {
-    "inaceptable": [
-        "prácticas de inteligencia artificial prohibidas Artículo 5",
-    ],
-    "alto_riesgo": [
-        "sistema de gestión de riesgos Artículo 9",
-        "datos y gobernanza de datos Artículo 10",
-        "documentación técnica Artículo 11",
-        "transparencia información usuarios Artículo 13",
-        "vigilancia y supervisión humana Artículo 14",
-        "precisión robustez y ciberseguridad Artículo 15",
-    ],
-    "riesgo_limitado": [
-        "obligaciones de transparencia Artículo 50",
-    ],
-    "riesgo_minimo": [
-        "códigos de conducta inteligencia artificial Artículo 95",
-    ],
-}
 
 # ---------------------------------------------------------------------------
 # Herramientas
@@ -147,7 +144,7 @@ def search_legal_docs(query: str) -> str:
     except Exception as e:
         return f"Error de validacion: {e}"
 
-    from src.rag.main import retrieve, grade, generate
+    from src.rag.main import retrieve, grade, format_context
 
     docs = retrieve(query)
     if not docs:
@@ -167,42 +164,51 @@ def search_legal_docs(query: str) -> str:
     if not relevant:
         return "Se encontraron documentos pero ninguno fue relevante para la consulta."
 
-    result = generate(query, relevant)
-
     # Side-channel: depositar citas verificadas
     meta = _get_tool_metadata()
-    for source_meta in result.get("sources", []):
-        if isinstance(source_meta, dict) and source_meta:
+    for d in relevant:
+        source_meta = d.get("metadata", {})
+        if source_meta:
             meta["citations"].append({
                 "source": source_meta.get("source", ""),
                 "unit_title": source_meta.get("unit_title", ""),
                 "unit_id": source_meta.get("unit_id", ""),
             })
 
-    return result["answer"]
+    return format_context(relevant)
 
 
 @tool
 @observe(name="tool.classify_risk")
 def classify_risk(system_description: str) -> str:
-    """Clasifica un sistema de IA según su nivel de riesgo
-    (inaceptable, alto, limitado, mínimo).
+    """Clasifica un sistema de IA segun su nivel de riesgo
+    (inaceptable, alto, limitado, minimo) y genera un checklist de
+    cumplimiento con obligaciones legales, recomendaciones especificas
+    y deteccion de casos borderline.
 
     Usa esta herramienta cuando el usuario describe un sistema de IA y quiere
-    saber su nivel de riesgo según el EU AI Act.
+    saber su nivel de riesgo, obtener un informe de cumplimiento, evaluacion
+    o checklist segun el EU AI Act.
     """
     try:
         _SystemDescriptionInput(system_description=system_description)
     except Exception as e:
         return f"Error de validacion: {e}"
 
+    from src.checklist.main import build_compliance_checklist
+
     result = _cached_predict_risk(system_description)
+    checklist = build_compliance_checklist(result, system_description)
+
     try:
         langfuse_context.update_current_observation(
             metadata={
-                "risk_level": result.get("risk_level"),
-                "confidence": result.get("confidence"),
-                "annex3_ref": result.get("annex3_ref"),
+                "risk_level": checklist["risk_level"],
+                "confidence": checklist["confidence"],
+                "annex3_ref": checklist.get("annex3_ref"),
+                "borderline": checklist["borderline_warning"] is not None,
+                "n_obligations": len(checklist["obligations"]),
+                "n_specific_recs": len(checklist["specific_recommendations"]),
             }
         )
     except Exception:
@@ -232,119 +238,178 @@ def classify_risk(system_description: str) -> str:
         "annex3_override": result.get("annex3_override", False),
     }
 
-    response = (
-        f"Clasificacion: {result['risk_level'].upper()}\n"
-        f"Confianza: {result['confidence']:.0%}\n"
-        f"Referencia legal: {legal_ref}\n"
-    )
+    return _format_checklist(checklist)
 
-    # Bug 7 — Mostrar solo features semánticamente interpretables.
-    # Excluir componentes SVD (svd_N) y métricas de longitud (num_palabras,
-    # num_caracteres), que no tienen significado legal para el usuario.
-    _NO_INTERPRETAR = {"num_palabras", "num_caracteres"}
-    interpretable = [
-        f for f in result.get("shap_top_features", [])
-        if not f["feature"].startswith("svd_") and f["feature"] not in _NO_INTERPRETAR
+
+def _format_checklist(checklist: dict) -> str:
+    """Formatea el checklist como texto estructurado para el agente."""
+    lines = [
+        f"NIVEL DE RIESGO: {checklist['risk_level'].upper()}",
+        f"CONFIANZA: {checklist['confidence']:.0%}",
     ]
-    if interpretable:
-        features = ", ".join(f["feature"] for f in interpretable[:3])
-        response += f"Factores clave: {features}\n"
 
-    return response
+    if checklist.get("annex3_override"):
+        lines.append(f"OVERRIDE ANEXO III: {checklist.get('annex3_ref', '')}")
 
+    if checklist.get("borderline_warning"):
+        lines.append(f"ADVERTENCIA BORDERLINE: {checklist['borderline_warning']}")
+
+    lines.append("")
+    lines.append("OBLIGACIONES APLICABLES:")
+    for i, ob in enumerate(checklist["obligations"], 1):
+        tag = "[OBLIGATORIO]" if ob["mandatory"] else "[VOLUNTARIO]"
+        lines.append(f"  {i}. {tag} {ob['article']} - {ob['title']}")
+        lines.append(f"     {ob['description']}")
+
+    if checklist["specific_recommendations"]:
+        lines.append("")
+        lines.append("RECOMENDACIONES ESPECIFICAS (basadas en caracteristicas del sistema):")
+        for i, rec in enumerate(checklist["specific_recommendations"], 1):
+            lines.append(f"  {i}. [{rec['annex_ref']}] (feature: {rec['feature']})")
+            lines.append(f"     {rec['recommendation']}")
+
+    lines.append("")
+    lines.append(checklist["disclaimer"])
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Herramienta de memoria de usuario
+# ---------------------------------------------------------------------------
+
+
+def _user_namespace(config: RunnableConfig) -> tuple[str, str]:
+    """Namespace aislado por usuario para el store de preferencias.
+
+    Usa ``user_id`` si está disponible (preferencias persisten entre sesiones),
+    sino ``thread_id`` como fallback (preferencias aisladas por sesión).
+    """
+    cfg = config.get("configurable", {})
+    scope = cfg.get("user_id") or cfg.get("thread_id", "default")
+    return ("user_preferences", scope)
 
 
 @tool
-@observe(name="tool.generate_report")
-def generate_report(system_description: str) -> str:
-    """Genera un informe de cumplimiento normativo para un sistema de IA.
+def save_user_preference(
+    key: str,
+    value: str,
+    store: Annotated[Any, InjectedStore()],
+    config: RunnableConfig,
+) -> str:
+    """Guarda una preferencia o dato del usuario para recordarlo en futuras
+    conversaciones.
 
-    Usa esta herramienta cuando el usuario quiere un informe, reporte o
-    evaluación de conformidad para su sistema. Esta herramienta clasifica
-    el riesgo internamente — no es necesario llamar a classify_risk antes.
+    Usa esta herramienta cuando el usuario te pida explícitamente que
+    recuerdes algo sobre él o su organización (sector, tipo de sistema,
+    preferencias, contexto).
     """
-    try:
-        _SystemDescriptionInput(system_description=system_description)
-    except Exception as e:
-        return f"Error de validacion: {e}"
+    store.put(_user_namespace(config), key, {"value": value})
+    return f"Preferencia guardada: {key} = {value}"
 
-    from src.report.main import generate_report as _build_report
 
-    # 1. Clasificar riesgo del sistema (usa caché si classify_risk ya lo computó)
-    risk_result = _cached_predict_risk(system_description)
-    risk_level = risk_result["risk_level"]
+@tool
+def get_user_preferences(
+    store: Annotated[Any, InjectedStore()],
+    config: RunnableConfig,
+) -> str:
+    """Recupera las preferencias guardadas del usuario.
 
-    # 2. Buscar artículos relevantes en el corpus legal
-    #    Una query por obligación conocida para evitar que la búsqueda
-    #    semántica genérica favorezca guías AESIA sobre el texto legal.
-    articles = []
-    try:
-        from src.retrieval.retriever import search as search_docs
-        queries = _REPORT_QUERIES.get(risk_level, [])
-        seen_ids: set[str] = set()
-        for q in queries:
-            hits = search_docs(q, k=1)
-            for h in hits:
-                doc_id = h.get("id", "")
-                if doc_id not in seen_ids:
-                    seen_ids.add(doc_id)
-                    hit_meta = h.get("metadata", {}) or {}
-                    source = hit_meta.get("source", "")
-                    unit = hit_meta.get("unit_title") or hit_meta.get("unit_id", "")
-                    label = f"{source} — {unit}".strip(" —")
-                    text = h.get("text", "").strip()
-                    if label:
-                        entry = f"{label}\n{text}" if text else label
-                        articles.append(entry)
-    except Exception as e:
-        logger.warning("Retriever no disponible para informe: %s", e)
-
-    if not articles:
-        logger.warning(
-            "Sin artículos verificados del corpus para nivel '%s'. "
-            "Informe generado sin citas verificadas.",
-            risk_level,
-        )
-        articles = ["No se pudieron verificar artículos específicos en el corpus legal."]
-
-    try:
-        langfuse_context.update_current_observation(
-            metadata={
-                "risk_level": risk_level,
-                "n_articles": len(articles),
-                "articles_verified": articles[0] != "No se pudieron verificar artículos específicos en el corpus legal.",
-            }
-        )
-    except Exception:
-        pass
-
-    # 3. Side-channel: depositar metadatos del informe
-    meta = _get_tool_metadata()
-    meta["report"] = {
-        "risk_level": risk_level,
-        "n_articles": len(articles),
-    }
-
-    # 4. Generar informe con template
-    return _build_report(system_description, risk_level, articles)
+    Usa esta herramienta al inicio de la conversación o cuando necesites
+    contexto sobre el usuario.
+    """
+    items = store.search(_user_namespace(config))
+    if not items:
+        return "No hay preferencias guardadas."
+    return "\n".join(f"- {item.key}: {item.value['value']}" for item in items)
 
 
 # ---------------------------------------------------------------------------
-# Agente ReAct
+# Agente ReAct con memoria
 # ---------------------------------------------------------------------------
 
 _agent = None
+_checkpointer = None
+_store = None
+_lock = threading.Lock()
+
+
+def _get_checkpointer():
+    """Singleton thread-safe del checkpointer (double-checked locking).
+
+    Intenta SQLite si está disponible; degrada a MemorySaver si falla
+    la creación del directorio o la inicialización de la base de datos.
+    """
+    global _checkpointer
+    if _checkpointer is not None:
+        return _checkpointer
+
+    with _lock:
+        if _checkpointer is not None:
+            return _checkpointer
+
+        if _SQLITE_AVAILABLE:
+            try:
+                import sqlite3
+
+                memory_dir = Path(MEMORY_DIR)
+                memory_dir.mkdir(parents=True, exist_ok=True)
+                db_path = str(memory_dir / "conversations.db")
+                conn = sqlite3.connect(db_path, check_same_thread=False)
+                saver = SqliteSaver(conn)
+                saver.setup()
+                _checkpointer = saver
+                logger.info("Checkpointer SQLite inicializado: %s", db_path)
+            except Exception:
+                logger.warning(
+                    "SQLite checkpointer falló, degradando a memoria",
+                    exc_info=True,
+                )
+                _checkpointer = MemorySaver()
+        else:
+            _checkpointer = MemorySaver()
+            logger.info(
+                "Checkpointer en memoria (langgraph-checkpoint-sqlite no instalado)"
+            )
+
+    return _checkpointer
+
+
+def _get_store() -> InMemoryStore:
+    """Singleton thread-safe del store para memoria cross-thread."""
+    global _store
+    if _store is not None:
+        return _store
+
+    with _lock:
+        if _store is None:
+            _store = InMemoryStore()
+            logger.info("InMemoryStore inicializado para preferencias de usuario")
+
+    return _store
 
 
 def _build_agent():
-    """Construye el agente ReAct con Bedrock Nova Lite y las herramientas."""
+    """Construye el agente ReAct con Bedrock Nova Lite, herramientas y memoria."""
     llm = ChatBedrockConverse(
         model=BEDROCK_MODEL_ID,
         region_name=BEDROCK_REGION,
         temperature=0.0,
     )
-    tools = [search_legal_docs, classify_risk, generate_report]
-    return create_react_agent(llm, tools, prompt=SYSTEM_PROMPT)
+    tools = [
+        search_legal_docs,
+        classify_risk,
+        save_user_preference,
+        get_user_preferences,
+    ]
+    return create_react_agent(
+        llm,
+        tools,
+        prompt=SYSTEM_PROMPT,
+        checkpointer=_get_checkpointer(),
+        store=_get_store(),
+        pre_model_hook=pre_model_hook,
+    )
 
 
 def _get_agent():
@@ -356,7 +421,11 @@ def _get_agent():
 
 
 def run(query: str, session_id: str | None = None, user_id: str | None = None) -> dict:
-    """Ejecuta el agente ReAct con una consulta del usuario."""
+    """Ejecuta el agente ReAct con memoria conversacional.
+
+    Con el checkpointer, solo se envía el mensaje nuevo. El checkpointer
+    carga automáticamente el historial previo para el ``thread_id``.
+    """
     agent = _get_agent()
     _tool_metadata.set(None)  # limpiar invocación anterior
 
@@ -372,9 +441,17 @@ def run(query: str, session_id: str | None = None, user_id: str | None = None) -
         logger.debug("Langfuse no disponible: %s — continuando sin trazas", e)
         callbacks = []
 
+    config = {
+        "callbacks": callbacks,
+        "configurable": {
+            "thread_id": session_id or "default",
+            "user_id": user_id,
+        },
+    }
+
     result = agent.invoke(
         {"messages": [("user", query)]},
-        config={"callbacks": callbacks},
+        config=config,
     )
 
     # Recoger metadatos verificados de las herramientas (side-channel)
@@ -386,19 +463,19 @@ def run(query: str, session_id: str | None = None, user_id: str | None = None) -
 if __name__ == "__main__":
     import uuid
 
-    # Generamos un ID único para agrupar estas consultas en una misma sesión de Langfuse
+    # Generamos un ID único para agrupar estas consultas en una misma sesión
     test_session = f"session-{uuid.uuid4().hex[:8]}"
 
+    # Demo de memoria multi-turn: las queries usan la misma sesión
     queries = [
         "¿Qué dice el artículo 5 del EU AI Act?",
         "Clasifica mi sistema de reconocimiento facial",
-        "Genera un informe de cumplimiento para mi chatbot",
-        "Clasifica un sistema de scoring crediticio y dime que articulos aplican",
+        # Esta query depende del contexto previo (multi-turn):
+        "Genera un informe de cumplimiento para ese sistema",
     ]
 
     for q in queries:
         print(f"{'=' * 60}")
-        # Pasamos el session_id para que Langfuse v3 lo capture mediante el CallbackHandler
         result = run(q, session_id=test_session)
 
         final_message = result["messages"][-1]
@@ -406,4 +483,4 @@ if __name__ == "__main__":
         print(f"  Response: {final_message.content[:200]}...")
         print()
 
-    print(f"✓ orchestrator/main.py OK — Agente funcional (Sesión: {test_session})")
+    print(f"✓ orchestrator/main.py OK — Agente con memoria (Sesión: {test_session})")

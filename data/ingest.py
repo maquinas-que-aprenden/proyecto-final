@@ -106,7 +106,7 @@ def read_pdf_docs(directory: Path, source: str) -> list[dict]:
     return docs
 
 
-# ── Chunking estructurado (BOE / EU AI Act / AESIA) ────────────────
+# ── Chunking estructurado ─────────────────────────────────────────
 
 
 def _split_units(text: str, patterns: list[str]) -> list[tuple[str, str]]:
@@ -146,13 +146,16 @@ def _parse_doc_meta(source: str, file: str, text: str) -> dict:
     )
     date = f"{m.group(1)} {m.group(2).lower()} {m.group(3)}" if m else None
 
-    boe_id = boe_year = None
+    meta = {"doc_title": title, "doc_date": date}
+
+    # Campos específicos BOE (solo cuando aplica)
     if source == "boe":
         m2 = re.search(r"BOE-[A-Z]-([0-9]{4})-([0-9]+)", file)
         if m2:
-            boe_year, boe_id = m2.group(1), m2.group(2)
+            meta["boe_year"] = m2.group(1)
+            meta["boe_id"] = m2.group(2)
 
-    return {"doc_title": title, "doc_date": date, "boe_year": boe_year, "boe_id": boe_id}
+    return meta
 
 
 def _unit_meta(header: str) -> tuple[str, str | None, str]:
@@ -270,8 +273,6 @@ def chunk_docs(
                     "file": file,
                     "doc_title": dmeta["doc_title"],
                     "doc_date": dmeta["doc_date"],
-                    "boe_year": dmeta["boe_year"],
-                    "boe_id": dmeta["boe_id"],
                     "unit_type": unit_type,
                     "unit_id": unit_id,
                     "unit_title": unit_title,
@@ -279,132 +280,14 @@ def chunk_docs(
                     "sub_index": sub_i,
                     "text": sub_text,
                 }
+                # Campos específicos BOE
+                if "boe_year" in dmeta:
+                    chunk["boe_year"] = dmeta["boe_year"]
+                if "boe_id" in dmeta:
+                    chunk["boe_id"] = dmeta["boe_id"]
                 chunk["id"] = _md5(
                     f"{source}|{file}|{unit_type}|{unit_id}|{u_idx}|{sub_i}|{sub_text[:200]}"
                 )
-                chunks.append(chunk)
-
-    return chunks
-
-
-# ── Chunking LOPD/RGPD (logica diferente: por articulos) ───────────
-
-_RE_TITULO = re.compile(r"^\s*T[ÍI]TULO\s+([IVXLCDM]+)\b\.?\s*(.*)$", re.IGNORECASE)
-_RE_CAPIT = re.compile(r"^\s*CAP[ÍI]TULO\s+([IVXLCDM]+)\b\.?\s*(.*)$", re.IGNORECASE)
-_RE_SECC = re.compile(r"^\s*SECCI[ÓO]N\s+([IVXLCDM]+)\b\.?\s*(.*)$", re.IGNORECASE)
-_RE_ART = re.compile(r"^\s*Art[íi]culo\s+(\d+)\.?\s*(.*)$", re.IGNORECASE)
-
-
-def _chunk_by_articles(text: str) -> list[dict]:
-    """Divide texto LOPD/RGPD en chunks por articulos."""
-    lines = [ln.strip() for ln in text.replace("\ufeff", "").splitlines() if ln.strip()]
-    cur = {"titulo": None, "capitulo": None, "seccion": None, "articulo": None}
-    buf: list[str] = []
-    out: list[dict] = []
-    seen_article = False
-
-    def flush():
-        nonlocal buf
-        if not buf:
-            return
-        chunk_text = "\n".join(buf).strip()
-        if chunk_text:
-            out.append({"meta": cur.copy(), "text": chunk_text})
-        buf = []
-
-    for ln in lines:
-        m = _RE_TITULO.match(ln)
-        if m:
-            cur["titulo"] = (m.group(1) + (" " + m.group(2) if m.group(2) else "")).strip()
-            buf.append(ln)
-            continue
-
-        m = _RE_CAPIT.match(ln)
-        if m:
-            cur["capitulo"] = (m.group(1) + (" " + m.group(2) if m.group(2) else "")).strip()
-            buf.append(ln)
-            continue
-
-        m = _RE_SECC.match(ln)
-        if m:
-            cur["seccion"] = (m.group(1) + (" " + m.group(2) if m.group(2) else "")).strip()
-            buf.append(ln)
-            continue
-
-        m = _RE_ART.match(ln)
-        if m:
-            if seen_article:
-                flush()
-            seen_article = True
-            cur["articulo"] = m.group(1)
-            buf.append(ln)
-            continue
-
-        buf.append(ln)
-
-    flush()
-    if not out:
-        out = [{"meta": cur.copy(), "text": "\n".join(lines)}]
-    return out
-
-
-def chunk_lopd(docs: list[dict]) -> list[dict]:
-    """Genera chunks estructurados para LOPD/RGPD."""
-    chunks = []
-    for doc in docs:
-        file = doc["file"]
-        raw_chunks = _chunk_by_articles(doc["text"])
-
-        for i, ch in enumerate(raw_chunks):
-            txt = ch["text"].strip()
-            if len(txt) < MIN_CHUNK_CHARS:
-                continue
-
-            meta = ch["meta"]
-            if meta.get("articulo"):
-                unit_type = "article"
-            elif meta.get("seccion"):
-                unit_type = "section"
-            elif meta.get("capitulo"):
-                unit_type = "chapter"
-            elif meta.get("titulo"):
-                unit_type = "title"
-            else:
-                unit_type = None
-
-            unit_id = (
-                meta.get("articulo")
-                or meta.get("seccion")
-                or meta.get("capitulo")
-                or meta.get("titulo")
-            )
-            if meta.get("articulo"):
-                unit_title = f"Artículo {meta['articulo']}"
-            else:
-                unit_title = unit_id or "DOCUMENT"
-
-            sub_parts = _resplit_if_needed(txt)
-            for sub_i, sub_text in enumerate(sub_parts):
-                sub_text = sub_text.strip()
-                if len(sub_text) < MIN_CHUNK_CHARS:
-                    continue
-
-                chunk = {
-                    "id": None,
-                    "source": "lopd_rgpd",
-                    "file": file,
-                    "doc_title": file,
-                    "doc_date": None,
-                    "boe_id": None,
-                    "boe_year": None,
-                    "unit_type": unit_type,
-                    "unit_id": unit_id,
-                    "unit_title": unit_title,
-                    "unit_index": i,
-                    "sub_index": sub_i,
-                    "text": sub_text,
-                }
-                chunk["id"] = _md5(json.dumps(chunk, ensure_ascii=False, sort_keys=True))
                 chunks.append(chunk)
 
     return chunks
@@ -429,15 +312,18 @@ def main() -> None:
     aesia_docs = read_pdf_docs(RAW_DIR / AESIA_DIR, "aesia")
     lopd_docs = read_pdf_docs(RAW_DIR / LOPD_DIR, "lopd_rgpd")
 
-    # 2) Chunking estructurado
+    # 2) Chunking estructurado (todas las fuentes usan chunk_docs)
     print("\n-- Chunking --")
     boe_chunks = chunk_docs("boe", boe_docs, BOE_PATTERNS)
     eu_chunks = chunk_docs("eu_ai_act", eu_docs, EU_PATTERNS)
     aesia_chunks = chunk_docs("aesia", aesia_docs, AESIA_PATTERNS, unit_meta_fn=_unit_meta_aesia)
-    lopd_chunks = chunk_lopd(lopd_docs)
+    lopd_chunks = chunk_docs("lopd_rgpd", lopd_docs, BOE_PATTERNS)
 
-    main_chunks = boe_chunks + eu_chunks + aesia_chunks
-    all_chunks = main_chunks + lopd_chunks
+    all_chunks = boe_chunks + eu_chunks + aesia_chunks + lopd_chunks
+
+    if not all_chunks:
+        print("\n[ERROR] No se generaron chunks. Revisa rutas de data/raw y patrones de chunking.")
+        return
 
     print(f"  BOE: {len(boe_chunks)} chunks")
     print(f"  EU AI Act: {len(eu_chunks)} chunks")
@@ -445,16 +331,11 @@ def main() -> None:
     print(f"  LOPD/RGPD: {len(lopd_chunks)} chunks")
     print(f"  TOTAL: {len(all_chunks)} chunks")
 
-    # 3) Escribir outputs
+    # 3) Escribir output
     print("\n-- Escritura --")
-    out_main = OUT_DIR / "chunks_final.jsonl"
-    out_all = OUT_DIR / "chunks_final_all_sources.jsonl"
-
-    _write_jsonl(out_main, main_chunks)
-    print(f"  {out_main.name}: {len(main_chunks)} chunks")
-
-    _write_jsonl(out_all, all_chunks)
-    print(f"  {out_all.name}: {len(all_chunks)} chunks")
+    out_path = OUT_DIR / "chunks_final_all_sources.jsonl"
+    _write_jsonl(out_path, all_chunks)
+    print(f"  {out_path.name}: {len(all_chunks)} chunks")
 
     # 4) Verificación
     sizes = [len(c["text"]) for c in all_chunks]

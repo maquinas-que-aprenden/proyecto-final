@@ -8,27 +8,37 @@ NormaBot is an Agentic RAG system for querying Spanish/EU AI regulation (BOE, EU
 
 ## Architecture
 
-A **ReAct agent** (LangGraph `create_react_agent`) orchestrates three tools:
+A **ReAct agent** (LangGraph `create_react_agent`) orchestrates two tools:
 
-1. **RAG Normativo** (`src/rag/main.py`) — Corrective RAG: Retrieve → Grade → Generate with legal citations. Uses ChromaDB + `paraphrase-multilingual-MiniLM-L12-v2` embeddings. `retrieve()` calls `src.retrieval.retriever.search()` (ChromaDB real). `grade()` uses **Ollama Qwen 2.5 3B** (local LLM) for relevance grading with score-based fallback. `generate()` is still a stub. Data pipeline in `data/ingest.py` (raw→chunks) and `data/index.py` (chunks→embeddings→ChromaDB).
-2. **Clasificador de Riesgo** (`src/classifier/`) — XGBoost classifies AI systems into 4 EU AI Act risk levels (inaceptable, alto, limitado, mínimo). Full ML pipeline in `functions.py`: spaCy text cleaning, TF-IDF + manual keyword features, Grid Search with StratifiedKFold, SHAP explainability, MLflow tracking.
-3. **Informes** (`src/report/main.py`) — Generates structured compliance reports with legal citations.
+1. **RAG Normativo** (`src/rag/main.py`) — Corrective RAG: Retrieve → Grade. Uses ChromaDB + `intfloat/multilingual-e5-base` embeddings. `retrieve()` calls `src.retrieval.retriever.search()` (ChromaDB real). `grade()` uses **Ollama Qwen 2.5 3B** (local LLM) for relevance grading with score-based fallback. `format_context()` prepares graded docs for the orchestrator LLM (no separate generation step — the orchestrator generates the final answer). Data pipeline in `data/ingest.py` (raw→chunks) and `data/index.py` (chunks→embeddings→ChromaDB).
+2. **Clasificador de Riesgo + Checklist** (`src/classifier/`, `src/checklist/main.py`) — XGBoost classifies AI systems into 4 EU AI Act risk levels (inaceptable, alto, limitado, mínimo). Full ML pipeline in `functions.py`: spaCy text cleaning, TF-IDF + manual keyword features, Grid Search with StratifiedKFold, SHAP explainability, MLflow tracking. Includes deterministic compliance checklist with obligations, SHAP-based recommendations, and borderline detection.
 
-**Orchestrator** (`src/orchestrator/main.py`): ReAct agent using Amazon Bedrock (Nova Lite v1) with tool calling. The LLM decides which tool(s) to invoke based on the user query. The three `@tool` functions are currently stubs returning hardcoded responses — they need to be connected to the real implementations in `src/rag`, `src/classifier`, and `src/report`.
+**Orchestrator** (`src/orchestrator/main.py`): ReAct agent using Amazon Bedrock (Nova Lite v1) with tool calling. The LLM decides which tool(s) to invoke based on the user query. The two `@tool` functions (`search_legal_docs`, `classify_risk`) connect to `src/rag` and `src/classifier`+`src/checklist`.
 
-**Retriever** (`src/retrieval/retriever.py`): ChromaDB PersistentClient with lazy initialization. `search()` supports `mode="base"` (direct semantic) and `mode="soft"` (source-prioritized). `search_tool()` returns LLM-ready formatted string. Collection: `normabot_legal_chunks`.
-
-**State** (`src/agents/state.py`): `AgentState` TypedDict with `Annotated[list, operator.add]` for accumulating documents and sources across nodes.
+**Retriever** (`src/retrieval/retriever.py`): ChromaDB PersistentClient with lazy initialization. `search()` supports `mode="base"` (direct semantic) and `mode="soft"` (source-prioritized). Collection: `normabot_legal_chunks`.
 
 **Entry point**: `app.py` — Streamlit chat UI that calls `src.orchestrator.main.run(query)`.
 
-## Classifier: Two Parallel Experiments
+## Classifier: Structure
 
-There are two classifier variants under `src/classifier/`:
-- **Root level** (`functions.py`, `feature.py`, `main.py`) — trained on real manually-labeled dataset. MLflow experiment: `clasificador_riesgo_ia`.
-- **`classifier_2/`** — trained on synthetic/augmented dataset (`eu_ai_act_flagged`). MLflow experiment: `clasificador_riesgo_ia_artificial`. Has extended `preparar_dataset()` supporting `extra_columns` with leakage-safe features.
+Files under `src/classifier/`:
+- **`functions.py`** — ML pipeline library: spaCy text cleaning, TF-IDF, Grid Search, SHAP, MLflow. MLflow experiment: `clasificador_riesgo_dataset_fusionado`.
+- **`main.py`** — Inference service: `predict_risk(text) -> dict`. Loads XGBoost + SVD + LabelEncoder from `classifier_dataset_fusionado/model/`. Includes Annex III deterministic override and Langfuse observability.
+- **`retrain.py`** — Incremental retraining with augmented data (Annex III examples). Promotes artefacts only if F1-macro improves by ≥ 0.005.
+- **`create_normative_features.py`** — Enriches training dataset with 5 binary features (Art. 5 EU AI Act patterns). CLI: `python -m src.classifier.create_normative_features`.
+- **`_constants.py`** — Single source of truth for `KEYWORDS_DOMINIO`, `PALABRAS_SUPERVISION`, `STOPWORDS_ES`, `RISK_LABELS`, `LEAKAGE_COLUMNS`. All other modules import from here.
+- **`classifier_dataset_real/`** — Experiments on the original hand-labelled real dataset. MLflow experiment: `clasificador_riesgo_dataset_real`.
+  - `model/` — Serialized models from experiments
+  - `data/finetune/` — `train.jsonl`, `test.jsonl` used for fine-tuning evaluation
+- **`classifier_dataset_artificial/`** — Experiments on a purely synthetic dataset. MLflow experiment: `clasificador_riesgo_dataset_artificial`.
+  - `model/` — Serialized models from experiments
+  - `data/finetune/` — `train.jsonl`, `test.jsonl` used for fine-tuning evaluation
+- **`classifier_dataset_fusionado/`** — **Production model.** Experiments on the merged dataset (real + synthetic). MLflow experiment: `clasificador_riesgo_dataset_fusionado`. **Artefacts loaded by `main.py` at runtime.**
+  - `model/` — `modelo_xgboost.joblib`, `tfidf_vectorizer.joblib`, `svd_transformer.joblib`, `label_encoder.joblib`, `mejor_modelo_seleccion.json`
+  - `data/finetune/` — `train.jsonl`, `test.jsonl`
 
-Both share similar function signatures but differ in: `evaluar_modelo()` (root takes `tfidf` param and transforms internally; `classifier_2` expects pre-transformed features), `preparar_dataset()` (classifier_2 supports `extra_columns` and auto-derives `num_articles`), and `analisis_errores()` (classifier_2 takes separate `X_test_text` param).
+**Migration Note**: `classifier_2/` was the original experimental directory during initial development. Since early March 2026, the structure has been consolidated into three experiment folders (real, artificial, fusionado) for better organization and clarity. References to `classifier_2/` in legacy config files (e.g., `.dockerignore` line 32) are kept for safety but point to non-existent paths and have no functional impact.
+
 
 ## Commands
 
@@ -99,7 +109,7 @@ pip install -r requirements/infra.txt  # AWS, DVC, Langfuse, RAGAS
 - Every generated response MUST include the disclaimer: *"Informe preliminar generado por IA. Consulte profesional jurídico."*
 - Legal citations must be exact (law, article, date). Hallucinated citations are unacceptable.
 - Classifier dataset is small (200-300 examples). Always use `class_weight='balanced'` and document as a known limitation.
-- LLM stack: Bedrock Nova Lite for orchestrator, **Ollama Qwen 2.5 3B** (local) for RAG document grading. RAG generation LLM pending (task 1.3). Model selection rationale: grading is a binary classification task (sí/no per document, ~5 calls per query) — a local 3B model avoids API keys, rate limits, and network latency. Qwen 2.5 3B chosen over Llama 3.2 3B and Gemma 2 2B for superior Spanish language support.
+- LLM stack: Bedrock Nova Lite for orchestrator (also generates RAG answers), **Ollama Qwen 2.5 3B** (local) for RAG document grading. Model selection rationale: grading is a binary classification task (sí/no per document, ~5 calls per query) — a local 3B model avoids API keys, rate limits, and network latency. Qwen 2.5 3B chosen over Llama 3.2 3B and Gemma 2 2B for superior Spanish language support.
 
 ## Environment Variables
 

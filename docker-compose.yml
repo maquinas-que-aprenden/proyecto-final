@@ -7,8 +7,11 @@ services:
       - .env
     volumes:
       - ./data/processed/vectorstore:/app/data/processed/vectorstore
+      - ./eval:/app/eval
       - ollama_models:/home/appuser/.ollama
+      - normabot_memory:/app/data/memory
     restart: unless-stopped
 
 volumes:
   ollama_models:
+  normabot_memory:
