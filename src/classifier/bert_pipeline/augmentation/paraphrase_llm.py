@@ -6,7 +6,6 @@ la estructura de la oración para reducir la dependencia léxica del clasificado
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 
@@ -69,7 +68,7 @@ def paraphrase(text: str, n: int = 3, label: str = "") -> list[str]:
         raw = response["output"]["message"]["content"][0]["text"]
         lines = [line.strip() for line in raw.strip().splitlines() if line.strip()]
         # Filtrar líneas que sean idénticas al original o demasiado cortas
-        valid = [l for l in lines if l != text and len(l) > 20]
+        valid = [ln for ln in lines if ln != text and len(ln) > 20]
         return valid[:n]
     except Exception as e:
         logger.warning("Error en paráfrasis LLM para '%s...': %s", text[:40], e)

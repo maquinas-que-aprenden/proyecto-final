@@ -139,8 +139,8 @@ def train(
     model = AutoModelForSequenceClassification.from_pretrained(
         model_name,
         num_labels=len(LABELS),
-        id2label={i: l for i, l in enumerate(LABELS)},
-        label2id={l: i for i, l in enumerate(LABELS)},
+        id2label={i: lbl for i, lbl in enumerate(LABELS)},
+        label2id={lbl: i for i, lbl in enumerate(LABELS)},
     )
 
     # Pesos de clase para manejar el desbalanceo
