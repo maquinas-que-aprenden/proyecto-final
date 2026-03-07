@@ -101,8 +101,8 @@ print(f"\n[3/5] Cargando modelo: {MODEL_NAME}...")
 model = AutoModelForSequenceClassification.from_pretrained(
     MODEL_NAME,
     num_labels=len(LABELS),
-    id2label={i: l for i, l in enumerate(LABELS)},
-    label2id={l: i for i, l in enumerate(LABELS)},
+    id2label={i: lbl for i, lbl in enumerate(LABELS)},
+    label2id={lbl: i for i, lbl in enumerate(LABELS)},
 )
 n_params    = sum(p.numel() for p in model.parameters())
 n_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -206,28 +206,33 @@ with mlflow.start_run(run_name=f"bert_{MODEL_NAME.split('/')[-1]}") as run:
 # ---------------------------------------------------------------------------
 print("\n[5/5] Guardando curvas de entrenamiento...")
 log_history = trainer.state.log_history
-train_logs  = [l for l in log_history if "loss" in l and "eval_loss" not in l]
-eval_logs   = [l for l in log_history if "eval_loss" in l]
+train_logs  = [entry for entry in log_history if "loss" in entry and "eval_loss" not in entry]
+eval_logs   = [entry for entry in log_history if "eval_loss" in entry]
 
 if eval_logs:
-    epochs_eval = [l["epoch"] for l in eval_logs]
-    f1_vals     = [l.get("eval_f1") for l in eval_logs]
-    val_losses  = [l["eval_loss"] for l in eval_logs]
+    epochs_eval = [entry["epoch"] for entry in eval_logs]
+    f1_vals     = [entry.get("eval_f1") for entry in eval_logs]
+    val_losses  = [entry["eval_loss"] for entry in eval_logs]
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
 
     ax1.plot(epochs_eval, val_losses, marker="o", color="steelblue", label="Val loss")
     if train_logs:
         ax1.plot(
-            [l["epoch"] for l in train_logs],
-            [l["loss"] for l in train_logs],
+            [entry["epoch"] for entry in train_logs],
+            [entry["loss"] for entry in train_logs],
             alpha=0.4, color="orange", label="Train loss",
         )
-    ax1.set_xlabel("Epoch"); ax1.set_ylabel("Loss"); ax1.set_title("Loss"); ax1.legend()
+    ax1.set_xlabel("Epoch")
+    ax1.set_ylabel("Loss")
+    ax1.set_title("Loss")
+    ax1.legend()
 
     if any(f1_vals):
         ax2.plot(epochs_eval, f1_vals, marker="o", color="green")
-        ax2.set_xlabel("Epoch"); ax2.set_ylabel("F1 Macro"); ax2.set_title("F1 Macro (validation)")
+        ax2.set_xlabel("Epoch")
+        ax2.set_ylabel("F1 Macro")
+        ax2.set_title("F1 Macro (validation)")
 
     plt.suptitle("Curvas de entrenamiento BERT")
     plt.tight_layout()
