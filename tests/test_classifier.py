@@ -41,9 +41,12 @@ Dependencias necesarias:
   - spaCy ``es_core_news_sm`` (opcional — fallback a regex si no está disponible)
 """
 
+from pathlib import Path
+from unittest.mock import patch
+
 import pytest
 
-from src.classifier.main import predict_risk
+from src.classifier.main import predict_risk, predict_risk_bert
 
 # Conjunto de niveles de riesgo válidos según el EU AI Act (EU 2024/1689).
 # Son los valores que el clasificador puede devolver en ``risk_level``.
@@ -420,6 +423,28 @@ class TestAnnex3Override:
                 f"shap_explanation tras override menciona un término ML ('{prefijo}'): '{expl}'"
             )
 
+    def test_no_actua_si_ml_ya_coincide_con_anexo_iii(self):
+        """Si ML ya predijo el nivel correcto del Anexo III, override no modifica el resultado."""
+        from src.classifier.main import _annex3_override
+        resultado_correcto = {
+            "risk_level": "alto_riesgo",
+            "confidence": 0.91,
+            "probabilities": {
+                "inaceptable": 0.05,
+                "alto_riesgo": 0.91,
+                "riesgo_limitado": 0.03,
+                "riesgo_minimo": 0.01,
+            },
+        }
+        resultado = _annex3_override(
+            "evaluación del riesgo de recidiva para recomendar libertad condicional",
+            resultado_correcto.copy(),
+        )
+        # No debe añadir annex3_override ni cambiar nada
+        assert resultado.get("annex3_override") is not True
+        assert resultado["risk_level"] == "alto_riesgo"
+        assert resultado["confidence"] == 0.91
+
     def test_best_level_incluido_si_faltaba_en_probabilities_originales(self):
         """Si best_level no estaba en el dict original, debe aparecer en el resultado."""
         from src.classifier.main import _annex3_override
@@ -440,3 +465,359 @@ class TestAnnex3Override:
         )
         assert "alto_riesgo" in resultado["probabilities"]
         assert resultado["probabilities"]["alto_riesgo"] == 0.85
+
+
+# ---------------------------------------------------------------------------
+# Helpers compartidos para tests BERT
+# ---------------------------------------------------------------------------
+
+_BERT_MODEL_DIR = (
+    Path(__file__).parent.parent
+    / "src/classifier/bert_pipeline/models/bert_model"
+)
+_BERT_AVAILABLE = _bert_model_dir_exists = _BERT_MODEL_DIR.exists()
+
+_FAKE_PROBS = {
+    "alto_riesgo"   : 0.70,
+    "inaceptable"   : 0.10,
+    "riesgo_limitado": 0.15,
+    "riesgo_minimo" : 0.05,
+}
+_FAKE_BERT_RESULT_ML = ("alto_riesgo", 0.70, _FAKE_PROBS)
+
+
+# ---------------------------------------------------------------------------
+# Grupo 6: Dispatch CLASSIFIER_BACKEND y fallback a XGBoost
+# ---------------------------------------------------------------------------
+
+class TestBertDispatch:
+    """Verifica que predict_risk() enruta correctamente según CLASSIFIER_BACKEND.
+
+    El backend se lee de la variable de entorno al importar el módulo,
+    por lo que se parchea directamente la constante de módulo ``_CLASSIFIER_BACKEND``.
+    """
+
+    def test_backend_bert_delega_a_predict_risk_bert(self):
+        """Con CLASSIFIER_BACKEND=bert, predict_risk() debe llamar predict_risk_bert()."""
+        import src.classifier.main as m
+        mock_result = {"risk_level": "alto_riesgo", "confidence": 0.70,
+                       "probabilities": _FAKE_PROBS, "backend": "bert",
+                       "shap_explanation": "Clasificación BERT."}
+        with patch.object(m, "_CLASSIFIER_BACKEND", "bert"):
+            with patch.object(m, "predict_risk_bert", return_value=mock_result) as mock_bert:
+                result = predict_risk("sistema de reconocimiento facial en aeropuertos")
+        mock_bert.assert_called_once()
+        assert result == mock_result
+
+    def test_backend_xgboost_no_llama_bert(self):
+        """Con CLASSIFIER_BACKEND=xgboost (por defecto), predict_risk_bert() no se invoca."""
+        import src.classifier.main as m
+        with patch.object(m, "_CLASSIFIER_BACKEND", "xgboost"):
+            with patch.object(m, "predict_risk_bert") as mock_bert:
+                predict_risk("chatbot de atención al cliente para tienda online")
+        mock_bert.assert_not_called()
+
+    def test_bert_fallo_usa_xgboost_fallback(self):
+        """Si predict_risk_bert() lanza una excepción, predict_risk() cae a XGBoost."""
+        import src.classifier.main as m
+        with patch.object(m, "_CLASSIFIER_BACKEND", "bert"):
+            with patch.object(m, "predict_risk_bert", side_effect=RuntimeError("GPU no disponible")):
+                result = predict_risk("chatbot de atención al cliente para tienda online")
+        # El fallback XGBoost debe devolver un resultado válido
+        assert result["risk_level"] in RISK_LEVELS
+        assert result.get("backend") != "bert"  # XGBoost no añade campo backend
+
+    def test_bert_fallo_fallback_devuelve_estructura_completa(self):
+        """El fallback XGBoost mantiene el contrato de salida completo."""
+        import src.classifier.main as m
+        with patch.object(m, "_CLASSIFIER_BACKEND", "bert"):
+            with patch.object(m, "predict_risk_bert", side_effect=RuntimeError("fallo")):
+                result = predict_risk("chatbot de atención al cliente para tienda online")
+        assert "risk_level" in result
+        assert "confidence" in result
+        assert "probabilities" in result
+
+
+# ---------------------------------------------------------------------------
+# Grupo 7: Estructura del resultado predict_risk_bert (con _predict_bert_raw mockeado)
+# ---------------------------------------------------------------------------
+
+class TestBertEstructuraRespuesta:
+    """Verifica el contrato de salida de predict_risk_bert().
+
+    Se mockea ``_predict_bert_raw`` para aislar la lógica de ensamblado
+    del resultado de la carga real del modelo (que requiere artefactos en disco).
+    """
+
+    @pytest.fixture(scope="class")
+    def resultado_bert(self):
+        import src.classifier.main as m
+        with patch.object(m, "_predict_bert_raw", return_value=_FAKE_BERT_RESULT_ML):
+            return predict_risk_bert("sistema de reconocimiento facial en aeropuertos")
+
+    def test_devuelve_dict(self, resultado_bert):
+        assert isinstance(resultado_bert, dict)
+
+    def test_contiene_backend_bert(self, resultado_bert):
+        """predict_risk_bert debe incluir ``backend='bert'`` para distinguirlo de XGBoost."""
+        assert resultado_bert.get("backend") == "bert"
+
+    def test_contiene_risk_level(self, resultado_bert):
+        assert "risk_level" in resultado_bert
+
+    def test_risk_level_valido(self, resultado_bert):
+        assert resultado_bert["risk_level"] in RISK_LEVELS
+
+    def test_contiene_confidence(self, resultado_bert):
+        assert "confidence" in resultado_bert
+
+    def test_confidence_es_probabilidad(self, resultado_bert):
+        c = resultado_bert["confidence"]
+        assert isinstance(c, float)
+        assert 0.0 <= c <= 1.0
+
+    def test_contiene_probabilities(self, resultado_bert):
+        assert "probabilities" in resultado_bert
+
+    def test_probabilities_cubre_todas_las_clases(self, resultado_bert):
+        assert set(resultado_bert["probabilities"].keys()) == RISK_LEVELS
+
+    def test_probabilities_suman_uno(self, resultado_bert):
+        total = sum(resultado_bert["probabilities"].values())
+        assert abs(total - 1.0) < 0.02
+
+    def test_contiene_shap_explanation(self, resultado_bert):
+        """BERT no tiene SHAP; shap_explanation debe existir igualmente con descripción."""
+        assert "shap_explanation" in resultado_bert
+        assert len(resultado_bert["shap_explanation"]) > 0
+
+    def test_shap_explanation_menciona_bert(self, resultado_bert):
+        """shap_explanation BERT debe mencionar 'BERT' o la confianza, no features SHAP."""
+        expl = resultado_bert["shap_explanation"]
+        # Cuando no hay override, la explicación menciona "BERT" y la confianza
+        if not resultado_bert.get("annex3_override"):
+            assert "BERT" in expl or "%" in expl, (
+                f"shap_explanation BERT debería mencionar 'BERT' o la confianza: '{expl}'"
+            )
+
+    def test_no_contiene_shap_top_features(self, resultado_bert):
+        """BERT no calcula features SHAP individuales; shap_top_features no debe aparecer."""
+        if not resultado_bert.get("annex3_override"):
+            assert "shap_top_features" not in resultado_bert, (
+                "BERT no genera shap_top_features — la explicación es semántica global"
+            )
+
+
+# ---------------------------------------------------------------------------
+# Grupo 8: Validación de entrada en ruta BERT
+# ---------------------------------------------------------------------------
+
+class TestBertValidacionEntrada:
+    """Pydantic debe rechazar entradas inválidas antes de llamar a _predict_bert_raw."""
+
+    def test_texto_vacio_lanza_excepcion(self):
+        from pydantic import ValidationError
+        import src.classifier.main as m
+        with patch.object(m, "_predict_bert_raw", return_value=_FAKE_BERT_RESULT_ML):
+            with pytest.raises(ValidationError):
+                predict_risk_bert("")
+
+    def test_texto_demasiado_largo_lanza_excepcion(self):
+        from pydantic import ValidationError
+        import src.classifier.main as m
+        with patch.object(m, "_predict_bert_raw", return_value=_FAKE_BERT_RESULT_ML):
+            with pytest.raises(ValidationError):
+                predict_risk_bert("a" * 5001)
+
+    def test_texto_valido_no_lanza_excepcion(self):
+        import src.classifier.main as m
+        with patch.object(m, "_predict_bert_raw", return_value=_FAKE_BERT_RESULT_ML):
+            result = predict_risk_bert("sistema de IA médica")
+        assert result["risk_level"] in RISK_LEVELS
+
+
+# ---------------------------------------------------------------------------
+# Grupo 9: Override Anexo III en ruta BERT
+# ---------------------------------------------------------------------------
+
+class TestBertAnnex3Override:
+    """Verifica que el override determinista del Anexo III funciona en la ruta BERT.
+
+    Se mockea ``_predict_bert_raw`` para controlar qué predice BERT
+    y verificar que _annex3_override actúa sobre ese resultado.
+    """
+
+    @pytest.fixture(scope="class")
+    def override_bert_recidiva(self):
+        """BERT predice riesgo_minimo; el override debe corregirlo a alto_riesgo."""
+        import src.classifier.main as m
+        fake_probs_minimo = {
+            "inaceptable": 0.05, "alto_riesgo": 0.10,
+            "riesgo_limitado": 0.20, "riesgo_minimo": 0.65,
+        }
+        with patch.object(m, "_predict_bert_raw", return_value=("riesgo_minimo", 0.65, fake_probs_minimo)):
+            return predict_risk_bert(
+                "evaluación del riesgo de recidiva para recomendar libertad condicional"
+            )
+
+    def test_override_activo(self, override_bert_recidiva):
+        assert override_bert_recidiva.get("annex3_override") is True
+
+    def test_risk_level_corregido(self, override_bert_recidiva):
+        assert override_bert_recidiva["risk_level"] == "alto_riesgo"
+
+    def test_backend_preservado_tras_override(self, override_bert_recidiva):
+        """El campo backend='bert' debe sobrevivir al override."""
+        assert override_bert_recidiva.get("backend") == "bert"
+
+    def test_shap_explanation_es_referencia_legal(self, override_bert_recidiva):
+        expl = override_bert_recidiva.get("shap_explanation", "")
+        assert "EU AI Act" in expl
+
+    def test_ml_prediction_preserva_prediccion_bert_original(self, override_bert_recidiva):
+        ml = override_bert_recidiva.get("ml_prediction", {})
+        assert ml.get("risk_level") == "riesgo_minimo"
+
+    def test_probabilities_coherentes_tras_override(self, override_bert_recidiva):
+        nivel = override_bert_recidiva["risk_level"]
+        probs = override_bert_recidiva["probabilities"]
+        assert probs[nivel] == max(probs.values())
+
+    def test_llamadas_consecutivas_bert_consistentes(self):
+        """Dos llamadas a predict_risk_bert con el mismo texto dan el mismo resultado."""
+        import src.classifier.main as m
+        with patch.object(m, "_predict_bert_raw", return_value=_FAKE_BERT_RESULT_ML):
+            r1 = predict_risk_bert("chatbot de atención al cliente para tienda online")
+            r2 = predict_risk_bert("chatbot de atención al cliente para tienda online")
+        assert r1["risk_level"] == r2["risk_level"]
+        assert r1["confidence"] == r2["confidence"]
+
+
+# ---------------------------------------------------------------------------
+# Grupo 10: Carga de artefactos BERT — errores sin modelo en disco
+# ---------------------------------------------------------------------------
+
+class TestBertLoadArtifacts:
+    """Verifica el comportamiento de _load_bert_artifacts() sin el modelo en disco."""
+
+    def test_filenotfounderror_si_directorio_no_existe(self, tmp_path):
+        """_load_bert_artifacts lanza FileNotFoundError si el directorio BERT no existe."""
+        import src.classifier.main as m
+        original_dir   = m._BERT_DIR
+        original_model = m._bert_model
+        original_tok   = m._bert_tokenizer
+        original_id2l  = m._bert_id2label
+
+        m._bert_model     = None
+        m._bert_tokenizer = None
+        m._bert_id2label  = None
+        m._BERT_DIR       = tmp_path / "modelo_inexistente"
+
+        try:
+            with pytest.raises(FileNotFoundError, match="Modelo BERT no encontrado"):
+                m._load_bert_artifacts()
+        finally:
+            m._BERT_DIR       = original_dir
+            m._bert_model     = original_model
+            m._bert_tokenizer = original_tok
+            m._bert_id2label  = original_id2l
+
+    def test_singleton_none_tras_fallo_de_carga(self, tmp_path):
+        """Si la carga falla, los singletons quedan en None (no half-loaded)."""
+        import src.classifier.main as m
+        original_dir   = m._BERT_DIR
+        original_model = m._bert_model
+        original_tok   = m._bert_tokenizer
+        original_id2l  = m._bert_id2label
+
+        m._bert_model     = None
+        m._bert_tokenizer = None
+        m._bert_id2label  = None
+        m._BERT_DIR       = tmp_path / "no_existe"
+
+        try:
+            with pytest.raises(FileNotFoundError):
+                m._load_bert_artifacts()
+            assert m._bert_model     is None
+            assert m._bert_tokenizer is None
+            assert m._bert_id2label  is None
+        finally:
+            m._BERT_DIR       = original_dir
+            m._bert_model     = original_model
+            m._bert_tokenizer = original_tok
+            m._bert_id2label  = original_id2l
+
+
+# ---------------------------------------------------------------------------
+# Grupo 11: Smoke tests BERT con modelo real (skip si no hay artefactos)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.skipif(
+    not _BERT_AVAILABLE,
+    reason="Modelo BERT no disponible — ejecuta: python src/classifier/bert_pipeline/train.py",
+)
+class TestBertSmoke:
+    """Smoke tests end-to-end con el modelo BERT real.
+
+    Se saltan automáticamente si ``bert_pipeline/models/bert_model/`` no existe.
+    En CI sin GPU estos tests no se ejecutan; en local (o CI con GPU) validan
+    el pipeline completo incluyendo carga del modelo real.
+    """
+
+    @pytest.fixture(scope="class")
+    def resultado_bert_real(self):
+        return predict_risk_bert(
+            "sistema de reconocimiento facial en aeropuertos para control de acceso"
+        )
+
+    def test_devuelve_dict(self, resultado_bert_real):
+        assert isinstance(resultado_bert_real, dict)
+
+    def test_risk_level_valido(self, resultado_bert_real):
+        assert resultado_bert_real["risk_level"] in RISK_LEVELS
+
+    def test_confidence_en_rango(self, resultado_bert_real):
+        c = resultado_bert_real["confidence"]
+        assert 0.0 <= c <= 1.0
+
+    def test_backend_bert(self, resultado_bert_real):
+        assert resultado_bert_real.get("backend") == "bert"
+
+    def test_texto_corto(self):
+        result = predict_risk_bert("IA médica")
+        assert result["risk_level"] in RISK_LEVELS
+
+    def test_texto_largo(self):
+        texto = (
+            "Sistema automatizado de vigilancia biométrica en espacios públicos "
+            "que utiliza reconocimiento facial en tiempo real para identificar "
+            "personas en listas de seguimiento policial, integrado con cámaras "
+            "de circuito cerrado en estaciones de metro y aeropuertos."
+        )
+        result = predict_risk_bert(texto)
+        assert result["risk_level"] in RISK_LEVELS
+
+    def test_texto_sin_keywords_dominio(self):
+        result = predict_risk_bert("software de gestión de inventario para almacenes")
+        assert result["risk_level"] in RISK_LEVELS
+
+    def test_llamadas_consecutivas_consistentes(self):
+        texto = "chatbot de atención al cliente para tienda online"
+        r1 = predict_risk_bert(texto)
+        r2 = predict_risk_bert(texto)
+        assert r1["risk_level"] == r2["risk_level"]
+        assert r1["confidence"] == r2["confidence"]
+
+    def test_probabilities_suman_uno(self, resultado_bert_real):
+        total = sum(resultado_bert_real["probabilities"].values())
+        assert abs(total - 1.0) < 0.02
+
+    def test_predict_risk_con_backend_bert_env(self, monkeypatch):
+        """predict_risk() con CLASSIFIER_BACKEND=bert usa BERT real sin fallback."""
+        import src.classifier.main as m
+        with patch.object(m, "_CLASSIFIER_BACKEND", "bert"):
+            result = predict_risk(
+                "sistema de reconocimiento facial en aeropuertos para control de acceso"
+            )
+        assert result["risk_level"] in RISK_LEVELS
+        assert result.get("backend") == "bert"
