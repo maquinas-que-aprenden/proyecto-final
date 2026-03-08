@@ -8,7 +8,7 @@
 #   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 # CPU (sin GPU):
 #   pip install torch --index-url https://download.pytorch.org/whl/cpu
-torch
+torch>=2.5.0,<2.6.0
 
 # Stack de fine-tuning QLoRA
 # CVE-2024-11392/11393/11394: versión mínima segura para transformers
