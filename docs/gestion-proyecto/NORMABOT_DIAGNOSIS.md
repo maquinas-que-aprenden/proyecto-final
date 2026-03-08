@@ -195,7 +195,7 @@ Fecha: 2026-02-27 (rama: `docs/improve-ideas`, commit: `4c101f83`)
 
 ### RAG Pipeline (src/rag/main.py)
 
-**retrieve(query, k=5) → list[dict]**
+**retrieve(query, k=9) → list[dict]**
 - Líneas: 43-74
 - Llama `src.retrieval.retriever.search(query, k=k, mode="soft")`
 - Convierte formato retriever (text/distance) a formato grade (doc/score)

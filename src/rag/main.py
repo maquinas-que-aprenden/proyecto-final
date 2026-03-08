@@ -31,9 +31,12 @@ MAX_DOC_CHARS_GRADING = 3000
 
 GRADING_PROMPT = (
     "Dado el siguiente documento y la pregunta, "
-    "¿el documento contiene información útil para responder la pregunta?\n\n"
+    "¿el documento contiene información parcial o totalmente útil para responder la pregunta?\n\n"
+    "Sé permisivo: responde 'si' si el documento toca el tema aunque no lo responda completamente.\n"
+    "Solo responde 'no' si el documento es completamente irrelevante.\n\n"
     "Documento: {document}\n"
     "Pregunta: {query}\n\n"
+    "IMPORTANTE: Responde únicamente con 'si' o 'no'. No añadas explicaciones ni te inventes información.\n"
     'Responde solo con "si" o "no":'
 )
 
@@ -56,7 +59,7 @@ def _get_grading_llm():
 
 
 @observe(name="rag.retrieve")
-def retrieve(query: str, k: int = 5) -> list[dict]:
+def retrieve(query: str, k: int = 9) -> list[dict]:
     """Recupera documentos de ChromaDB y los formatea para grade()."""
     try:
         results = search(query, k=k, mode="soft")
@@ -129,6 +132,7 @@ def _grade_with_ollama(query: str, docs: list[dict], threshold: float) -> list[d
     return relevant
 
 
+
 @observe(name="rag.grade")
 def grade(query: str, docs: list[dict], threshold: float = 0.3) -> list[dict]:
     """Evalúa relevancia de cada documento con LLM local.
@@ -137,14 +141,32 @@ def grade(query: str, docs: list[dict], threshold: float = 0.3) -> list[dict]:
     1. Modelo fine-tuneado (QLoRA, F1=0.895) — si el adaptador está disponible.
     2. Ollama Qwen 2.5 3B base              — si Ollama está corriendo.
     3. Filtro por score de similitud        — fallback sin LLM.
+
+    En los métodos 1 y 2, si el grader descarta todos los docs, se aplica
+    la garantía mínima: filtro por score para evitar devolver lista vacía.
     """
     if not docs:
         return []
+
+    def _empty_fallback(relevant: list[dict], method: str) -> list[dict]:
+        if not relevant:
+            relevant = _grade_by_score(docs, threshold)
+            logger.warning("Grader devolvió 0 relevantes — fallback a filtro por score")
+            try:
+                langfuse_context.update_current_observation(
+                    level="WARNING",
+                    status_message="Grader devolvió 0 relevantes — fallback a filtro por score",
+                    metadata={"n_docs_in": len(docs), "n_relevant": len(relevant), "method": "empty_fallback"},
+                )
+            except Exception:
+                pass
+        return relevant
 
     # 1. Modelo fine-tuneado
     if _FINETUNED_GRADER_IMPORTED and _ft_available():
         try:
             relevant = _grade_with_finetuned(query, docs, threshold)
+            relevant = _empty_fallback(relevant, "finetuned_lora")
             try:
                 langfuse_context.update_current_observation(
                     metadata={"n_docs_in": len(docs), "n_relevant": len(relevant), "method": "finetuned_lora"},
@@ -158,6 +180,7 @@ def grade(query: str, docs: list[dict], threshold: float = 0.3) -> list[dict]:
     # 2. Ollama (modelo base)
     try:
         relevant = _grade_with_ollama(query, docs, threshold)
+        relevant = _empty_fallback(relevant, "ollama")
         try:
             langfuse_context.update_current_observation(
                 metadata={"n_docs_in": len(docs), "n_relevant": len(relevant), "method": "ollama"},
