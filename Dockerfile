@@ -20,7 +20,7 @@ RUN useradd -m -u 1000 appuser && \
     chown -R appuser:appuser /app /usr/local/bin/ollama /home/appuser/.ollama
 
 COPY requirements/ requirements/
-RUN pip install --no-cache-dir -r requirements/app.txt -r requirements/classifier.txt
+RUN pip install --no-cache-dir -r requirements/app.txt -r requirements/classifier.txt -r requirements/finetuning.txt
 RUN python -m spacy download es_core_news_sm
 
 COPY src/ src/
