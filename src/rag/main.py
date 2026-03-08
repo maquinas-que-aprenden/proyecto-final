@@ -82,13 +82,13 @@ def retrieve(query: str, k: int = 9) -> list[dict]:
     return docs
 
 
-def _grade_by_score(docs: list[dict], threshold: float = 0.7) -> list[dict]:
+def _grade_by_score(docs: list[dict], threshold: float = 0.3) -> list[dict]:
     """Fallback: filtra documentos por score de similitud."""
     return [d for d in docs if d["score"] >= threshold]
 
 
 @observe(name="rag.grade")
-def grade(query: str, docs: list[dict], threshold: float = 0.7) -> list[dict]:
+def grade(query: str, docs: list[dict], threshold: float = 0.3) -> list[dict]:
     """Evalúa relevancia de cada documento con LLM local (Ollama).
 
     Fallback a filtro por score si Ollama no está disponible.
