@@ -89,7 +89,7 @@ def retrieve(query: str, k: int = 5) -> list[dict]:
     return docs
 
 
-def _grade_by_score(docs: list[dict], threshold: float = 0.7) -> list[dict]:
+def _grade_by_score(docs: list[dict], threshold: float = 0.3) -> list[dict]:
     """Fallback: filtra documentos por score de similitud."""
     return [d for d in docs if d["score"] >= threshold]
 
@@ -130,7 +130,7 @@ def _grade_with_ollama(query: str, docs: list[dict], threshold: float) -> list[d
 
 
 @observe(name="rag.grade")
-def grade(query: str, docs: list[dict], threshold: float = 0.7) -> list[dict]:
+def grade(query: str, docs: list[dict], threshold: float = 0.3) -> list[dict]:
     """Evalúa relevancia de cada documento con LLM local.
 
     Jerarquía de métodos:

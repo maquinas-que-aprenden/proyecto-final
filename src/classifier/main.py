@@ -5,13 +5,13 @@ Carga el modelo serializado entrenado en el dataset fusionado y expone
 
 Backends disponibles (seleccionable via variable de entorno CLASSIFIER_BACKEND):
 
-- ``xgboost`` (por defecto): XGBoost + TF-IDF + SVD(100) + 7 keywords.
-  F1-macro test 0.8822. Artefactos en ``classifier_dataset_fusionado/model/``.
-
-- ``bert``: BERT fine-tuneado (dccuchile/bert-base-spanish-wwm-cased).
+- ``bert`` (por defecto): BERT fine-tuneado (dccuchile/bert-base-spanish-wwm-cased).
   F1-macro val 0.7289 (entrenado en dataset sintético aumentado ~4000 ejemplos).
   Captura relaciones semánticas y contexto, superior en generalización.
   Artefactos en ``bert_pipeline/models/bert_model/``.
+
+- ``xgboost``: XGBoost + TF-IDF + SVD(100) + 7 keywords.
+  F1-macro test 0.8822. Artefactos en ``classifier_dataset_fusionado/model/``.
 
 En ambos casos se aplica el override determinista del Anexo III EU AI Act
 tras la predicción del modelo ML.
@@ -41,9 +41,9 @@ from src.observability.langfuse_compat import observe, langfuse_context
 logger = logging.getLogger(__name__)
 
 # Backend seleccionable via variable de entorno.
-# "bert"    → BERT fine-tuneado (dccuchile/bert-base-spanish-wwm-cased)
-# "xgboost" → XGBoost + TF-IDF + SVD (por defecto, siempre disponible)
-_CLASSIFIER_BACKEND = os.environ.get("CLASSIFIER_BACKEND", "xgboost").lower()
+# "bert"    → BERT fine-tuneado (dccuchile/bert-base-spanish-wwm-cased) [por defecto]
+# "xgboost" → XGBoost + TF-IDF + SVD
+_CLASSIFIER_BACKEND = os.environ.get("CLASSIFIER_BACKEND", "bert").lower()
 
 # ---------------------------------------------------------------------------
 # Singletons BERT (cargados lazy en el primer uso)
@@ -424,8 +424,8 @@ def predict_risk(text: str) -> dict:
     """Clasifica un sistema de IA por nivel de riesgo EU AI Act.
 
     Despacha al backend configurado en CLASSIFIER_BACKEND:
-    - "bert"    → predict_risk_bert() (semántico, lazy-load)
-    - "xgboost" → pipeline TF-IDF+SVD+XGBoost (por defecto)
+    - "bert"    → predict_risk_bert() (semántico, lazy-load) [por defecto]
+    - "xgboost" → pipeline TF-IDF+SVD+XGBoost
 
     En caso de error con BERT, hace fallback automático a XGBoost.
 
