@@ -475,7 +475,10 @@ _BERT_MODEL_DIR = (
     Path(__file__).parent.parent
     / "src/classifier/bert_pipeline/models/bert_model"
 )
-_BERT_AVAILABLE = _bert_model_dir_exists = _BERT_MODEL_DIR.exists()
+_BERT_AVAILABLE = _BERT_MODEL_DIR.exists() and any(
+    (_BERT_MODEL_DIR / f).exists()
+    for f in ("pytorch_model.bin", "model.safetensors", "tf_model.h5")
+)
 
 _FAKE_PROBS = {
     "alto_riesgo"   : 0.70,
