@@ -21,9 +21,12 @@ MAX_DOC_CHARS_GRADING = 3000
 
 GRADING_PROMPT = (
     "Dado el siguiente documento y la pregunta, "
-    "¿el documento contiene información útil para responder la pregunta?\n\n"
+    "¿el documento contiene información parcial o totalmente útil para responder la pregunta?\n\n"
+    "Sé permisivo: responde 'si' si el documento toca el tema aunque no lo responda completamente.\n"
+    "Solo responde 'no' si el documento es completamente irrelevante.\n\n"
     "Documento: {document}\n"
     "Pregunta: {query}\n\n"
+    "IMPORTANTE: Responde únicamente con 'si' o 'no'. No añadas explicaciones ni te inventes información.\n"
     'Responde solo con "si" o "no":'
 )
 
@@ -46,7 +49,7 @@ def _get_grading_llm():
 
 
 @observe(name="rag.retrieve")
-def retrieve(query: str, k: int = 5) -> list[dict]:
+def retrieve(query: str, k: int = 9) -> list[dict]:
     """Recupera documentos de ChromaDB y los formatea para grade()."""
     try:
         results = search(query, k=k, mode="soft")
@@ -121,6 +124,20 @@ def grade(query: str, docs: list[dict], threshold: float = 0.7) -> list[dict]:
             logger.warning("Error en grading LLM, incluyendo doc por score")
             if doc["score"] >= threshold:
                 relevant.append(doc)
+
+    # Garantía mínima: si el grader descartó todo, usar filtro por score
+    # Solo pasa docs que superen el umbral de similitud, evita pasar basura al generador
+    if not relevant:
+        relevant = _grade_by_score(docs, threshold)
+        logger.warning("Grader devolvió 0 relevantes — fallback a filtro por score")
+        try:
+            langfuse_context.update_current_observation(
+                level="WARNING",
+                status_message="Grader devolvió 0 relevantes — fallback a filtro por score",
+                metadata={"n_docs_in": len(docs), "n_relevant": len(relevant), "method": "empty_fallback"},
+            )
+        except Exception:
+            pass
 
     try:
         langfuse_context.update_current_observation(
