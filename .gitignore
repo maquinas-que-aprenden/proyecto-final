@@ -13,7 +13,7 @@ __pycache__/
 .env
 .aws/
 aws.pem
-
+src/finetuning/.env
 # ── Data ───────────────────────────────────────
 *.csv
 !*.dvc
@@ -47,7 +47,19 @@ terraform.rc
 # ── MLflow ─────────────────────────────────────
 mlruns/
 
+# ── Modelos BERT (binarios grandes, usar DVC o HuggingFace Hub) ────────────
+src/classifier/bert_pipeline/models/checkpoints/
+src/classifier/bert_pipeline/models/*.safetensors
+src/classifier/bert_pipeline/models/*.joblib
+src/classifier/bert_pipeline/models/*.bin
+src/classifier/bert_pipeline/models/*.pt
+src/classifier/bert_pipeline/models/*.pth
+src/classifier/bert_pipeline/models/bert_model/*.safetensors
+src/classifier/bert_pipeline/models/bert_model/*.bin
+src/classifier/bert_pipeline/models/bert_model/*.pt
+
 # ── Archivos locales / personales ──────────────
 src/classifier/tareas/
 .venv_rag/
-src\classifier\classifier_ultimo_dataset
+src/finetuning/tareas/
+src/classifier/classifier_ultimo_dataset/

@@ -13,10 +13,13 @@ joblib==1.4.2
 scipy==1.14.1
 
 # Deep Learning / Fine-tuning QLoRA
-# Windows (CPU-only): instalar con:
+# CUDA 12.8 (Windows/Linux con GPU NVIDIA — RTX 4070 Super y similares, drivers CUDA 13.x):
+#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+# CPU-only (sin GPU):
 #   pip install torch --index-url https://download.pytorch.org/whl/cpu
-# Linux/Mac (CUDA): cambiar por torch==2.5.1 sin --index-url
-torch
+# GPU (CUDA): pip install torch --index-url https://download.pytorch.org/whl/cu128
+# CPU/CI:    pip install torch --index-url https://download.pytorch.org/whl/cpu
+torch>=2.1.0
 # CVE-2024-11392/11393/11394: versión mínima segura
 transformers>=4.48.0
 peft==0.14.0
