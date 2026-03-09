@@ -14,7 +14,8 @@ MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI")
 MLFLOW_EXPERIMENT = "normabot-ragas-eval"
 THRESHOLDS = {
     "faithfulness": 0.80,
-    "answer_relevancy": 0.85,
+    # answer_relevancy excluida: Nova Lite no sigue el prompt de RAGAS
+    # (devuelve JSON incompleto sin el campo "question"), lo que produce NaN siempre.
     "context_precision": 0.70,
     "context_recall": 0.70,
 }
@@ -97,7 +98,7 @@ def build_ragas_dataset(rows: list[dict]):
 def get_ragas_llm():
     """Devuelve un LLM compatible con RAGAS usando Bedrock Nova Lite.
 
-    RAGAS necesita un LLM para calcular faithfulness y answer_relevancy.
+    RAGAS necesita un LLM para calcular faithfulness, context_precision y context_recall.
     Usamos el mismo modelo que el agente para consistencia.
     """
     from langchain_aws import ChatBedrockConverse
@@ -133,24 +134,16 @@ def get_ragas_embeddings():
 
 def run_ragas(ragas_dataset) -> dict:
     from ragas import evaluate
-    from ragas.metrics import Faithfulness, AnswerRelevancy, ContextPrecision, ContextRecall
+    from ragas.metrics import Faithfulness, ContextPrecision, ContextRecall
 
     ragas_llm = get_ragas_llm()
 
-    # Cargar embeddings para evitar error de OpenAI
-    try:
-        ragas_embeddings = get_ragas_embeddings()
-        logger.info("Embeddings sentence-transformers cargados correctamente.")
-    except Exception as e:
-        logger.warning("No se pudieron cargar embeddings, AnswerRelevancy fallará: %s", e)
-        ragas_embeddings = None
-
     logger.info("Calculando métricas RAGAS...")
 
-    # Definimos las métricas pasando los embeddings explícitamente
+    # AnswerRelevancy excluida: Nova Lite no sigue el prompt few-shot de RAGAS
+    # y devuelve JSON sin el campo "question", produciendo NaN en todos los ejemplos.
     metrics = [
         Faithfulness(llm=ragas_llm),
-        AnswerRelevancy(llm=ragas_llm, embeddings=ragas_embeddings),
         ContextPrecision(llm=ragas_llm),
         ContextRecall(llm=ragas_llm),
     ]
@@ -173,7 +166,6 @@ def run_ragas(ragas_dataset) -> dict:
 
     metrics = {
         "faithfulness": round(float(np.nanmean(results["faithfulness"])), 4),
-        "answer_relevancy": round(float(np.nanmean(results["answer_relevancy"])), 4),
         "context_precision": round(float(np.nanmean(results["context_precision"])), 4),
         "context_recall": round(float(np.nanmean(results["context_recall"])), 4),
     }
