@@ -43,8 +43,8 @@ Inicialmente se plantea:
 A fecha de 20/02 se decide la separación en dos instancias: una para MLflow y otra para Normabot, cada una con su correspondiente security group.
 Actualmente:
     * MLflow necesita un t3.small, porque la memoria RAM de t3.micro del free-tier no es suficiente para su ejecución.
-    * NormaBot está desplegado en una t3.large (8GB RAM). Se necesita t3.large porque Ollama/Qwen 2.5 3B requiere ~1.9GB de RAM y el t3.medium (4GB) no dejaba margen suficiente tras el arranque de la app.
-    * Ambas instancias tienen IMDSv2 forzado (`http_tokens = "required"`) para impedir ataques SSRF que podrían robar credenciales del instance profile.
+    * NormaBot se desplegó inicialmente en una t3.large (4 vCPU, 8 GB RAM), suficiente para Ollama/Qwen 2.5 3B (~1.9 GB RAM). La t3.large se usó como servidor de desarrollo y pruebas hasta los días finales del proyecto. En la última semana se migró a una **g4dn.xlarge** (4 vCPU, 16 GB RAM, GPU NVIDIA T4 con 16 GB VRAM) para poder ejecutar el grader QLoRA fine-tuneado (`src/finetuning/grader.py`) en GPU. El volumen EBS de 30 GB está adjunto al servidor GPU. La t3.large permanece definida en Terraform pero detenida.
+    * Las tres instancias tienen IMDSv2 forzado (`http_tokens = "required"`) para impedir ataques SSRF que podrían robar credenciales del instance profile.
     * En el caso del servidor de normabot es necesario añadir manualmente un .env entrando en la instancia que incluya las variables de entorno que usa:
     ```
     AWS_REGION=eu-west-1
@@ -78,7 +78,7 @@ De momento solo hay una para MLflow. Es preferible usar SQLite dentro de la prop
     * `cicd-main.yml`: lint completo + smoke tests (pytest) + construye, publica con tag `:latest` y despliega automáticamente en el servidor en cada push a `main`. Los tests también corren en PRs a `main` como gate antes del merge.
     * `eval.yml`: ejecuta la evaluación RAGAS en EC2 contra la imagen `:latest` desplegada. Se lanza manualmente (`workflow_dispatch`).
 * El despliegue se hace vía SSH a la EC2. El script de deploy hace login en GHCR, `dvc pull` del vectorstore y levanta el contenedor con `docker compose up -d --pull always --force-recreate`. Pendiente: valorar si simplificar a `docker run` directo.
-* Los smoke tests (115 tests, 5 suites: clasificador, checklist, memoria conversacional, orquestador, reentrenamiento) se ejecutan con `pytest tests/ -v`. Los servicios externos (Bedrock, Ollama) están mockeados y el reentrenamiento usa un stub `_FakeXGB`, por lo que no requieren credenciales ni entrenamiento real en CI. El clasificador incluye `TestAnnex3Override` (14 tests) y el orquestador `TestNoDobleClasificacion` (2 tests) para los bugs críticos cerrados en la semana de cierre.
+* Los smoke tests (133 tests, 6 suites: clasificador, checklist, constantes del clasificador, memoria conversacional, orquestador, reentrenamiento) se ejecutan con `pytest tests/ -v`. Los servicios externos (Bedrock, Ollama) están mockeados y el reentrenamiento usa un stub `_FakeXGB`, por lo que no requieren credenciales ni entrenamiento real en CI. El clasificador incluye `TestAnnex3Override` (14 tests) y el orquestador `TestNoDobleClasificacion` (2 tests) para los bugs críticos cerrados en la semana de cierre. La rama `fine-tuning` (no mergeada) añade `test_finetuning.py` con 45 tests adicionales del grader QLoRA.
 
 ## Observabilidad y trazabilidad
 * Usamos [MLflow](https://mlflow.org/) para los modelos de clasificación: métricas de entrenamiento y registro del modelo.
@@ -87,11 +87,10 @@ De momento solo hay una para MLflow. Es preferible usar SQLite dentro de la prop
     * Permite monitorizar usos en tiempo real del consumo de tokens, latencias y alucinaciones mediante métricas.
     * Gestiona versiones de prompts.
     * Cobertura de instrumentación por módulo con `@observe` de Langfuse v2:
-        * `rag/main.py` — retrieve, grade, generate: con `level=ERROR` si ChromaDB no está disponible, y `level=WARNING` si Ollama o Bedrock caen al fallback.
+        * `rag/main.py` — retrieve, grade: con `level=ERROR` si ChromaDB no está disponible, y `level=WARNING` si Ollama cae al fallback por score.
         * `classifier/main.py` — predict_risk: registra nivel de riesgo, confianza y distribución de probabilidades; `score_current_trace` guarda la confianza del modelo como métrica numérica.
-        * `report/main.py` — generate_report: registra si el informe lo generó Bedrock o el template estático (`grounded`), con `level=WARNING` en el caso de fallback.
-        * `retriever.py` — search y search_tool: registra distancias min/max, número de resultados, fuentes únicas y si el contexto fue truncado.
-        * `orchestrator/main.py` — las 3 herramientas del agente (search_legal_docs, classify_risk, generate_report) con `@observe`.
+        * `retrieval/retriever.py` — search: registra distancias min/max, número de resultados, fuentes únicas y si el contexto fue truncado.
+        * `orchestrator/main.py` — search_legal_docs y classify_risk con `@observe`; save_user_preference y get_user_preferences sin instrumentar.
     * **Limitación conocida**: la traza raíz del agente LangGraph vía `CallbackHandler` no está disponible. `langfuse.callback` en v2.60.x requiere `langchain.callbacks.base` que fue eliminado en langchain 0.3. Las trazas individuales de cada herramienta sí llegan a Langfuse vía `@observe`.
     * Feedback de usuario (👍/👎): eliminado — dependía del `trace_id` del `CallbackHandler` raíz, que no está disponible por incompatibilidad entre `langfuse.callback` v2 y `langchain` 0.3.
     * En tests, Langfuse se desactiva con `LANGFUSE_ENABLED=false` en `tests/conftest.py` para evitar dependencias de credenciales en CI.
