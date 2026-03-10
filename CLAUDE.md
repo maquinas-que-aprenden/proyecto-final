@@ -21,15 +21,15 @@ A **ReAct agent** (LangGraph `create_react_agent`) orchestrates two main tools p
 
 ## Source Modules
 
-| Module | Main file | Lines | Purpose |
-|--------|-----------|-------|---------|
-| `src/rag/` | `main.py` | 175 | Corrective RAG: retrieve + grade + format_context |
-| `src/retrieval/` | `retriever.py` | 184 | ChromaDB PersistentClient with lazy init |
-| `src/classifier/` | `main.py` | 512 | XGBoost inference + Annex III override + SHAP |
-| `src/checklist/` | `main.py` | 469 | Deterministic compliance checklist (no LLM) |
-| `src/orchestrator/` | `main.py` | 486 | ReAct agent + SQLite memory + side-channel metadata |
-| `src/memory/` | `hooks.py` | 41 | Pre-model hook: trim conversation to 30K tokens |
-| `src/observability/` | `langfuse_compat.py` | 25 | Graceful Langfuse degradation (no-op if unavailable) |
+| Module | Main file | Purpose |
+|--------|-----------|---------|
+| `src/rag/` | `main.py` | Corrective RAG: retrieve + grade + format_context |
+| `src/retrieval/` | `retriever.py` | ChromaDB PersistentClient with lazy init |
+| `src/classifier/` | `main.py` | XGBoost inference + Annex III override + SHAP |
+| `src/checklist/` | `main.py` | Deterministic compliance checklist (no LLM) |
+| `src/orchestrator/` | `main.py` | ReAct agent + SQLite memory + side-channel metadata |
+| `src/memory/` | `hooks.py` | Pre-model hook: trim conversation to 30K tokens |
+| `src/observability/` | `langfuse_compat.py` | Graceful Langfuse degradation (no-op if unavailable) |
 
 ## Classifier: Structure
 
@@ -93,12 +93,14 @@ python -m src.classifier.main
 python -m src.orchestrator.main
 
 # Install dependencies (split by context)
-pip install -r requirements/app.txt        # Streamlit + LangGraph + LangChain
-pip install -r requirements/ml.txt         # ML/NLP (spaCy, XGBoost, SHAP, MLflow, torch)
+# base.txt is shared (pandas, numpy, dotenv) — install first, or use app/ml/classifier which include it
+pip install -r requirements/base.txt       # Shared deps (required by data.txt, infra.txt, dev.txt)
+pip install -r requirements/app.txt        # Streamlit + LangGraph + LangChain (includes base)
+pip install -r requirements/ml.txt         # ML/NLP (spaCy, XGBoost, SHAP, MLflow, torch) (includes base)
 pip install -r requirements/data.txt       # Data pipeline (sentence-transformers, chromadb, bs4, pypdf)
 pip install -r requirements/dev.txt        # ruff only
 pip install -r requirements/infra.txt      # AWS, DVC, Langfuse, RAGAS
-pip install -r requirements/classifier.txt # Classifier-specific dependencies
+pip install -r requirements/classifier.txt # Classifier-specific dependencies (includes base)
 ```
 
 ## Tests
@@ -145,7 +147,7 @@ To run the full test suite (including ML tests), install ML dependencies first: 
   - `data/processed/vectorstore/` — embeddings + ChromaDB (DVC-managed)
   - `data/memory/` — SQLite conversation database (`conversations.db`)
 - **Container registry**: `ghcr.io/maquinas-que-aprenden/proyecto-final`
-- **Ollama**: Local LLM inference. Used for RAG document grading (Qwen 2.5 3B). Install: `brew install ollama`. Pull model: `ollama pull qwen2.5:3b`. Start: `brew services start ollama`. In Docker: installed in container via `ollama-entrypoint.sh`.
+- **Ollama**: Local LLM inference. Used for RAG document grading (Qwen 2.5 3B). Install: macOS `brew install ollama`, Linux `curl -fsSL https://ollama.com/install.sh | sh`, Windows via [ollama.com/download](https://ollama.com/download). Pull model: `ollama pull qwen2.5:3b`. Start: macOS `brew services start ollama`, Linux/Windows `ollama serve`. In Docker: installed in container via `ollama-entrypoint.sh`.
 - **CodeRabbit**: configured in `.coderabbit.yaml` — reviews focus only on logic/security/performance bugs, all style linters disabled
 
 ## Key Domain Rules
