@@ -119,7 +119,7 @@ docker compose up
 | Clasificador (XGBoost) | F1-macro | 0.88 |
 | Clasificador | Dataset | ~600 ejemplos (real [`EU-AI-Act-Flagged`](https://huggingface.co/datasets/suhas-km/EU-AI-Act-Flagged) + sintético fusionado) |
 | RAG (RAGAS) | Faithfulness | ≥ 0.80 (umbral) |
-| RAG (RAGAS) | Context precision | 0.86–1.0 (umbral ≥ 0.70) |
+| RAG (RAGAS) | Context precision | (umbral ≥ 0.70) |
 | RAG (RAGAS) | Context recall | 0.44–0.52 (umbral ≥ 0.70) |
 | Tests | Automatizados | 53+ deterministas, ~73+ total con ML deps |
 | CI/CD | Workflows | 5 (lint, build, deploy, eval, manual) |
@@ -141,7 +141,7 @@ docker compose up
 ## Limitaciones conocidas
 
 - **Dataset limitado** (~600 ejemplos) — Mitigado con `class_weight='balanced'`, StratifiedKFold y override determinista. Documentado como limitación inherente al dominio legal especializado.
-- **Context recall RAGAS** — Por debajo del umbral (0.44-0.52 vs 0.70 objetivo). El grader puede ser demasiado restrictivo; mejora futura: ajustar threshold o ampliar dataset de evaluación.
+- **Context recall RAGAS** — Por debajo del umbral (0.44-0.52 vs 0.70 objetivo). El retriever no recupera todos los documentos relevantes; mejora futura: aumentar K, ajustar chunking o ampliar dataset de evaluación.
 - **Dependencia de Ollama** — El grading local requiere Ollama corriendo. En caso de fallo, el sistema continúa con fallback por score semántico (sin grading LLM).
 - **Corpus centrado en IA** — Actualmente cubre EU AI Act, BOE y normativa AESIA. La extensión a RGPD/LOPDGDD y sector financiero queda como mejora futura.
 
