@@ -58,8 +58,9 @@ def get_retriever_rows(dataset: list[dict]) -> list[dict]:
             "Instala las dependencias de RAG antes de ejecutar la evaluación del retriever."
         ) from exc
 
+    total = len(dataset)
     rows = []
-    for item in dataset:
+    for idx, item in enumerate(dataset, 1):
         question = item["question"]
         try:
             docs = retrieve(question)
@@ -69,6 +70,10 @@ def get_retriever_rows(dataset: list[dict]) -> list[dict]:
             # el resultado del retriever. No usar item["contexts"] como fallback
             # porque contaminaría las métricas con datos gold.
             contexts = [d["doc"] for d in relevant]
+            logger.info(
+                "[%d/%d] %d/%d docs relevantes — %s",
+                idx, total, len(relevant), len(docs), question[:80],
+            )
         except Exception as exc:
             # No usar contextos estáticos como fallback: contaminarían las métricas
             # del retriever con datos gold y harían que Phase A fuera engañosa.
@@ -123,8 +128,9 @@ def get_agent_answers(
         for row in retriever_rows:
             retriever_index[row["question"]] = row["contexts"]
 
+    total = len(dataset)
     rows = []
-    for item in dataset:
+    for idx, item in enumerate(dataset, 1):
         question = item["question"]
 
         if use_agent:
@@ -160,6 +166,11 @@ def get_agent_answers(
                 except Exception:
                     logger.exception("Error en retrieval para '%s' — usando contextos estáticos", question[:50])
 
+        source = "agente" if use_agent else "mock"
+        logger.info(
+            "[%d/%d] respuesta=%d chars, contextos=%d (%s) — %s",
+            idx, total, len(answer), len(contexts), source, question[:80],
+        )
         rows.append({
             "question": question,
             "answer": answer,
@@ -187,14 +198,16 @@ def _fix_nova_json(text: str) -> str:
     # 1. Quitar fences de markdown
     text = re.sub(r"```(?:json)?\s*([\s\S]*?)```", r"\1", text).strip()
 
-    # 2. Desenvuelve {"properties": {...}} → {...}
+    # 2. Desenvuelve {"properties": {...}, "type": "object", ...} → {...}
+    # Nova Lite confunde el formato con JSON Schema y añade "type", "title",
+    # "required", etc. La señal inequívoca es type=="object" + properties dict,
+    # independientemente de cuántas claves extra tenga el wrapper.
     try:
         data = json.loads(text)
         if (
             isinstance(data, dict)
-            and "properties" in data
-            and isinstance(data["properties"], dict)
-            and len(data) <= 3  # solo "properties", "type", "title"
+            and isinstance(data.get("properties"), dict)
+            and data.get("type") == "object"
         ):
             return json.dumps(data["properties"])
     except (json.JSONDecodeError, ValueError):
@@ -308,14 +321,25 @@ def run_ragas_retriever(ragas_dataset) -> dict:
         # "response" no incluido: ContextPrecision/ContextRecall no lo usan.
     }
 
+    from ragas import RunConfig
+
     try:
         results = evaluate(
             dataset=ragas_dataset,
             metrics=metrics,
             column_map=column_map,
+            run_config=RunConfig(timeout=120, max_retries=3),
         )
     except Exception as e:
         raise RuntimeError(f"Fallo crítico en Bedrock/Ragas (Phase A): {e}")
+
+    questions = ragas_dataset["question"]
+    for i, (q, cp, cr) in enumerate(
+        zip(questions, results["context_precision"], results["context_recall"]), 1
+    ):
+        cp_s = f"{cp:.3f}" if not np.isnan(cp) else " NaN"
+        cr_s = f"{cr:.3f}" if not np.isnan(cr) else " NaN"
+        logger.info("  [%d] prec=%-5s  rec=%-5s  %s", i, cp_s, cr_s, q[:80])
 
     scores = {
         "context_precision": round(float(np.nanmean(results["context_precision"])), 4),
@@ -356,14 +380,22 @@ def run_ragas_e2e(ragas_dataset) -> dict:
         "reference": "ground_truth",
     }
 
+    from ragas import RunConfig
+
     try:
         results = evaluate(
             dataset=ragas_dataset,
             metrics=metrics,
             column_map=column_map,
+            run_config=RunConfig(timeout=120, max_retries=3),
         )
     except Exception as e:
         raise RuntimeError(f"Fallo crítico en Bedrock/Ragas (Phase B): {e}")
+
+    questions = ragas_dataset["question"]
+    for i, (q, f) in enumerate(zip(questions, results["faithfulness"]), 1):
+        f_s = f"{f:.3f}" if not np.isnan(f) else " NaN"
+        logger.info("  [%d] faith=%-5s  %s", i, f_s, q[:80])
 
     scores = {
         "faithfulness": round(float(np.nanmean(results["faithfulness"])), 4),
