@@ -218,15 +218,19 @@ El workflow `eval.yml` ejecuta una evaluación RAGAS sobre NormaBot. Se lanza ma
 
 Lo que hace: se conecta por SSH al servidor EC2, hace `git pull` para tener los últimos ficheros de `eval/`, y ejecuta `docker exec` sobre el contenedor `normabot` ya en marcha. El script `eval/run_ragas.py --ci`:
 
-1. Carga el dataset de evaluación (`eval/dataset.json`).
-2. Obtiene respuestas reales del agente para cada pregunta y captura los contextos devueltos por el retriever.
-3. Calcula las métricas RAGAS. Los umbrales actuales son:
-   - `faithfulness` ≥ 0.80
-   - `context_precision` ≥ 0.70
-   - `context_recall` ≥ 0.70
-   - `answer_relevancy` excluida: Nova Lite no sigue el prompt de RAGAS para esta métrica (devuelve JSON sin el campo `question`), lo que produce NaN sistemáticamente.
-4. Registra los resultados en MLflow (experimento `ragas_eval`) y anota scores en Langfuse.
+1. Carga el dataset de evaluación (`eval/dataset.json`, 14 ejemplos).
+2. **Phase A — Retriever**: recupera contextos reales del vectorstore para cada pregunta (sin invocar el agente) y calcula ContextPrecision y ContextRecall.
+3. **Phase B — E2E**: obtiene respuestas reales del agente reutilizando los contextos de Phase A, y calcula Faithfulness. Usar los mismos contextos garantiza que ambas fases son comparables.
+4. Registra los resultados en MLflow (experimento `normabot-ragas-eval`) y anota scores en Langfuse.
 5. Si alguna métrica no supera el umbral, sale con código 1 (en local solo avisa, no bloquea).
+
+Los umbrales actuales son:
+- `context_precision` ≥ 0.70 (Phase A)
+- `context_recall` ≥ 0.70 (Phase A)
+- `faithfulness` ≥ 0.80 (Phase B)
+- `answer_relevancy` excluida: Nova Lite produce NaN sistemáticamente en esta métrica.
+
+**Limitación importante**: los scores finales son `nanmean` (media ignorando NaN). Nova Lite no sigue los prompts JSON de RAGAS de forma consistente, lo que produce NaN en muchos ejemplos — especialmente en Faithfulness. El número final puede estar calculado sobre una fracción pequeña del dataset. Consultar [`docs/mlops/analisis-ragas.md`](analisis-ragas.md) para el análisis detallado de los runs realizados.
 
 El directorio `eval/` está montado en el contenedor como bind mount (`./eval:/app/eval` en `docker-compose.yml`), por lo que el `git pull` en EC2 basta para que el contenedor vea los ficheros actualizados sin necesitar un redeploy.
 

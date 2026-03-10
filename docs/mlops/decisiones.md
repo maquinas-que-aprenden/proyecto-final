@@ -76,9 +76,16 @@ De momento solo hay una para MLflow. Es preferible usar SQLite dentro de la prop
     * `pr_lint.yml`: lint con ruff solo sobre los ficheros `.py`/`.ipynb` modificados, en cada PR a `main` o `develop`.
     * `ci-develop.yml`: lint completo + smoke tests (pytest) + construye y publica la imagen con tag `:develop` en cada push a `develop`.
     * `cicd-main.yml`: lint completo + smoke tests (pytest) + construye, publica con tag `:latest` y despliega automáticamente en el servidor en cada push a `main`. Los tests también corren en PRs a `main` como gate antes del merge.
-    * `eval.yml`: ejecuta la evaluación RAGAS en EC2 contra la imagen `:latest` desplegada. Se lanza manualmente (`workflow_dispatch`).
+    * `eval.yml`: ejecuta la evaluación RAGAS en EC2 contra la imagen `:latest` desplegada. Se lanza manualmente (`workflow_dispatch`). La evaluación se divide en dos fases: Phase A (retriever: ContextPrecision + ContextRecall) y Phase B (E2E: Faithfulness). Phase B reutiliza los contextos de Phase A para que ambas fases sean comparables.
 * El despliegue se hace vía SSH a la EC2. El script de deploy hace login en GHCR, `dvc pull` del vectorstore y levanta el contenedor con `docker compose up -d --pull always --force-recreate`. Pendiente: valorar si simplificar a `docker run` directo.
 * Los smoke tests (133 tests, 6 suites: clasificador, checklist, constantes del clasificador, memoria conversacional, orquestador, reentrenamiento) se ejecutan con `pytest tests/ -v`. Los servicios externos (Bedrock, Ollama) están mockeados y el reentrenamiento usa un stub `_FakeXGB`, por lo que no requieren credenciales ni entrenamiento real en CI. El clasificador incluye `TestAnnex3Override` (14 tests) y el orquestador `TestNoDobleClasificacion` (2 tests) para los bugs críticos cerrados en la semana de cierre. La rama `fine-tuning` (no mergeada) añade `test_finetuning.py` con 45 tests adicionales del grader QLoRA.
+
+## Evaluación RAGAS
+
+* **LLM evaluador**: se usa Nova Lite (el mismo LLM de producción) como evaluador RAGAS por no requerir credenciales adicionales. Limitación conocida: Nova Lite no sigue bien los prompts JSON estructurados de RAGAS, lo que produce NaN en la mayoría de los ejemplos de Faithfulness. A futuro habría que usar un LLM evaluador separado (GPT-4o-mini u otro compatible con RAGAS).
+* **Concurrencia `max_workers=2`**: RAGAS lanza todos los jobs en paralelo por defecto (`max_workers=16`). Con Nova Lite en `eu-west-1` esto dispara ThrottlingException masivo. Se reduce a `max_workers=2` para evitarlo, a costa de mayor duración del workflow.
+* **Métricas y umbrales**: ContextPrecision ≥ 0.70 y ContextRecall ≥ 0.70 (Phase A); Faithfulness ≥ 0.80 (Phase B). AnswerRelevancy excluida: Nova Lite no sigue el prompt de RAGAS para esta métrica. Ver análisis completo en [`docs/mlops/analisis-ragas.md`](analisis-ragas.md).
+* **Dataset manual de 14 preguntas**: suficiente para un primer baseline, insuficiente para estadística estable. A futuro: generar automáticamente con `ragas.testset.TestsetGenerator` desde el corpus para obtener 50-100 ejemplos con cobertura proporcional al contenido indexado.
 
 ## Observabilidad y trazabilidad
 * Usamos [MLflow](https://mlflow.org/) para los modelos de clasificación: métricas de entrenamiento y registro del modelo.
