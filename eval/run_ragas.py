@@ -21,8 +21,6 @@ import logging
 import os
 import sys
 
-import numpy as np
-
 from helpers import (
     load_dataset,
     get_retriever_rows,
