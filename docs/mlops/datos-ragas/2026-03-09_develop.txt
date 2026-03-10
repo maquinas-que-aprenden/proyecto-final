@@ -1,0 +1,373 @@
+Run appleboy/ssh-action@v1
+Run echo "$GITHUB_ACTION_PATH" >> $GITHUB_PATH
+Run entrypoint.sh
+Downloading drone-ssh-1.8.2-linux-amd64 from https://github.com/appleboy/drone-ssh/releases/download/v1.8.2
+======= CLI Version Information =======
+Drone SSH version 1.8.2
+=======================================
+From https://github.com/maquinas-que-aprenden/proyecto-final
+ * branch            develop    -> FETCH_HEAD
+HEAD is now at 2148da9 Merge pull request #127 from maquinas-que-aprenden/fix/ragas-formatting
+INFO  === NormaBot — Evaluación RAGAS ===
+INFO  Dataset cargado: 14 ejemplos
+INFO  generated new fontManager
+INFO  Agente ReAct disponible — usando respuestas reales
+INFO  Found credentials from IAM Role: NormaBot_Agent_EC2_Role
+INFO  Checkpointer SQLite inicializado: data/memory/conversations.db
+INFO  InMemoryStore inicializado para preferencias de usuario
+INFO  Using Bedrock Converse API to generate response
+INFO  Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+INFO  Use pytorch device_name: cuda
+INFO  Load pretrained SentenceTransformer: intfloat/multilingual-e5-base
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00,  1.44it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00,  1.44it/s]
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 88.76it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 103.07it/s]
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 116.52it/s]
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 110.75it/s]
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 115.66it/s]
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 107.59it/s]
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 114.04it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 104.64it/s]
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 94.93it/s]
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 114.60it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 111.15it/s]
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 99.51it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 109.17it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 106.55it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 113.09it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 106.65it/s]
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 112.51it/s]
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 110.04it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 112.95it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 104.15it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 111.65it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 114.03it/s]
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 86.87it/s]
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 106.99it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 88.81it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 107.79it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 88.90it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  Using Bedrock Converse API to generate response
+INFO  Cargando modelo desde metadata: Exp 2: XGBoost + SVD + GS
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 25.80it/s]
+INFO  Clasificador cargado: XGBClassifier (107 features, pipeline=tfidf_svd_manual) desde /app/src/classifier/classifier_dataset_fusionado/model
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 109.13it/s]
+INFO  Caché guardada en /app/eval/answers_cache_2148da95.json
+INFO  Calculando métricas RAGAS...
+Evaluating:   0%|          | 0/42 [00:00<?, ?it/s]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:   2%|▏         | 1/42 [00:01<01:07,  1.64s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:   7%|▋         | 3/42 [00:02<00:33,  1.16it/s]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  19%|█▉        | 8/42 [00:03<00:09,  3.74it/s]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+ERROR  Exception raised in Job[3]: OutputParserException(Invalid json output: A system of Artificial Intelligence (AI) is considered high risk when it meets two conditions. The first condition is that the AI system is used as a safety component or as a product subject to conformity assessment. The AI system must be used as a safety component of a product that is subject to the harmonizing legislative acts of the Union listed in Annex I of the EU AI Act. The AI system must be subject to a third-party conformity assessment for its introduction to the market or putting into service, according to the harmonizing legislative acts of the Union listed in Annex I. The second condition is that the AI systems listed in Annex III are also considered high risk. However, these systems may not be considered high risk if they do not pose a significant risk of causing harm to the health, safety, or fundamental rights of natural persons, and do not substantially influence the outcome of decision-making. Article 6 defines the 
+For troubleshooting, visit: https://python.langchain.com/docs/troubleshooting/errors/OUTPUT_PARSING_FAILURE )
+Evaluating:  24%|██▍       | 10/42 [00:11<00:44,  1.39s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+ERROR  Exception raised in Job[24]: OutputParserException(Invalid json output: Los sistemas de IA incluidos en el Anexo III del EU AI Act son aquellos destinados a realizar tareas específicas. Estos sistemas se consideran de alto riesgo pero tienen excepciones determinadas por la normativa. El Anexo III especifica estos sistemas de IA que suelen estar vinculados a ciertos usos y funciones. Los sistemas incluidos son aquellos que detectan patrones de toma de decisiones o desviaciones en relación con patrones anteriores. Los sistemas incluidos son aquellos que realizan tareas preparatorias para evaluaciones relevantes a los casos de uso listados en el Anexo III. Los sistemas incluidos son aquellos que crean perfiles de individuos. Estos sistemas solo se consideran de alto riesgo si no se aplican las condiciones que los eximen de este nivel de riesgo. Los sistemas destinados a realizar tareas de procedimiento limitadas están exentos de la clasificación de alto riesgo. Los sistemas destinados a mejorar el resulta
+For troubleshooting, visit: https://python.langchain.com/docs/troubleshooting/errors/OUTPUT_PARSING_FAILURE )
+Evaluating:  31%|███       | 13/42 [00:21<01:03,  2.19s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  33%|███▎      | 14/42 [00:29<01:25,  3.04s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  38%|███▊      | 16/42 [00:40<01:38,  3.78s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  40%|████      | 17/42 [00:41<01:23,  3.33s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  43%|████▎     | 18/42 [00:51<01:53,  4.74s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  45%|████▌     | 19/42 [00:58<02:01,  5.27s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  48%|████▊     | 20/42 [01:05<02:02,  5.56s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  52%|█████▏    | 22/42 [01:07<01:16,  3.84s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  55%|█████▍    | 23/42 [01:21<01:55,  6.09s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  57%|█████▋    | 24/42 [01:23<01:31,  5.09s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  60%|█████▉    | 25/42 [01:29<01:28,  5.21s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+ERROR  Exception raised in Job[27]: OutputParserException(Invalid json output: Los proveedores de sistemas de IA de alto riesgo tienen varias obligaciones específicas relacionadas con la documentación técnica según el EU AI Act. Los proveedores deben redactar una Declaración UE de conformidad por escrito en un formato legible por máquina. Los proveedores deben mantener la Declaración UE de conformidad disponible para las autoridades nacionales competentes durante un período de diez años. La Declaración UE de conformidad debe contener información específica como la indicada en el Anexo V del Reglamento Europeo de IA. La Declaración UE de conformidad debe ser traducida a una lengua que puedan entender fácilmente las autoridades nacionales competentes del Estado o Estados Miembro en que se introduzca el sistema en el mercado. La Declaración UE de conformidad debe mencionar que el sistema de IA cumple con los requisitos establecidos en el Reglamento Europeo de IA para sistemas de alto riesgo. Los proveedores debe
+For troubleshooting, visit: https://python.langchain.com/docs/troubleshooting/errors/OUTPUT_PARSING_FAILURE )
+Evaluating:  64%|██████▍   | 27/42 [01:33<00:57,  3.81s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  67%|██████▋   | 28/42 [01:36<00:53,  3.83s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  69%|██████▉   | 29/42 [01:40<00:48,  3.75s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  71%|███████▏  | 30/42 [01:57<01:26,  7.23s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+ERROR  Exception raised in Job[39]: OutputParserException(Invalid json output: Un sistema de IA que decide las dosis de medicación de un paciente ha sido clasificado como de **RIESGO INACEPTABLE**. Este nivel de riesgo se debe a la naturaleza crítica y sensible de las decisiones médicas, donde un fallo podría tener consecuencias graves para la salud de los pacientes. Según el EU AI Act (Reglamento (UE) 2024/1689), dichos sistemas están prohibidos. Este tipo de sistemas está prohibido. Por lo tanto, se debe cesar de manera inmediata su desarrollo, despliegue y uso. Lamentablemente, un sistema que decide dosis de medicamentos sin intervención humana no puede ser desplegado legalmente debido a los altos riesgos asociados. Además, según el EU AI Act, la obligación de alfabetización de los usuarios no es suficiente para sistemas de este tipo. Los proveedores deben implementar medidas técnicas y organizativas adecuadas para asegurar que estos sistemas se utilicen de manera segura, siempre bajo la supervisión humana
+For troubleshooting, visit: https://python.langchain.com/docs/troubleshooting/errors/OUTPUT_PARSING_FAILURE )
+Evaluating:  74%|███████▍  | 31/42 [02:01<01:09,  6.36s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  76%|███████▌  | 32/42 [02:17<01:30,  9.08s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  79%|███████▊  | 33/42 [02:23<01:12,  8.08s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+ERROR  Exception raised in Job[37]: OutputParserException(Invalid json output: The context provided does not specifically mention the elements that should be included in a post-market surveillance plan for high-risk AI systems according to AESIA Guide 13. While it discusses the importance and objectives of a post-market surveillance plan, it does not detail the specific elements required by the AESIA Guide 13.
+For troubleshooting, visit: https://python.langchain.com/docs/troubleshooting/errors/OUTPUT_PARSING_FAILURE )
+Evaluating:  81%|████████  | 34/42 [02:30<01:03,  7.88s/it]
+Evaluating:  83%|████████▎ | 35/42 [02:31<00:39,  5.71s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+ERROR  Exception raised in Job[21]: OutputParserException(Invalid json output: The LOPD-GDD (Ley Orgánica de Protección de Datos y Garantía de los Derechos Digitales) establishes specific obligations regarding data protection impact assessments (data protection impact assessments or EIDDP henceforth). According to Article 35 of the LOPD-GDD, here are the key aspects:
+1. Obligation of Realization: Data controllers must conduct data protection impact assessments, especially when the data processing is likely to result in a high risk to the rights and freedoms of individuals.
+2. Consultation of Interested Parties: When appropriate, the controller must obtain the opinion of the data subjects or their representatives about the intended processing, provided that this does not affect public or commercial interests or the security of processing operations.
+3. Existing Assessments: If the processing is based on Union or Member State law, and a data protection impact assessment has already been conducted in the context of the adoption of such legal basis, the previous obligations do not apply unless the Member States consider a prior assessment necessary before processing.
+4. Compliance Review: The controller must examine whether the processing complies with the data protection impact assessment, especially in the case of changes in the risk posed by processing operations.
+These points summarize the obligations regarding data protection impact assessments according to the LOPD-GDD.
+Preliminary report generated by AI. Consult a legal professional.
+For troubleshooting, visit: https://python.langchain.com/docs/troubleshooting/errors/OUTPUT_PARSING_FAILURE )
+Evaluating:  86%|████████▌ | 36/42 [02:37<00:35,  5.86s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+ERROR  Exception raised in Job[34]: OutputParserException(Failed to parse Verification from completion {"properties": {"reason": "The context provided does not contain any information related to the obligation of designating a Data Protection Officer (DPO) for service providers using AI systems for large-scale user profiling. The context focuses on the qualifications and roles of individuals involved in the development and operation of AI systems, which is not directly relevant to the question about the legal obligation to appoint a DPO.", "verdict": 0}, "required": ["reason", "verdict"], "title": "Verification", "type": "object"}. Got: 2 validation errors for Verification
+reason
+  Field required [type=missing, input_value={'properties': {'reason':...tion', 'type': 'object'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+verdict
+  Field required [type=missing, input_value={'properties': {'reason':...tion', 'type': 'object'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+For troubleshooting, visit: https://python.langchain.com/docs/troubleshooting/errors/OUTPUT_PARSING_FAILURE )
+Evaluating:  88%|████████▊ | 37/42 [02:46<00:34,  6.85s/it]INFO  Using Bedrock Converse API to generate response
+Evaluating:  90%|█████████ | 38/42 [02:48<00:21,  5.47s/it]INFO  Using Bedrock Converse API to generate response
+Evaluating:  93%|█████████▎| 39/42 [02:54<00:16,  5.56s/it]ERROR  Exception raised in Job[12]: TimeoutError()
+Evaluating:  95%|█████████▌| 40/42 [03:00<00:11,  5.56s/it]ERROR  Exception raised in Job[22]: TimeoutError()
+Evaluating:  98%|█████████▊| 41/42 [03:02<00:04,  4.74s/it]ERROR  Exception raised in Job[28]: TimeoutError()
+Evaluating: 100%|██████████| 42/42 [03:21<00:00,  8.94s/it]
+Evaluating: 100%|██████████| 42/42 [03:21<00:00,  4.80s/it]
+INFO  ────────────────────────────────────────
+INFO  Resultados RAGAS:
+INFO    ✗ faithfulness              0.7272  (umbral: 0.80)
+INFO    ✓ context_precision         0.8500  (umbral: 0.70)
+INFO    ✗ context_recall            0.5042  (umbral: 0.70)
+INFO  ────────────────────────────────────────

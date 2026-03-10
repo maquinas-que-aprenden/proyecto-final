@@ -110,7 +110,7 @@ terraform destroy
 Para desplegar o destruir hay que tener permisos para crear los recursos en AWS, requiere un key pair de EC2.
 
 ### Ansible
-* Estamos usando [Ansible](https://docs.ansible.com/) para configurar los dos servidores que tenemos: normabot y mlflow.
+* Estamos usando [Ansible](https://docs.ansible.com/) para configurar los tres servidores que tenemos: normabot (GPU), la t3.large de desarrollo (detenida) y mlflow.
 * Estos son los ficheros actuales:
 ```
 .
@@ -132,7 +132,11 @@ Para desplegar o destruir hay que tener permisos para crear los recursos en AWS,
 [normabot]
 <IP> ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/aws.pem
 
+[normabot_gpu]
+<IP> ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/aws.pem
+
 ```
+**Nota**: los playbooks `normabot_ebs.yaml` y `normabot_data.yaml` tienen `hosts: normabot`. Para ejecutarlos contra el servidor GPU hay que añadir su IP al grupo `[normabot]` (o al grupo `[normabot_gpu]` y cambiar el `hosts:` del playbook).
 
 #### Cómo ejecutar
 Existe un orden para ejecutarlos.
@@ -189,20 +193,19 @@ La app estará disponible en `http://<ip-normabot>:8080`.
 ### Langfuse Cloud
 Tenemos una cuenta común para [Langfuse Cloud](https://cloud.langfuse.com/) y una API key para mandar trazas que se puede consultar en la web.
 
-Usamos Langfuse SDK v3 (`langfuse>=3.0.0,<4.0.0`) con dos mecanismos de instrumentación:
-* **`@observe` (decoradores de función)**: captura llamadas individuales a las funciones del pipeline (retrieve, grade, generate, predict_risk, generate_report, search, search_tool y las 3 herramientas del orquestador) con sus inputs, outputs y metadatos específicos de cada paso.
-* **CallbackHandler de LangChain**: captura el ciclo completo del agente ReAct, incluyendo el razonamiento y la selección de herramientas.
+Usamos Langfuse SDK v2 (`langfuse>=2.7.3,<3.0.0`) con `@observe` como mecanismo principal de instrumentación:
+* **`@observe` (decoradores de función)**: captura llamadas individuales a las funciones del pipeline (retrieve, grade, predict_risk, search y las herramientas search_legal_docs y classify_risk del orquestador) con sus inputs, outputs y metadatos específicos de cada paso.
+* **CallbackHandler de LangChain**: instanciado en `src/observability/main.py` e inyectado en el agente ReAct. **Limitación conocida**: `langfuse.callback` v2 requiere `langchain.callbacks.base`, eliminado en langchain 0.3, por lo que la traza raíz del agente no llega a Langfuse. Las trazas individuales de cada herramienta sí funcionan vía `@observe`.
 
 #### Qué se puede ver en Langfuse
 Para cada petición al sistema:
-* Traza del agente ReAct: qué herramienta seleccionó el agente y por qué.
 * Span `rag.retrieve`: cuántos documentos recuperó ChromaDB y con qué distancias de similitud.
 * Span `rag.grade`: cuántos documentos superaron el filtro de relevancia, y si Ollama estuvo disponible o se usó el fallback por score (se distingue con `level=WARNING`).
-* Span `rag.generate`: si la respuesta está fundamentada en documentos reales (`grounded: true`) o es un fallback por concatenación.
 * Span `classifier.predict_risk`: nivel de riesgo predicho, confianza, y distribución de probabilidades por clase.
-* Span `report.generate`: si el informe lo generó Bedrock o el template estático, con la longitud del texto producido.
-* Los spans con `level=ERROR` (ChromaDB caído) o `level=WARNING` (Ollama o Bedrock en fallback) se distinguen visualmente para detectar degradaciones rápidamente.
-* Feedback de usuario (👍/👎) registrado como score en cada traza desde la UI.
+* Span `retriever.search`: distancias min/max, número de resultados, fuentes únicas y si el contexto fue truncado.
+* Spans `tool.search_legal_docs` y `tool.classify_risk`: inputs y outputs de las herramientas del agente.
+* Los spans con `level=ERROR` (ChromaDB caído) o `level=WARNING` (Ollama en fallback) se distinguen visualmente para detectar degradaciones rápidamente.
+* **Feedback de usuario (👍/👎): no disponible** — dependía del `trace_id` del CallbackHandler raíz, que no está accesible por la incompatibilidad descrita arriba.
 
 #### Tests
 En pytest, Langfuse se desactiva automáticamente mediante `LANGFUSE_ENABLED=false` en `tests/conftest.py`. No es necesario configurar credenciales para ejecutar los tests localmente ni en CI.
@@ -219,9 +222,9 @@ Lo que hace: se conecta por SSH al servidor EC2, hace `git pull` para tener los 
 2. Obtiene respuestas reales del agente para cada pregunta y captura los contextos devueltos por el retriever.
 3. Calcula las métricas RAGAS. Los umbrales actuales son:
    - `faithfulness` ≥ 0.80
-   - `answer_relevancy` ≥ 0.85
    - `context_precision` ≥ 0.70
    - `context_recall` ≥ 0.70
+   - `answer_relevancy` excluida: Nova Lite no sigue el prompt de RAGAS para esta métrica (devuelve JSON sin el campo `question`), lo que produce NaN sistemáticamente.
 4. Registra los resultados en MLflow (experimento `ragas_eval`) y anota scores en Langfuse.
 5. Si alguna métrica no supera el umbral, sale con código 1 (en local solo avisa, no bloquea).
 
@@ -317,11 +320,14 @@ pytest tests/ -v
 pytest tests/ -v -s
 ```
 
-Hay cinco suites de smoke tests (115 tests en total):
+Hay seis suites de smoke tests (133 tests en total):
 - `test_classifier.py` — 35 tests: estructura de `predict_risk()`, robustez, explicabilidad SHAP, validación de entrada, coherencia de campos tras el override del Anexo III (`TestAnnex3Override`).
 - `test_checklist.py` — 27 tests: obligaciones por nivel de riesgo, recomendaciones SHAP, construcción del checklist de cumplimiento y detección de casos borderline.
+- `test_constants.py` — 14 tests: integridad de `src/classifier/_constants.py` — claves y tipos de `RISK_LABELS`, `KEYWORDS_DOMINIO`, `LEAKAGE_COLUMNS` y `STOPWORDS_ES`. Evita regresiones silenciosas al editar las constantes compartidas.
 - `test_memory.py` — 5 tests: hook `pre_model_hook` de truncación del historial de conversación para no exceder la ventana de contexto del LLM.
-- `test_orchestrator.py` — 34 tests: SYSTEM_PROMPT con requisitos legales (incluida instrucción anti-doble-clasificación), nombres y descripciones de las 3 tools, validación de entrada, comportamiento de `classify_risk`, `search_legal_docs` y `generate_report`, ausencia de doble llamada al clasificador (`TestNoDobleClasificacion`), side-channel de metadatos, contrato de `run()`, y memoria conversacional.
+- `test_orchestrator.py` — 38 tests: SYSTEM_PROMPT con requisitos legales (incluida instrucción anti-doble-clasificación), nombres y descripciones de las 4 tools, validación de entrada, comportamiento de `classify_risk`, `search_legal_docs` y `generate_report`, ausencia de doble llamada al clasificador (`TestNoDobleClasificacion`), side-channel de metadatos, contrato de `run()`, y memoria conversacional.
 - `test_retrain.py` — 14 tests: limpieza de texto, carga de JSONL, features manuales e integración de `main()` con `monkeypatch` de rutas y stub `_FakeXGB` (sin entrenamiento real).
+
+La rama `fine-tuning` (no mergeada en `main`) incluye adicionalmente `test_finetuning.py` — 45 tests sobre `src/finetuning/functions.py` y `src/finetuning/grader.py`: constantes, carga y split del dataset de grading, construcción de mensajes de entrenamiento, parseo de respuestas del grader QLoRA, disponibilidad del adaptador y manejo de errores de carga del modelo.
 
 Los tests de orchestrator y RAG mockean `langchain_aws` (Bedrock), `langchain_core` y `langchain_ollama` (Ollama) a nivel de módulo para no depender de servicios externos. Langfuse se desactiva automáticamente durante la ejecución de pytest.
