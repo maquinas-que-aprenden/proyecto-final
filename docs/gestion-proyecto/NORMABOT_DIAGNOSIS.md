@@ -14,7 +14,7 @@ Fecha: 2026-03-09 (rama: `develop`, commit: `2148da95`)
 | **Servicio Clasificador** | `src/classifier/main.py` (512 líneas) | **FUNCIONAL** | Expone `predict_risk(text) → dict`. Lazy loading thread-safe. Fallback a regex si spaCy no disponible. |
 | **ChromaDB Retriever** | `src/retrieval/retriever.py` (184 líneas) | **FUNCIONAL** | PersistentClient lazy init. Tres modos búsqueda: search_base(), search_soft(), search(). Langfuse integrado. |
 | **RAG Pipeline** | `src/rag/main.py` (175 líneas) | **FUNCIONAL** | retrieve() → ChromaDB real. grade() → Ollama Qwen 2.5 3B con fallback score. format_context() para orquestador. SIN generate() — refactorizado. |
-| **Orquestador ReAct** | `src/orchestrator/main.py` (486 líneas) | **FUNCIONAL** | Agent con `create_react_agent()` + Bedrock Nova Lite v1. Dos @tools: search_legal_docs + classify_risk. Memoria conversacional (SQLite/MemorySaver) + preferencias usuario. |
+| **Orquestador ReAct** | `src/orchestrator/main.py` (486 líneas) | **FUNCIONAL** | Agent con `create_react_agent()` + Bedrock Nova Lite v1. Cuatro @tools: search_legal_docs, classify_risk, save_user_preference, get_user_preferences. Memoria conversacional (SQLite/MemorySaver) + preferencias usuario. |
 | **Checklist Cumplimiento** | `src/checklist/main.py` (469 líneas) | **NUEVO - FUNCIONAL** | Módulo determinista (sin LLM) con obligaciones EU AI Act por nivel, SHAP→recomendaciones Anexo III, detección borderline. Fusión de lógica anterior de report_generate. |
 | **Observabilidad** | `src/observability/main.py` (33 líneas) | **FUNCIONAL** | `get_langfuse_handler()` con graceful degradation si keys no disponibles. |
 | **Memory Hooks** | `src/memory/hooks.py` (41 líneas) | **FUNCIONAL** | Pre-model hook para recortar historial antes de LLM (evita exceder context window). |
@@ -40,7 +40,7 @@ Fecha: 2026-03-09 (rama: `develop`, commit: `2148da95`)
 - Eliminar `src/report/main.py` (158 líneas) → REMOVIDO
 - Crear `src/checklist/main.py` (469 líneas) → NUEVO, completamente determinista
 - Enriquecer `classify_risk()` para devolver checklist directamente
-- Orquestador pasa de 3 tools → 2 tools (search_legal_docs + classify_risk)
+- Orquestador pasa de 3 tools → 4 tools (search_legal_docs, classify_risk, save_user_preference, get_user_preferences)
 
 **Cambios en archivos**:
 - `src/orchestrator/main.py`: 277 → 486 líneas (+209 líneas, nueva lógica de memory + metadata side-channel)
@@ -133,8 +133,7 @@ pytest tests/ --collect-only -q
 - `test_constants.py`: 4 tests (constantes de clasificador)
 - `test_retrain.py`: ERROR — pandas dependency
 
-**Nota importante**: Los errores de importación son esperados en contexto ML-only (venv_proyecto sin pandas).
-En ambiente de producción (con `requirements/ml.txt`), todos corren.
+**Nota**: Para ejecutar la suite completa, instalar `requirements/ml.txt`. Sin estas dependencias, test_classifier.py y test_retrain.py no se recolectan. Para ejecutar solo tests deterministas: `pytest tests/test_checklist.py tests/test_orchestrator.py tests/test_memory.py tests/test_constants.py -v`.
 
 ### Tests Smoke vs. Unit
 
@@ -212,7 +211,7 @@ _tool_metadata: contextvars.ContextVar[dict | None]
 ```
 
 **Beneficio**: 
-- Citas 100% acertadas (no regeneradas por LLM)
+- Citas tomadas directamente de ChromaDB (no regeneradas por LLM)
 - Clasificación no sufre alucinaciones
 - UI puede renderizar metadata verificada sin confiar en parsing
 
@@ -308,7 +307,7 @@ classify_risk() [Bedrock LLM decide qué tool usar]
 - **100% Funcional** — Todos los módulos críticos operativos
 - **Optimizado** — Refactor eliminó redundancia (double LLM calls)
 - **Robusto** — Graceful degradation de dependencies opcionales
-- **Testeable** — 46 tests funcionales (limitado por env deps, no por código)
+- **Testeable** — 53+ tests deterministas ejecutables, ~73+ total con dependencias ML completas
 - **Listo para presentación** — 2026-03-12 (3 días)
 
 **Cambios principales**:

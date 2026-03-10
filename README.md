@@ -12,7 +12,7 @@ NormaBot es un sistema inteligente que consulta normativa española y europea so
 
 El sistema sigue una arquitectura **Agentic RAG** con un agente ReAct (LangGraph) como orquestador central:
 
-1. **Pipeline de datos**: Fuentes legales (BOE, EU AI Act, RGPD) → chunking estructurado → embeddings multilingües → ChromaDB
+1. **Pipeline de datos**: Fuentes legales (BOE, EU AI Act) → chunking estructurado → embeddings multilingües → ChromaDB
 2. **Agente ReAct** (Amazon Bedrock Nova Lite): decide qué herramienta invocar según la consulta del usuario
 3. **Herramientas**:
    - `search_legal_docs` — RAG correctivo: recupera documentos de ChromaDB y los evalúa con un LLM local
@@ -63,7 +63,10 @@ pip install -r requirements/app.txt -r requirements/data.txt
 dvc pull
 
 # Iniciar Ollama (necesario para grading)
+# macOS:
 brew install ollama && ollama pull qwen2.5:3b && brew services start ollama
+# Linux: curl -fsSL https://ollama.com/install.sh | sh && ollama pull qwen2.5:3b && ollama serve &
+# En Docker, Ollama se instala automáticamente (ver Dockerfile)
 
 # Configurar variables de entorno
 cp .env.example .env  # editar con credenciales AWS
@@ -98,7 +101,7 @@ docker compose up
 │   ├── raw/                    # Corpus legal (DVC)
 │   └── processed/              # Chunks, vectorstore, memoria (DVC)
 ├── eval/                       # RAGAS: run_ragas.py + dataset.json
-├── tests/                      # 46 tests (pytest)
+├── tests/                      # 53+ tests (pytest)
 ├── infra/
 │   ├── terraform/              # IaC: VPC, EC2, S3, IAM
 │   └── ansible/                # Playbooks: deploy, nginx, MLflow
@@ -117,7 +120,7 @@ docker compose up
 | Clasificador | Dataset | ~300 ejemplos (real + sintético fusionado) |
 | RAG (RAGAS) | Faithfulness | ≥ 0.80 (umbral) |
 | RAG (RAGAS) | Context precision | ≥ 0.70 (umbral) |
-| Tests | Automatizados | 46 (checklist, orchestrator, classifier, memory) |
+| Tests | Automatizados | 53+ deterministas, ~73+ total con ML deps |
 | CI/CD | Workflows | 5 (lint, build, deploy, eval, manual) |
 
 ---
@@ -139,7 +142,7 @@ docker compose up
 - **Dataset pequeño** (~300 ejemplos) — Mitigado con `class_weight='balanced'`, StratifiedKFold y override determinista. Documentado como limitación inherente al dominio legal especializado.
 - **Context recall RAGAS** — Por debajo del umbral (0.44-0.52 vs 0.70 objetivo). El grader puede ser demasiado restrictivo; mejora futura: ajustar threshold o ampliar dataset de evaluación.
 - **Dependencia de Ollama** — El grading local requiere Ollama corriendo. En caso de fallo, el sistema continúa con fallback por score semántico (sin grading LLM).
-- **Corpus centrado en IA** — Actualmente cubre EU AI Act y BOE. La extensión a RGPD/LOPDGDD y sector financiero queda como mejora futura.
+- **Corpus centrado en IA** — Actualmente cubre EU AI Act, BOE y normativa AESIA. La extensión a RGPD/LOPDGDD y sector financiero queda como mejora futura.
 
 ---
 

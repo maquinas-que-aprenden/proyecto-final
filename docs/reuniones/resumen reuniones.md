@@ -1,4 +1,4 @@
-﻿**Transcripción depurada (reunión equipo — Proyecto Final Bootcamp)**
+**Transcripción depurada (reunión equipo — Proyecto Final Bootcamp)**
 
 Participantes (según contexto de la conversación): Persona A, Persona D, Persona B, Persona C.
 
@@ -559,5 +559,5 @@ Se empieza a organizar la defensa final.
 El equipo acepta que el sistema no está completamente optimizado, pero decide enfocarse en explicar correctamente el aprendizaje técnico, la arquitectura y los problemas encontrados, en lugar de intentar forzar un resultado perfecto a última hora.
 
 
-[ref1]: data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAjcAAAAICAYAAAAFm97/AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAOxAAADsQBlSsOGwAAADJJREFUeJztzjERAAAIBCDtH/HDaArPBRJQBQAAAAAAAOc6yXwnAAAAAAAAAAAAAIAfC1PtA5IGL5gkAAAAAElFTkSuQmCC
-[ref2]: data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAjcAAAAICAYAAAAFm97/AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAOxAAADsQBlSsOGwAAADJJREFUeJztzjERAAAIBCDtX+U7agrPBRJQBQAAAAAAAOc6yXwnAAAAAAAAAAAAAIAfC+rzAwUxxmqQAAAAAElFTkSuQmCC
+[ref1]: #
+[ref2]: #

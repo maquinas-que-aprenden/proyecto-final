@@ -113,7 +113,7 @@ pip install -r requirements/classifier.txt # Classifier-specific dependencies
 | `test_retrain.py` | ~10 | Incremental retraining pipeline |
 | `conftest.py` | — | Shared fixtures |
 
-Note: `test_classifier.py` and `test_retrain.py` require `requirements/ml.txt` (pandas, spaCy). In environments without ML deps, these show import errors — expected behavior.
+To run the full test suite (including ML tests), install ML dependencies first: `pip install -r requirements/ml.txt`. Without these, `test_classifier.py` and `test_retrain.py` will fail with import errors. To run only deterministic tests: `pytest tests/test_checklist.py tests/test_orchestrator.py tests/test_memory.py tests/test_constants.py -v`.
 
 ## Conventions
 

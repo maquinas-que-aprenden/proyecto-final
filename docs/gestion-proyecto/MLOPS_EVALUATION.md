@@ -3,7 +3,7 @@
 **Fecha**: 2026-03-09  
 **Rama**: develop  
 **Commit**: 2148da95  
-**Evaluador**: Claude Code (auditor técnico)
+**Evaluador**: Claude Code (asistente de auditoría, resultados validados por el equipo)
 
 ---
 
@@ -32,7 +32,7 @@
 - **Lógica**: Detecta archivos `.py` / `.ipynb` cambiados, ejecuta `ruff check` solo en cambios
 - **Líneas**: 32 líneas, lightweight
 - **Status**: ✓ FUNCIONAL
-- **Evidencia**: `/Users/maru/developement/proyecto-final/.github/workflows/pr_lint.yml` (líneas 1-32)
+- **Evidencia**: `.github/workflows/pr_lint.yml` (líneas 1-32)
 
 ```yaml
 # Ejemplo de ejecución
@@ -266,7 +266,7 @@ os.environ.setdefault("LANGFUSE_ENABLED", "false")  # No envía trazas en tests
 
 ### Integración en Classifier
 
-**Archivo**: `/Users/maru/developement/proyecto-final/src/classifier/functions.py`
+**Archivo**: `src/classifier/functions.py`
 
 **Funciones**:
 
@@ -395,7 +395,7 @@ except (ValueError, OSError) as e:
 
 ### Dockerfile
 
-**Ubicación**: `/Users/maru/developement/proyecto-final/Dockerfile` (39 líneas)
+**Ubicación**: `Dockerfile` (39 líneas)
 
 **Etapas**:
 
@@ -487,7 +487,7 @@ ENTRYPOINT ["/ollama-entrypoint.sh"]
 
 ### docker-compose.yml
 
-**Ubicación**: `/Users/maru/developement/proyecto-final/docker-compose.yml` (18 líneas)
+**Ubicación**: `docker-compose.yml` (18 líneas)
 
 ```yaml
 services:
@@ -520,7 +520,7 @@ volumes:
 
 ### Entrypoint Script
 
-**Ubicación**: `/Users/maru/developement/proyecto-final/infra/ollama-entrypoint.sh`
+**Ubicación**: `infra/ollama-entrypoint.sh`
 
 **Función**: Inicia Ollama en background + Streamlit en foreground
 

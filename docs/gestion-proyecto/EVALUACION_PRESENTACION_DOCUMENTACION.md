@@ -28,8 +28,8 @@
 ### Estado: OK
 
 **Evidencia:**
-- `/Users/maru/developement/proyecto-final/README.md` — 1060 bytes
-- `/Users/maru/developement/proyecto-final/CLAUDE.md` — 300+ líneas de guía arquitectónica
+- `README.md` — 1060 bytes
+- `CLAUDE.md` — 300+ líneas de guía arquitectónica
 - 16 documentos MD en `docs/` cubriendo todos los subsistemas
 
 **Desglose de documentación:**

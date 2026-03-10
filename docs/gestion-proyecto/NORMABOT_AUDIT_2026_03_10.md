@@ -4,6 +4,7 @@
 **Fecha**: 2026-03-10, 15:30 CET  
 **Rama**: docs/final-update (diverge de main por README updates)  
 **Comparación**: vs. NORMABOT_DIAGNOSIS.md (2026-03-09)
+**Nota**: Este documento es una auditoría puntual. Para el estado operativo actual, ver NORMABOT_DIAGNOSIS.md y NORMABOT_PROGRESS.md.
 
 ---
 
@@ -42,7 +43,7 @@ El codebase es **100% operativo** para presentación (2026-03-12, 2 días).
 **Respuesta**: **NO**
 
 ```bash
-grep -r "evidently" /Users/maru/developement/proyecto-final --include="*.py"
+grep -r "evidently" . --include="*.py"
 # No matches
 ```
 
@@ -57,7 +58,7 @@ No hay evaluación de data drift, model monitoring, ni feature tracking con Evid
 **Respuesta**: **NO**
 
 ```bash
-grep -r "deepeval" /Users/maru/developement/proyecto-final --include="*.py"
+grep -r "deepeval" . --include="*.py"
 # No matches
 ```
 
@@ -358,9 +359,10 @@ grep -r "_get_nlp_ner\|\.ents\|ent\.label_" src/
 
 **Conclusión**: **CERO CAMBIOS de código**
 
-La rama actual (`docs/final-update`) solo actualiza:
-- `README.md` — Documentación
-- Posiblemente este archivo de auditoría
+La rama actual (`docs/final-update`) actualiza documentación del proyecto:
+- `README.md` — Documentación principal
+- Documentos de evaluación en `docs/gestion-proyecto/`
+- Plan de contenido de presentación
 
 No hay cambios en funcionalidad, arquitectura, o estado de componentes.
 
@@ -418,7 +420,7 @@ Tests:
 ├── tests/test_classifier.py    ~10 tests (import error, esperado)
 └── tests/test_retrain.py       ~10 tests (import error, esperado)
 ────────────────────────────────────
-TOTAL RECOLECTADOS: 46 tests (sin errores import)
+TOTAL RECOLECTADOS: 53 tests deterministas (sin deps ML), ~73+ total con requirements/ml.txt
 ```
 
 ---
@@ -433,7 +435,7 @@ TOTAL RECOLECTADOS: 46 tests (sin errores import)
 | **NER Unused** | `_get_nlp_ner()` definida pero no usada | Potencial para mejorar extraction; no crítico | LOW |
 | **Classifier Dataset** | Pequeño (200-300 ejemplos) | class_weight='balanced', documentado como limitación | MEDIUM |
 | **Langfuse Optional** | Hard dependency → soft dependency | Graceful degradation implementada | RESOLVED |
-| **Tests Coverage** | 46 tests, no unit tests de imports | Smoke tests + integration suficientes para pre-demo | MEDIUM |
+| **Tests Coverage** | 53 tests deterministas, no unit tests de imports | Smoke tests + integration suficientes para pre-demo | MEDIUM |
 
 ---
 

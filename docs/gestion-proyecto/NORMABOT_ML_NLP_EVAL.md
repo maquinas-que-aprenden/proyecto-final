@@ -277,7 +277,7 @@ n_manual = 2 + len(_KEYWORDS_DOMINIO) + 1
 | 7. Incremental retraining | **OK** | Anexo III augmentation, F1-macro promotion (delta=0.005), metadata persistence |
 | 8. Feature engineering | **OK** | `_constants.py` fuente única, keywords EU AI Act, auto-update |
 
-**Calificación**: **EXCELENTE para bootcamp de IA**
+**Calificación**: Cumple todos los criterios evaluados de ML/NLP del bootcamp.
 
 ---
 
@@ -298,7 +298,7 @@ n_manual = 2 + len(_KEYWORDS_DOMINIO) + 1
 
 ---
 
-**Conclusión**: El proyecto cumple criterios de excelencia ML/NLP. Listo para presentación 2026-03-12.
+**Conclusión**: El pipeline ML/NLP cumple los criterios del bootcamp. Las limitaciones documentadas (dataset pequeño, RAGAS pendiente de validación final) son conocidas y mitigadas. Ver NORMABOT_PROGRESS.md para el estado operativo.
 
 **Auditado por**: Claude Code  
 **Fecha**: 2026-03-09  

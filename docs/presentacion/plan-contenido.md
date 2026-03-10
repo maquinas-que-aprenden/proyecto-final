@@ -106,16 +106,16 @@ Explicar el flujo de izquierda a derecha:
 
 | Métrica | Valor | Umbral |
 |---------|-------|--------|
-| Faithfulness | pendiente resultado final | ≥ 0.80 |
-| Context precision | pendiente | ≥ 0.70 |
-| Context recall | 0.44-0.52 | ≥ 0.70 (no alcanzado) |
+| Faithfulness | No evaluable (rate limits Bedrock) | ≥ 0.80 |
+| Context precision | 0.86-1.0 (2 runs) | ≥ 0.70 ✓ |
+| Context recall | 0.44-0.52 | ≥ 0.70 (no alcanzado — grader restrictivo) |
 
 - Ser honestos: context recall bajo → el grader es restrictivo → mejora futura clara
 - Esto demuestra madurez: "medimos, identificamos el problema, sabemos cómo mejorarlo"
 
 ### Testing
 
-- 46 tests automatizados (23 checklist + 24 orchestrator + memory + constants)
+- 53+ tests automatizados (23 checklist + 24 orchestrator + 4 constants + 2 memory), ~73+ total con deps ML
 - CI/CD: 5 workflows GitHub Actions (lint → test → build → deploy → eval)
 
 ---
@@ -126,13 +126,13 @@ Explicar el flujo de izquierda a derecha:
 
 | Recurso | Coste | Notas |
 |---------|-------|-------|
-| EC2 (t2.micro/small) | ~$10-15/mes | Free tier + IP elástica |
+| EC2 (t3.medium) | ~$30/mes | App Streamlit + Ollama |
 | Bedrock Nova Lite | ~$0.001/query | Pay per use, muy bajo |
 | Ollama (local) | $0 | Grading sin coste API |
 | S3 (DVC) | ~$1/mes | Almacenamiento de datos |
 | MLflow server | compartido con EC2 | — |
 | Langfuse cloud | free tier | — |
-| **Total** | **~$15-20/mes** | — |
+| **Total** | **~$40-45/mes** | — |
 
 ### Decisiones de ahorro
 

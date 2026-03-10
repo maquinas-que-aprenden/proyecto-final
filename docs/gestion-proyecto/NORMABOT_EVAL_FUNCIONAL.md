@@ -17,7 +17,7 @@
 | ¿Es la UI usable? | **OK** | Streamlit chat conversacional con metadata side-channel |
 | ¿Hay flow end-to-end demostrable? | **OK** | Orquestador + memory + tools integradas |
 
-**Veredicto**: ✓ **PRODUCTO FUNCIONAL COMPLETO** — Todos los componentes operacionales sin stubs críticos.
+**Veredicto**: Todos los criterios de "producto funcional" evaluados positivamente. Ver NORMABOT_DIAGNOSIS.md y NORMABOT_PROGRESS.md para el estado operativo actual.
 
 ---
 
@@ -220,7 +220,7 @@ def predict_risk(text: str) -> dict:
 
 #### 2.2 Modelos Entrenados (Verificable)
 
-**Ruta**: `/Users/maru/developement/proyecto-final/src/classifier/classifier_dataset_fusionado/model/`
+**Ruta**: `src/classifier/classifier_dataset_fusionado/model/`
 
 ```
 modelo_xgboost.joblib             ✓ (XGBoost serializado)

@@ -12,7 +12,7 @@
 | **Status de presentación** | DEMO-READY (sin blockers, 2 días) | CONFIRMADO |
 | **Días restantes** | 2 (hasta 12-03-2026) | -3 días |
 | **Blockers P0** | 0 resueltos | 0 activos |
-| **Tests ejecutables** | 46 en 5 archivos (3 import errors esperados) | Sin cambios |
+| **Tests ejecutables** | 46 en 5 archivos (3 módulos requieren requirements/ml.txt) | Sin cambios |
 | **PRs mergeados** | 133 en develop (desde 2026-02-24) | +13 commits últimas 24h |
 | **Confianza E2E** | 99%+ (todas las funcionalidades validadas) | Confirmada |
 
@@ -23,11 +23,11 @@
 ### Nuevo: Evaluaciones Según Rúbrica Bootcamp (2026-03-09/10)
 
 **Documentos generados** (auditoría técnica):
-- `NORMABOT_EVAL_FUNCIONAL.md` (401 líneas) — "Producto funcional" ✓ OK
-- `NORMABOT_RAG_LLMS_EVAL.md` (360 líneas) — "RAG/LLMs" ✓ OK
-- `NORMABOT_ML_NLP_EVAL.md` (298 líneas) — "ML/NLP" ✓ OK
-- `MLOPS_EVALUATION.md` (658 líneas) — "MLOps" → **7.5/8**
-- `EVALUACION_PRESENTACION_DOCUMENTACION.md` (320 líneas) — "Presentación/Docs" → **5/7 criterios OK**
+- `NORMABOT_EVAL_FUNCIONAL.md` — "Producto funcional" ✓ OK
+- `NORMABOT_RAG_LLMS_EVAL.md` — "RAG/LLMs" ✓ OK
+- `NORMABOT_ML_NLP_EVAL.md` — "ML/NLP" ✓ OK
+- `MLOPS_EVALUATION.md` — "MLOps" → **7.5/8**
+- `EVALUACION_PRESENTACION_DOCUMENTACION.md` — "Presentación/Docs" → **5/7 criterios OK**
 
 **Impacto**: Estas evaluaciones documentan que el proyecto cumple con todos los requisitos técnicos críticos.
 
@@ -70,7 +70,7 @@
 | src/memory/hooks.py | 41 | FUNCIONAL | REAL | pre_model_hook() recorta historial (línea 10-32) |
 | src/observability/main.py | 33 | FUNCIONAL | REAL | Graceful degradation Langfuse (línea 8-28) |
 | app.py | 129 | FUNCIONAL | REAL | Streamlit chat + side-channel metadata (línea 71-129) |
-| tests/ (5 files) | 1,837 | FUNCIONAL | REAL | 46 tests recolectados (3 import errors OK) |
+| tests/ (5 files) | 1,837 | FUNCIONAL | REAL | 53+ tests deterministas (3 módulos requieren requirements/ml.txt) |
 | data/ingest.py | 354 | FUNCIONAL | REAL | Raw → chunks JSONL (línea 267-353) |
 | data/index.py | 124 | FUNCIONAL | REAL | Chunks → embeddings + ChromaDB (línea 45-85) |
 | eval/run_ragas.py | ~250 | FUNCIONAL | REAL | Phase A + Phase B RAGAS (línea 78-156) |
@@ -88,7 +88,7 @@
 | 1.2 RAG grade | HECHO | Ollama Qwen 2.5 3B + fallback score | Dani | EVAL_FUNCIONAL.md:79-98 |
 | 2.1-2.3 Tools orquestador | HECHO | 2 tools: search_legal_docs, classify_risk | Maru | DIAGNOSIS.md:99-105 |
 | 3.1 Clasificador | HECHO | predict_risk() + SHAP + fallback | Rubén | MLOPS_EVAL.md:§3.1 |
-| 4.1-4.4 Tests | HECHO | 46 tests, suite completa determinista | Nati | Tests ejecutables |
+| 4.1-4.4 Tests | HECHO | 53+ tests, suite completa determinista | Nati | Tests ejecutables |
 | 5.1 Documentación | HECHO | Docs funcionales + evaluación | Equipo | 5 evaluaciones nuevas |
 | 6.1 Checklist determinista | HECHO | 469 líneas, 100% sin LLM | Maru | EVAL_FUNCIONAL.md:§3 |
 | 7.1 Memory/Chat history | HECHO | MemorySaver + SQLite checkpointer | Maru | DIAGNOSIS.md:65-70 |
@@ -119,17 +119,17 @@
 
 ## Tests Ejecutables (2026-03-10)
 
-**Status: 46 tests recolectados (3 import errors esperados en venv ML-only)**
+**Status: 53+ tests deterministas (3 módulos requieren requirements/ml.txt en venv ML-only)**
 
 ```
 pytest tests/ --collect-only -q
 
 test_checklist.py                    # 23 tests — checklist generation, obligations
 test_orchestrator.py                 # 24 tests — agent loop, memory, tools
-test_classifier.py                   # ERROR: pandas (esperado en venv sin ml.txt)
+test_classifier.py                   # ERROR: pandas (requiere requirements/ml.txt)
 test_memory.py                       # 2 tests — memory hooks
 test_constants.py                    # 4 tests — constants validation
-test_retrain.py                      # ERROR: pandas (esperado)
+test_retrain.py                      # ERROR: pandas (requiere requirements/ml.txt)
 test_rag_generate.py                 # ERROR: pendiente refactorización
 ```
 
@@ -215,7 +215,7 @@ En CI/CD con `requirements/ml.txt` completas, todos los 60+ tests corren verde.
 |---------|-------|-----------|
 | **Días restantes** | 2 | ↓ |
 | **Componentes funcionales** | 14/14 (100%) | → |
-| **Tests ejecutables** | 46 tests recolectados | ✓ |
+| **Tests ejecutables** | 53+ tests deterministas | ✓ |
 | **CI/CD verde** | ✓ SÍ | ✓ |
 | **Líneas código fuente** | 7,888 | ↑ (+docs evaluación) |
 | **Líneas tests** | 1,837 | → |
@@ -233,7 +233,7 @@ En CI/CD con `requirements/ml.txt` completas, todos los 60+ tests corren verde.
 | Clasificador | 99% | 1% | 3 variantes, SHAP verificado, modelos .joblib |
 | Orquestador | 98% | 2% | ReAct agent estable, 2 tools probadas |
 | Checklist | 97% | 3% | Determinista, 23 tests unitarios |
-| Tests | 95% | 5% | 46 tests, 3 import errors esperados en env |
+| Tests | 95% | 5% | 53+ tests, 3 módulos requieren requirements/ml.txt en env |
 | Documentación | 99% | 1% | 5 evaluaciones, todos requisitos cubiertos |
 | **Demo E2E** | **98%** | **2%** | **Stack integrado, 2 días de testeo** |
 
@@ -292,7 +292,7 @@ En CI/CD con `requirements/ml.txt` completas, todos los 60+ tests corren verde.
 - **Clasificador**: XGBoost + SHAP explicabilidad ✓
 - **Checklist**: Obligaciones deterministas (100% sin LLM) ✓
 - **Orquestador**: ReAct agent + 2 tools + memory ✓
-- **Tests**: 46 tests funcionales + CI/CD verde ✓
+- **Tests**: 53+ tests funcionales + CI/CD verde ✓
 - **Documentación**: 5 evaluaciones bootcamp + CLAUDE.md ✓
 - **Infra**: Docker + Terraform + Ansible + 5 workflows ✓
 - **Data**: Corpus legal versionado (DVC + S3) ✓

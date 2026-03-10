@@ -3,6 +3,7 @@
 **Fecha**: 2026-03-09
 **Rama**: develop
 **Commit**: 2148da95
+**Nota**: Este documento evalúa la categoría RAG/LLMs. Para el estado operativo actual, ver NORMABOT_DIAGNOSIS.md y NORMABOT_PROGRESS.md.
 
 ---
 
@@ -12,7 +13,7 @@
 **Status**: ✓ FUNCIONAL
 
 **Evidence**:
-- `/Users/maru/developement/proyecto-final/src/retrieval/retriever.py:25-32`
+- `src/retrieval/retriever.py:25-32`
   - PersistentClient lazy initialization
   - Collection name: `normabot_legal_chunks`
   - Actual query to ChromaDB: `collection.query(query_embeddings=[...], n_results=k)`
@@ -33,12 +34,12 @@
 **Status**: ✓ FUNCIONAL
 
 **Evidence**:
-- `/Users/maru/developement/proyecto-final/data/ingest.py` (354 lines)
+- `data/ingest.py` (354 lines)
   - Reads HTML/PDF from `data/raw/` (4 sources: BOE, EU AI Act, AESIA, LOPD)
   - Chunks via regex patterns + RecursiveCharacterTextSplitter
   - Output: `data/processed/chunks_legal/chunks_final_all_sources.jsonl`
 
-- `/Users/maru/developement/proyecto-final/data/index.py` (124 lines)
+- `data/index.py` (124 lines)
   - Loads chunks from JSONL
   - Generates embeddings: `SentenceTransformer(MODEL_NAME).encode([...])`
   - Populates ChromaDB: `col.upsert(ids=..., documents=..., embeddings=..., metadatas=...)`
@@ -89,8 +90,8 @@ def retrieve(query: str, k: int = 9) -> list[dict]:
 
 **Evidence**:
 - Model: `intfloat/multilingual-e5-base` (384-dim, multilingual)
-- Used consistently in retriever: `/Users/maru/developement/proyecto-final/src/retrieval/retriever.py:14`
-- Used consistently in indexing: `/Users/maru/developement/proyecto-final/data/index.py:24`
+- Used consistently in retriever: `src/retrieval/retriever.py:14`
+- Used consistently in indexing: `data/index.py:24`
 
 **E5 Convention Applied**:
 - Query: `f"query: {text}"` (retriever.py:48)
@@ -100,7 +101,7 @@ def retrieve(query: str, k: int = 9) -> list[dict]:
 **Status**: ✓ FUNCIONAL
 
 **Configuration**:
-- Path: `/Users/maru/developement/proyecto-final/data/processed/vectorstore/chroma`
+- Path: `data/processed/vectorstore/chroma`
 - Client: `chromadb.PersistentClient(path=str(CHROMA_DIR))`
 - Collection: `normabot_legal_chunks`
 - Lazy initialization with thread-safe singleton (lock in retriever.py:22)
@@ -584,7 +585,7 @@ def check_thresholds(metrics: dict) -> list[str]:
 - **Why**: Prevents LLM hallucinating or reformulating legal citations
 - **Method**: ContextVar `_tool_metadata` transports citations outside LLM context
 - **Result**: UI renders verified citations from tool outputs, not from LLM parsing
-- **Benefit**: 100% citation accuracy (no hallucinations)
+- **Benefit**: Citations sourced directly from ChromaDB metadata, not reformulated by LLM (minimizes hallucination risk)
 
 ### 7.3 RAGAS Metrics
 - **Phase A (retriever)**: Evaluates **context precision** (retrieved docs are relevant) + **context_recall** (relevant docs are retrieved)
