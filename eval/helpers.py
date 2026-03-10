@@ -13,13 +13,19 @@ logger = logging.getLogger(__name__)
 DATASET_PATH = Path(__file__).parent / "dataset.json"
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI")
 MLFLOW_EXPERIMENT = "normabot-ragas-eval"
-THRESHOLDS = {
-    "faithfulness": 0.80,
-    # answer_relevancy excluida: Nova Lite no sigue el prompt de RAGAS
-    # (devuelve JSON incompleto sin el campo "question"), lo que produce NaN siempre.
+# Métricas del retriever (Phase A): sólo necesitan {question, contexts, ground_truth}.
+THRESHOLDS_RETRIEVER = {
     "context_precision": 0.70,
     "context_recall": 0.70,
 }
+# Métricas E2E (Phase B): necesitan la respuesta generada por el agente.
+THRESHOLDS_E2E = {
+    "faithfulness": 0.80,
+    # answer_relevancy excluida: Nova Lite no sigue el prompt de RAGAS
+    # (devuelve JSON incompleto sin el campo "question"), lo que produce NaN siempre.
+}
+# Umbrales combinados para check_thresholds() y logging.
+THRESHOLDS = {**THRESHOLDS_RETRIEVER, **THRESHOLDS_E2E}
 
 def load_dataset() -> list[dict]:
     """Carga eval/dataset.json."""
@@ -32,8 +38,64 @@ def load_dataset() -> list[dict]:
     logger.info("Dataset cargado: %d ejemplos", len(data))
     return data
 
-def get_agent_answers(dataset: list[dict]) -> list[dict]:
+def get_retriever_rows(dataset: list[dict]) -> list[dict]:
+    """Recupera y clasifica documentos para cada pregunta sin invocar al agente.
+
+    Produce las filas de Phase A: {question, contexts, ground_truth}.
+    No requiere credenciales de Bedrock.
+
+    Returns:
+        Lista de dicts con question, contexts, ground_truth.
+    """
+    try:
+        from src.rag.main import retrieve, grade
+    except ImportError as exc:
+        # Sin el módulo RAG no podemos evaluar el retriever en absoluto.
+        # Usar contextos estáticos del dataset contaminaría Context Precision/Recall
+        # con datos gold, invalidando Phase A por completo.
+        raise RuntimeError(
+            "Módulo src.rag.main no disponible. "
+            "Instala las dependencias de RAG antes de ejecutar la evaluación del retriever."
+        ) from exc
+
+    rows = []
+    for item in dataset:
+        question = item["question"]
+        try:
+            docs = retrieve(question)
+            relevant = grade(question, docs)
+            # Lista vacía si grade() no clasifica ningún doc como relevante:
+            # RAGAS puntuará precision=0 / recall=0, que refleja correctamente
+            # el resultado del retriever. No usar item["contexts"] como fallback
+            # porque contaminaría las métricas con datos gold.
+            contexts = [d["doc"] for d in relevant]
+        except Exception as exc:
+            # No usar contextos estáticos como fallback: contaminarían las métricas
+            # del retriever con datos gold y harían que Phase A fuera engañosa.
+            raise RuntimeError(
+                f"Error en retrieval para '{question[:80]}': {exc}"
+            ) from exc
+
+        rows.append({
+            "question": question,
+            "contexts": contexts,
+            "ground_truth": item["ground_truth"],
+        })
+
+    return rows
+
+
+def get_agent_answers(
+    dataset: list[dict],
+    retriever_rows: list[dict] | None = None,
+) -> list[dict]:
     """Invoca el agente para cada pregunta del dataset y recoge la respuesta.
+
+    Args:
+        dataset: Ejemplos de eval/dataset.json.
+        retriever_rows: Filas de Phase A con contextos ya recuperados. Si se
+            proporciona, se reutilizan esos contextos para que Faithfulness se
+            evalúe sobre los mismos documentos que Context Precision/Recall.
 
     Returns:
         Lista de dicts con question, answer, contexts, ground_truth.
@@ -54,6 +116,13 @@ def get_agent_answers(dataset: list[dict]) -> list[dict]:
         use_retriever = False
         logger.warning("Módulo src.rag.main no disponible — usando contextos estáticos del dataset")
 
+    # Indexar retriever_rows por pregunta para evitar alineación posicional frágil:
+    # la caché podría tener distinto orden o longitud si el dataset cambió.
+    retriever_index: dict[str, list[str]] = {}
+    if retriever_rows is not None:
+        for row in retriever_rows:
+            retriever_index[row["question"]] = row["contexts"]
+
     rows = []
     for item in dataset:
         question = item["question"]
@@ -70,17 +139,26 @@ def get_agent_answers(dataset: list[dict]) -> list[dict]:
             # Fallback mock: usamos ground_truth como answer para que RAGAS pueda correr
             answer = item.get("ground_truth", "")
 
-        # Obtener contextos reales del retriever para que RAGAS evalúe sobre
-        # lo que el pipeline realmente recuperó, no sobre fragmentos estáticos.
-        contexts = item["contexts"]  # fallback a los contextos estáticos del dataset
-        if use_retriever:
-            try:
-                docs = retrieve(question)
-                relevant = grade(question, docs)
-                if relevant:
-                    contexts = [d["doc"] for d in relevant]
-            except Exception:
-                logger.exception("Error en retrieval para '%s' — usando contextos estáticos", question[:50])
+        # Reutilizar contextos de Phase A (lookup por pregunta) para garantizar que
+        # Faithfulness se evalúa sobre los mismos documentos que Context Precision/Recall.
+        if question in retriever_index:
+            contexts = retriever_index[question]
+        else:
+            if retriever_rows is not None:
+                logger.warning(
+                    "Pregunta no encontrada en retriever_rows — regenerando contextos: '%s'",
+                    question[:50],
+                )
+            # Fallback: recuperar contextos en línea si no hay Phase A disponible.
+            contexts = item["contexts"]  # contextos estáticos del dataset
+            if use_retriever:
+                try:
+                    docs = retrieve(question)
+                    relevant = grade(question, docs)
+                    if relevant:
+                        contexts = [d["doc"] for d in relevant]
+                except Exception:
+                    logger.exception("Error en retrieval para '%s' — usando contextos estáticos", question[:50])
 
         rows.append({
             "question": question,
@@ -199,21 +277,77 @@ def get_ragas_embeddings():
 
     return LangchainEmbeddingsWrapper(_LocalEmbeddings())
 
-def run_ragas(ragas_dataset) -> dict:
+def run_ragas_retriever(ragas_dataset) -> dict:
+    """Evalúa las métricas del retriever (Phase A): Context Precision y Context Recall.
+
+    El dataset sólo necesita {question, contexts, ground_truth}; no se usa 'answer'.
+
+    Returns:
+        Dict con context_precision y context_recall (nanmean sobre todos los ejemplos).
+    """
     from ragas import evaluate
-    from ragas.metrics import Faithfulness, ContextPrecision, ContextRecall
+    from ragas.metrics import ContextPrecision, ContextRecall
 
     ragas_llm = get_ragas_llm()
 
-    logger.info("Calculando métricas RAGAS...")
+    logger.info("Phase A — calculando métricas del retriever (Context Precision, Context Recall)...")
 
-    # AnswerRelevancy excluida: Nova Lite no sigue el prompt few-shot de RAGAS
-    # y devuelve JSON sin el campo "question", produciendo NaN en todos los ejemplos.
+    # Nota: ContextRecall depende de la calidad del ground_truth. Si el ground_truth
+    # es incompleto o impreciso, el score puede ser engañoso aunque el retriever
+    # recupere documentos correctos. Revisar los ejemplos del dataset si ContextRecall
+    # da resultados inesperadamente bajos con un retriever aparentemente bueno.
     metrics = [
-        Faithfulness(llm=ragas_llm),
         ContextPrecision(llm=ragas_llm),
         ContextRecall(llm=ragas_llm),
     ]
+
+    column_map = {
+        "user_input": "question",
+        "retrieved_contexts": "contexts",
+        "reference": "ground_truth",
+        # "response" no incluido: ContextPrecision/ContextRecall no lo usan.
+    }
+
+    try:
+        results = evaluate(
+            dataset=ragas_dataset,
+            metrics=metrics,
+            column_map=column_map,
+        )
+    except Exception as e:
+        raise RuntimeError(f"Fallo crítico en Bedrock/Ragas (Phase A): {e}")
+
+    scores = {
+        "context_precision": round(float(np.nanmean(results["context_precision"])), 4),
+        "context_recall": round(float(np.nanmean(results["context_recall"])), 4),
+    }
+    nan_metrics = [k for k, v in scores.items() if np.isnan(v)]
+    if nan_metrics:
+        logger.warning("Métricas con NaN (Phase A): %s — se registran como NaN", nan_metrics)
+    return scores
+
+
+def run_ragas_e2e(ragas_dataset) -> dict:
+    """Evalúa las métricas E2E (Phase B): Faithfulness.
+
+    El dataset necesita {question, answer, contexts, ground_truth}.
+    Los contextos deben ser los mismos que se usaron en Phase A para que
+    Faithfulness y Context Precision/Recall sean comparables.
+
+    Returns:
+        Dict con faithfulness (nanmean sobre todos los ejemplos).
+    """
+    from ragas import evaluate
+    from ragas.metrics import Faithfulness
+
+    ragas_llm = get_ragas_llm()
+
+    logger.info("Phase B — calculando métricas E2E (Faithfulness)...")
+
+    # AnswerRelevancy excluida: Nova Lite no sigue el prompt de RAGAS para esta métrica,
+    # El output parser falla tras reintentos (fix_output_format), produciendo NaN en todos los ejemplos.
+    # No es parcheable con _fix_nova_json; requiere cambio de LLM.
+    metrics = [Faithfulness(llm=ragas_llm)]
 
     column_map = {
         "user_input": "question",
@@ -229,19 +363,16 @@ def run_ragas(ragas_dataset) -> dict:
             column_map=column_map,
         )
     except Exception as e:
-        raise RuntimeError(f"Fallo crítico en Bedrock/Ragas: {e}")
+        raise RuntimeError(f"Fallo crítico en Bedrock/Ragas (Phase B): {e}")
 
-    metrics = {
+    scores = {
         "faithfulness": round(float(np.nanmean(results["faithfulness"])), 4),
-        "context_precision": round(float(np.nanmean(results["context_precision"])), 4),
-        "context_recall": round(float(np.nanmean(results["context_recall"])), 4),
     }
-    nan_metrics = [k for k, v in metrics.items() if np.isnan(v)]
+    nan_metrics = [k for k, v in scores.items() if np.isnan(v)]
     if nan_metrics:
-        logger.warning("Métricas con NaN (jobs fallidos en RAGAS): %s — se registran como NaN", nan_metrics)
-    return metrics
+        logger.warning("Métricas con NaN (Phase B): %s — se registran como NaN", nan_metrics)
+    return scores
 
-# Cuando se apruebe PR#36 lo añado a observabilidad
 def log_to_mlflow(metrics: dict, n_examples: int, git_sha: str) -> None:
     """Loguea los resultados en MLflow (EC2)."""
     import mlflow
@@ -332,18 +463,31 @@ def log_to_langfuse(metrics: dict, n_examples: int, git_sha: str) -> None:
     logger.info("Scores RAGAS logueados en Langfuse (trace: %s)", trace.id)
 
 
-def save_answers_cache(rows: list[dict], git_sha: str) -> Path:
-    """Guarda las respuestas del agente en caché para evitar re-ejecutar."""
-    cache_path = Path(__file__).parent / f"answers_cache_{git_sha[:8]}.json"
+def save_answers_cache(rows: list[dict], git_sha: str, suffix: str = "") -> Path:
+    """Guarda filas en caché para evitar re-ejecutar el retriever o el agente.
+
+    Args:
+        suffix: Etiqueta que distingue la caché de Phase A ("retriever") de
+            la de Phase B ("e2e"). Deja vacío para compatibilidad con código
+            anterior que no usa el parámetro.
+    """
+    tag = f"_{suffix}" if suffix else ""
+    cache_path = Path(__file__).parent / f"answers_cache_{git_sha[:8]}{tag}.json"
     with open(cache_path, "w", encoding="utf-8") as f:
         json.dump({"git_sha": git_sha, "rows": rows}, f, ensure_ascii=False, indent=2)
     logger.info("Caché guardada en %s", cache_path)
     return cache_path
 
 
-def load_answers_cache(git_sha: str) -> list[dict] | None:
-    """Carga caché si existe y coincide el SHA. Devuelve None si no hay caché."""
-    cache_path = Path(__file__).parent / f"answers_cache_{git_sha[:8]}.json"
+def load_answers_cache(git_sha: str, suffix: str = "") -> list[dict] | None:
+    """Carga caché si existe y coincide el SHA. Devuelve None si no hay caché.
+
+    Args:
+        suffix: Debe coincidir con el usado en save_answers_cache()
+            ("retriever" para Phase A, "e2e" para Phase B).
+    """
+    tag = f"_{suffix}" if suffix else ""
+    cache_path = Path(__file__).parent / f"answers_cache_{git_sha[:8]}{tag}.json"
     if not cache_path.exists():
         return None
     with open(cache_path, encoding="utf-8") as f:
@@ -351,7 +495,7 @@ def load_answers_cache(git_sha: str) -> list[dict] | None:
     if data.get("git_sha") != git_sha:
         logger.warning("Caché obsoleta (SHA distinto) — ignorando")
         return None
-    logger.info("Caché cargada: %d respuestas (SHA: %s)", len(data["rows"]), git_sha[:8])
+    logger.info("Caché cargada: %d filas (SHA: %s, suffix=%r)", len(data["rows"]), git_sha[:8], suffix)
     return data["rows"]
 
 
@@ -363,7 +507,10 @@ def check_thresholds(metrics: dict) -> list[str]:
     """
     failures = []
     for metric, threshold in THRESHOLDS.items():
-        value = metrics.get(metric, 0.0)
+        if metric not in metrics:
+            # Métrica no producida en esta ejecución (p.ej. faithfulness con --retriever-only).
+            continue
+        value = metrics[metric]
         if np.isnan(value):
             failures.append(f"{metric}: NaN (métrica no calculada correctamente)")
         elif value < threshold:
