@@ -1,7 +1,7 @@
 # Análisis RAGAS — NormaBot
 
 **Fecha:** 2026-03-10
-**Datos:** [`datos-ragas/2026-03-10-logs_ragas.txt`](datos-ragas/2026-03-10-logs_ragas.txt) (Run 1) y [`datos-ragas/2026-03-10-logs_ragas_2.txt`](datos-ragas/2026-03-10-logs_ragas_2.txt) (Run 2)
+**Datos:** [`datos-ragas/2026-03-10-logs_ragas_1.txt`](datos-ragas/2026-03-10-logs_ragas_1.txt) (Run 1) y [`datos-ragas/2026-03-10-logs_ragas_2.txt`](datos-ragas/2026-03-10-logs_ragas_2.txt) (Run 2)
 **Dataset:** 14 ejemplos | **LLM evaluador:** Amazon Bedrock Nova Lite (`eu.amazon.nova-lite-v1:0`, `eu-west-1`) | **Embeddings:** `intfloat/multilingual-e5-base` (local)
 
 ---
