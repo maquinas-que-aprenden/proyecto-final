@@ -141,9 +141,11 @@ docker compose up
 ## Limitaciones conocidas
 
 - **Dataset limitado** (~600 ejemplos) — Mitigado con `class_weight='balanced'`, StratifiedKFold y override determinista. Documentado como limitación inherente al dominio legal especializado.
+- **ML clásico insuficiente para dominio legal** — TF-IDF + XGBoost no captura relaciones semánticas complejas del lenguaje jurídico. Mejora futura: modelos basados en transformers (BERT/RoBERTa fine-tuneado) para mejor comprensión contextual.
 - **Context recall RAGAS** — Por debajo del umbral (0.44-0.52 vs 0.70 objetivo). El retriever no recupera todos los documentos relevantes; mejora futura: aumentar K, ajustar chunking o ampliar dataset de evaluación.
+- **Evaluación RAGAS con Nova Lite** — El LLM evaluador (Bedrock Nova Lite) tiene incompatibilidades con el formato JSON que espera RAGAS, lo que impide calcular faithfulness de forma fiable. Mejora futura: usar un modelo compatible (e.g. GPT-4o, Claude) como LLM evaluador.
 - **Dependencia de Ollama** — El grading local requiere Ollama corriendo. En caso de fallo, el sistema continúa con fallback por score semántico (sin grading LLM).
-- **Corpus centrado en IA** — Actualmente cubre EU AI Act, BOE y normativa AESIA. La extensión a RGPD/LOPDGDD y sector financiero queda como mejora futura.
+- **Corpus centrado en regulación de IA** — Cubre EU AI Act, BOE, normativa AESIA y RGPD/LOPDGDD. La extensión a sector financiero y otras normativas sectoriales queda como mejora futura.
 
 ---
 
