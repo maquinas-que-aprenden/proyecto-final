@@ -328,7 +328,7 @@ def run_ragas_retriever(ragas_dataset) -> dict:
             dataset=ragas_dataset,
             metrics=metrics,
             column_map=column_map,
-            run_config=RunConfig(timeout=120, max_retries=3, max_concurrency=2),
+            run_config=RunConfig(timeout=120, max_retries=3, max_workers=2),
         )
     except Exception as e:
         raise RuntimeError(f"Fallo crítico en Bedrock/Ragas (Phase A): {e}")
@@ -387,7 +387,7 @@ def run_ragas_e2e(ragas_dataset) -> dict:
             dataset=ragas_dataset,
             metrics=metrics,
             column_map=column_map,
-            run_config=RunConfig(timeout=120, max_retries=3, max_concurrency=2),
+            run_config=RunConfig(timeout=120, max_retries=3, max_workers=2),
         )
     except Exception as e:
         raise RuntimeError(f"Fallo crítico en Bedrock/Ragas (Phase B): {e}")
