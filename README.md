@@ -117,9 +117,10 @@ docker compose up
 | Componente | Métrica | Valor |
 |-----------|---------|-------|
 | Clasificador (XGBoost) | F1-macro | 0.88 |
-| Clasificador | Dataset | ~300 ejemplos (real + sintético fusionado) |
+| Clasificador | Dataset | ~600 ejemplos (real [`EU-AI-Act-Flagged`](https://huggingface.co/datasets/suhas-km/EU-AI-Act-Flagged) + sintético fusionado) |
 | RAG (RAGAS) | Faithfulness | ≥ 0.80 (umbral) |
-| RAG (RAGAS) | Context precision | ≥ 0.70 (umbral) |
+| RAG (RAGAS) | Context precision | 0.86–1.0 (umbral ≥ 0.70) |
+| RAG (RAGAS) | Context recall | 0.44–0.52 (umbral ≥ 0.70) |
 | Tests | Automatizados | 53+ deterministas, ~73+ total con ML deps |
 | CI/CD | Workflows | 5 (lint, build, deploy, eval, manual) |
 
@@ -132,14 +133,14 @@ docker compose up
 | **Ollama local para grading** (vs API externa) | El grading es una tarea binaria (sí/no) con ~5 llamadas por query. Un modelo local 3B evita latencia de red, rate limits y costes. Qwen 2.5 3B elegido por mejor soporte de español vs Llama 3.2 3B y Gemma 2 2B. |
 | **Checklist determinista** (vs generar con LLM) | El módulo de report original hacía una segunda llamada a Bedrock, duplicando la llamada al clasificador. Reemplazado por lógica pura que mapea obligaciones EU AI Act sin intervención del LLM (~500ms menos de latencia). |
 | **Side-channel para citas** (vs confiar en el LLM) | Las citas legales se transportan fuera del LLM mediante ContextVar. El LLM genera la respuesta narrativa, pero las referencias a artículos provienen directamente de ChromaDB — imposible que alucine una cita. |
-| **XGBoost + override Anexo III** (vs solo ML) | El dataset es pequeño (300 ejemplos) y el dominio legal exige exactitud. Un override determinista con regex del Art. 5 y Anexo III garantiza clasificación correcta en casos claros; el ML cubre los casos ambiguos. |
+| **XGBoost + override Anexo III** (vs solo ML) | El dataset es limitado (~600 ejemplos) y el dominio legal exige exactitud. Un override determinista con regex del Art. 5 y Anexo III garantiza clasificación correcta en casos claros; el ML cubre los casos ambiguos. |
 | **Graceful degradation** | Langfuse, MLflow y Ollama son opcionales en runtime. El sistema funciona en modo degradado sin observabilidad ni grading LLM (fallback a score semántico). |
 
 ---
 
 ## Limitaciones conocidas
 
-- **Dataset pequeño** (~300 ejemplos) — Mitigado con `class_weight='balanced'`, StratifiedKFold y override determinista. Documentado como limitación inherente al dominio legal especializado.
+- **Dataset limitado** (~600 ejemplos) — Mitigado con `class_weight='balanced'`, StratifiedKFold y override determinista. Documentado como limitación inherente al dominio legal especializado.
 - **Context recall RAGAS** — Por debajo del umbral (0.44-0.52 vs 0.70 objetivo). El grader puede ser demasiado restrictivo; mejora futura: ajustar threshold o ampliar dataset de evaluación.
 - **Dependencia de Ollama** — El grading local requiere Ollama corriendo. En caso de fallo, el sistema continúa con fallback por score semántico (sin grading LLM).
 - **Corpus centrado en IA** — Actualmente cubre EU AI Act, BOE y normativa AESIA. La extensión a RGPD/LOPDGDD y sector financiero queda como mejora futura.
