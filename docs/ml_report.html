@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NormaBot — Informe ML</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3350;
+      --accent: #6c8af7;
+      --accent2: #a78bfa;
+      --green: #34d399;
+      --yellow: #fbbf24;
+      --red: #f87171;
+      --orange: #fb923c;
+      --text: #e2e8f0;
+      --muted: #8892a4;
+      --code-bg: #141720;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: linear-gradient(135deg, #1e2340 0%, #2a1f4f 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 48px 40px 36px;
+      text-align: center;
+    }
+    header .badge {
+      display: inline-block;
+      background: rgba(108,138,247,0.15);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 4px 14px;
+      border-radius: 20px;
+      margin-bottom: 16px;
+    }
+    header h1 {
+      font-size: 2.6rem;
+      font-weight: 800;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 10px;
+    }
+    header p { color: var(--muted); font-size: 1rem; max-width: 640px; margin: 0 auto; }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(15,17,23,0.92);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 40px;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    nav a {
+      display: inline-block;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 14px 16px;
+      border-bottom: 2px solid transparent;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    nav a:hover { color: var(--text); border-bottom-color: var(--accent); }
+
+    /* ── LAYOUT ── */
+    main { max-width: 1100px; margin: 0 auto; padding: 40px 24px; }
+
+    section { margin-bottom: 64px; }
+    section h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 24px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    section h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--accent2);
+      margin: 28px 0 12px;
+    }
+    p { color: var(--text); margin-bottom: 12px; }
+
+    /* ── CARDS ── */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 22px;
+    }
+    .card h4 { font-size: 0.85rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .card .val { font-size: 2rem; font-weight: 800; }
+    .card .sub { font-size: 0.82rem; color: var(--muted); margin-top: 4px; }
+    .green { color: var(--green); }
+    .yellow { color: var(--yellow); }
+    .red { color: var(--red); }
+    .blue { color: var(--accent); }
+    .purple { color: var(--accent2); }
+
+    /* ── METRIC ROW ── */
+    .metric-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .metric {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      text-align: center;
+    }
+    .metric .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+    .metric .value { font-size: 1.6rem; font-weight: 800; margin: 4px 0 2px; }
+    .metric .sub { font-size: 11px; color: var(--muted); }
+
+    /* ── COMPARE TABLE ── */
+    .compare {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--surface);
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .compare th {
+      background: var(--surface2);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 12px 18px;
+      text-align: left;
+    }
+    .compare td {
+      padding: 12px 18px;
+      border-top: 1px solid var(--border);
+      font-size: 14px;
+    }
+    .compare tr:hover td { background: rgba(108,138,247,0.04); }
+    .tag {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .tag-green { background: rgba(52,211,153,0.15); color: var(--green); }
+    .tag-yellow { background: rgba(251,191,36,0.15); color: var(--yellow); }
+    .tag-red { background: rgba(248,113,113,0.15); color: var(--red); }
+    .tag-blue { background: rgba(108,138,247,0.15); color: var(--accent); }
+    .tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+
+    /* ── CODE ── */
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 20px;
+      font-size: 13px;
+      line-height: 1.6;
+      overflow-x: auto;
+      margin-bottom: 16px;
+      color: #a9b7d6;
+    }
+    code {
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    }
+    pre code { background: none; padding: 0; border: none; font-size: inherit; }
+    p code, li code {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 12.5px;
+      color: var(--accent2);
+    }
+
+    /* ── PROGRESS BAR ── */
+    .progress-wrap { margin-bottom: 12px; }
+    .progress-label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 5px; }
+    .progress-label .name { color: var(--text); }
+    .progress-label .pct { color: var(--muted); font-weight: 700; }
+    .bar { height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s; }
+
+    /* ── PIPELINE ── */
+    .pipeline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0;
+      align-items: center;
+      margin: 20px 0;
+    }
+    .pipeline-step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 13px;
+      text-align: center;
+      min-width: 110px;
+    }
+    .pipeline-step .step-icon { font-size: 1.2rem; display: block; margin-bottom: 4px; }
+    .pipeline-step .step-name { font-weight: 600; color: var(--text); }
+    .pipeline-step .step-sub { color: var(--muted); font-size: 11px; margin-top: 2px; }
+    .arrow { color: var(--muted); font-size: 1.3rem; padding: 0 6px; }
+
+    /* ── FEATURES GRID ── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .feature-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .feature-item .fi-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+    .feature-item .fi-val { font-size: 14px; font-weight: 600; }
+
+    /* ── ALERT BOX ── */
+    .alert {
+      border-left: 3px solid;
+      border-radius: 0 8px 8px 0;
+      padding: 14px 18px;
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+    .alert-warning { border-color: var(--yellow); background: rgba(251,191,36,0.07); }
+    .alert-info { border-color: var(--accent); background: rgba(108,138,247,0.07); }
+    .alert-success { border-color: var(--green); background: rgba(52,211,153,0.07); }
+    .alert strong { display: block; margin-bottom: 4px; }
+
+    /* ── TAGS ROW ── */
+    .tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 16px; }
+
+    /* ── RISK LEVELS ── */
+    .risk-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 14px;
+      margin: 16px 0;
+    }
+    .risk-card {
+      border-radius: 10px;
+      border: 1px solid;
+      padding: 16px 18px;
+    }
+    .risk-card h4 { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+    .risk-card ul { padding-left: 16px; }
+    .risk-card ul li { font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+    .risk-inaceptable { border-color: rgba(248,113,113,0.4); background: rgba(248,113,113,0.05); }
+    .risk-inaceptable h4 { color: var(--red); }
+    .risk-alto { border-color: rgba(251,191,36,0.4); background: rgba(251,191,36,0.05); }
+    .risk-alto h4 { color: var(--yellow); }
+    .risk-limitado { border-color: rgba(108,138,247,0.4); background: rgba(108,138,247,0.05); }
+    .risk-limitado h4 { color: var(--accent); }
+    .risk-minimo { border-color: rgba(52,211,153,0.4); background: rgba(52,211,153,0.05); }
+    .risk-minimo h4 { color: var(--green); }
+
+    /* ── FOOTER ── */
+    footer {
+      text-align: center;
+      padding: 32px 24px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 13px;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+
+    ul, ol { padding-left: 22px; margin-bottom: 14px; }
+    li { margin-bottom: 5px; color: var(--text); }
+
+    @media (max-width: 600px) {
+      header h1 { font-size: 1.8rem; }
+      main { padding: 24px 14px; }
+      nav { padding: 0 14px; }
+      nav a { padding: 12px 10px; font-size: 12px; }
+      .pipeline { flex-direction: column; align-items: flex-start; }
+      .arrow { transform: rotate(90deg); padding: 4px 0; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════ HEADER ══════════ -->
+<header>
+  <div class="badge">Proyecto Final · KeepCoding ML/IA Bootcamp</div>
+  <h1>NormaBot — Módulo ML</h1>
+  <p>Clasificación automática de riesgo de sistemas de IA bajo el EU AI Act (Reglamento UE 2024/1689)</p>
+</header>
+
+<!-- ══════════ NAV ══════════ -->
+<nav>
+  <a href="#resumen">Resumen</a>
+  <a href="#datasets">Datasets</a>
+  <a href="#pipeline-xgb">Pipeline XGBoost</a>
+  <a href="#bert">BERT Fine-tuning</a>
+  <a href="#augmentation">Data Augmentation</a>
+  <a href="#features">Feature Engineering</a>
+  <a href="#resultados">Resultados</a>
+  <a href="#explicabilidad">Explicabilidad</a>
+  <a href="#produccion">Producción</a>
+  <a href="#limitaciones">Limitaciones</a>
+</nav>
+
+<!-- ══════════ MAIN ══════════ -->
+<main>
+
+<!-- ── RESUMEN ── -->
+<section id="resumen">
+  <h2>Resumen ejecutivo</h2>
+  <p>
+    El módulo ML de NormaBot clasifica descripciones textuales de sistemas de IA en cuatro niveles de riesgo
+    definidos por el EU AI Act. Implementa <strong>dos backends complementarios</strong> con fallback automático
+    y un <strong>override determinista</strong> basado en el Anexo III del Reglamento.
+  </p>
+
+  <div class="cards">
+    <div class="card">
+      <h4>Mejor modelo (XGBoost)</h4>
+      <div class="val green">88.2%</div>
+      <div class="sub">F1-macro en test · ROC-AUC 0.967</div>
+    </div>
+    <div class="card">
+      <h4>Modelo semántico (BERT)</h4>
+      <div class="val yellow">72.9%</div>
+      <div class="sub">F1-macro en test · dccuchile BERT español</div>
+    </div>
+    <div class="card">
+      <h4>Dataset fusionado</h4>
+      <div class="val blue">832</div>
+      <div class="sub">ejemplos (real + sintético balanceado)</div>
+    </div>
+    <div class="card">
+      <h4>Clases</h4>
+      <div class="val purple">4</div>
+      <div class="sub">inaceptable · alto · limitado · mínimo</div>
+    </div>
+  </div>
+
+  <h3>Arquitectura de dos backends</h3>
+  <p>
+    El sistema expone <code>predict_risk(text) → dict</code> con selección de backend vía variable de entorno
+    <code>CLASSIFIER_BACKEND</code> (por defecto: <code>"bert"</code>). Si BERT falla, el sistema hace fallback
+    automático a XGBoost.
+  </p>
+
+  <table class="compare">
+    <thead>
+      <tr>
+        <th>Característica</th>
+        <th>XGBoost + TF-IDF</th>
+        <th>BERT Fine-tuned</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>F1-macro (test)</td>
+        <td class="green" style="font-weight:700">0.8822 ✓</td>
+        <td>0.7289</td>
+      </tr>
+      <tr>
+        <td>Accuracy (test)</td>
+        <td class="green" style="font-weight:700">87.78%</td>
+        <td>72.5%</td>
+      </tr>
+      <tr>
+        <td>ROC-AUC</td>
+        <td class="green" style="font-weight:700">0.9668</td>
+        <td>N/A</td>
+      </tr>
+      <tr>
+        <td>Interpretabilidad</td>
+        <td><span class="tag tag-green">Alta (SHAP)</span></td>
+        <td><span class="tag tag-yellow">Baja (caja negra)</span></td>
+      </tr>
+      <tr>
+        <td>Capacidad semántica</td>
+        <td><span class="tag tag-yellow">Media</span></td>
+        <td><span class="tag tag-green">Alta</span></td>
+      </tr>
+      <tr>
+        <td>Dataset necesario</td>
+        <td>~300 ejemplos</td>
+        <td>~4000 (con augmentation)</td>
+      </tr>
+      <tr>
+        <td>Latencia inferencia</td>
+        <td><span class="tag tag-green">&lt; 50ms</span></td>
+        <td><span class="tag tag-yellow">200–800ms</span></td>
+      </tr>
+      <tr>
+        <td>Rol en producción</td>
+        <td><span class="tag tag-blue">Fallback / principal</span></td>
+        <td><span class="tag tag-purple">Backend por defecto</span></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ── DATASETS ── -->
+<section id="datasets">
+  <h2>Datasets</h2>
+
+  <h3>Evolución del dataset</h3>
+  <p>
+    El proceso partió de un dataset real pequeño etiquetado manualmente y evolucionó hasta un
+    dataset fusionado con balanceo de clases y técnicas de aumentación de datos.
+  </p>
+
+  <table class="compare">
+    <thead>
+      <tr><th>Dataset</th><th>Tamaño</th><th>Origen</th><th>Experimento MLflow</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>classifier_dataset_real/</code></td>
+        <td>~200 ej.</td>
+        <td>Etiquetado manual (legal)</td>
+        <td><code>clasificador_riesgo_dataset_real</code></td>
+      </tr>
+      <tr>
+        <td><code>classifier_dataset_artificial/</code></td>
+        <td>~300 ej.</td>
+        <td>Generado sintéticamente</td>
+        <td><code>clasificador_riesgo_dataset_artificial</code></td>
+      </tr>
+      <tr>
+        <td><strong>classifier_dataset_fusionado/</strong></td>
+        <td><strong>832 ej.</strong></td>
+        <td>Real + sintético + balanceado</td>
+        <td><code>clasificador_riesgo_dataset_fusionado</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Distribución del dataset fusionado (post-balanceo)</h3>
+  <div class="progress-wrap">
+    <div class="progress-label"><span class="name">Inaceptable</span><span class="pct">208 ej. (25%)</span></div>
+    <div class="bar"><div class="bar-fill" style="width:25%; background:var(--red)"></div></div>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-label"><span class="name">Alto riesgo</span><span class="pct">208 ej. (25%) — +72 manual</span></div>
+    <div class="bar"><div class="bar-fill" style="width:25%; background:var(--yellow)"></div></div>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-label"><span class="name">Riesgo limitado</span><span class="pct">208 ej. (25%) — +121 manual</span></div>
+    <div class="bar"><div class="bar-fill" style="width:25%; background:var(--accent)"></div></div>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-label"><span class="name">Riesgo mínimo</span><span class="pct">208 ej. (25%) — +39 manual</span></div>
+    <div class="bar"><div class="bar-fill" style="width:25%; background:var(--green)"></div></div>
+  </div>
+
+  <h3>Train/Test split</h3>
+  <div class="metric-row">
+    <div class="metric">
+      <div class="label">Train</div>
+      <div class="value blue">240</div>
+      <div class="sub">80%</div>
+    </div>
+    <div class="metric">
+      <div class="label">Validación</div>
+      <div class="value yellow">—</div>
+      <div class="sub">5-fold StratifiedKFold</div>
+    </div>
+    <div class="metric">
+      <div class="label">Test</div>
+      <div class="value green">60</div>
+      <div class="sub">20%</div>
+    </div>
+  </div>
+
+  <div class="alert alert-info">
+    <strong>Split estratificado</strong>
+    Se usa <code>StratifiedKFold</code> en todas las particiones para garantizar representación proporcional
+    de cada nivel de riesgo, dado el tamaño pequeño del dataset original.
+  </div>
+
+  <h3>Niveles de riesgo (EU AI Act)</h3>
+  <div class="risk-grid">
+    <div class="risk-card risk-inaceptable">
+      <h4>Inaceptable — Art. 5</h4>
+      <ul>
+        <li>Manipulación subliminal</li>
+        <li>Explotación de vulnerabilidades</li>
+        <li>Puntuación social ciudadana</li>
+        <li>Biometría en tiempo real (espacios públicos)</li>
+        <li>Perfilado policial predictivo sin indicios</li>
+      </ul>
+    </div>
+    <div class="risk-card risk-alto">
+      <h4>Alto riesgo — Anexo III</h4>
+      <ul>
+        <li>Selección de personal (CVs)</li>
+        <li>Scoring crediticio / solvencia</li>
+        <li>Justicia penal (reincidencia)</li>
+        <li>Migración y asilo</li>
+        <li>Educación (admisiones)</li>
+      </ul>
+    </div>
+    <div class="risk-card risk-limitado">
+      <h4>Riesgo limitado — Art. 50</h4>
+      <ul>
+        <li>Chatbots y asistentes</li>
+        <li>Generación de deepfakes</li>
+        <li>Contenido sintético</li>
+        <li>Transparencia obligatoria</li>
+      </ul>
+    </div>
+    <div class="risk-card risk-minimo">
+      <h4>Riesgo mínimo — Art. 95</h4>
+      <ul>
+        <li>Filtros de spam</li>
+        <li>Juegos con IA</li>
+        <li>Borradores automáticos</li>
+        <li>Mantenimiento predictivo</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ── PIPELINE XGBoost ── -->
+<section id="pipeline-xgb">
+  <h2>Pipeline XGBoost</h2>
+
+  <h3>Flujo completo de entrenamiento</h3>
+
+  <div class="pipeline">
+    <div class="pipeline-step">
+      <span class="step-icon">📄</span>
+      <div class="step-name">Raw text</div>
+      <div class="step-sub">Descripción sistema IA</div>
+    </div>
+    <span class="arrow">→</span>
+    <div class="pipeline-step">
+      <span class="step-icon">🧹</span>
+      <div class="step-name">spaCy</div>
+      <div class="step-sub">Limpieza + lematización</div>
+    </div>
+    <span class="arrow">→</span>
+    <div class="pipeline-step">
+      <span class="step-icon">📊</span>
+      <div class="step-name">TF-IDF</div>
+      <div class="step-sub">5000 terms, bigramas</div>
+    </div>
+    <span class="arrow">→</span>
+    <div class="pipeline-step">
+      <span class="step-icon">🔻</span>
+      <div class="step-name">SVD</div>
+      <div class="step-sub">100 componentes (67.3%)</div>
+    </div>
+    <span class="arrow">→</span>
+    <div class="pipeline-step">
+      <span class="step-icon">🔑</span>
+      <div class="step-name">Keywords</div>
+      <div class="step-sub">7 features manuales</div>
+    </div>
+    <span class="arrow">→</span>
+    <div class="pipeline-step">
+      <span class="step-icon">🌳</span>
+      <div class="step-name">XGBoost</div>
+      <div class="step-sub">Grid Search + CV</div>
+    </div>
+    <span class="arrow">→</span>
+    <div class="pipeline-step">
+      <span class="step-icon">🏷️</span>
+      <div class="step-name">Predicción</div>
+      <div class="step-sub">4 clases + confianza</div>
+    </div>
+  </div>
+
+  <h3>Vectorización TF-IDF</h3>
+  <pre><code>TfidfVectorizer(
+    max_features  = 5000,
+    ngram_range   = (1, 2),      # unigramas + bigramas
+    sublinear_tf  = True,        # log(1 + tf) en lugar de tf crudo
+    token_pattern = r"(?u)\b[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]{3,}\b"
+)
+# Fit sólo en train, transform en val/test (sin data leakage)</code></pre>
+
+  <h3>Reducción dimensional SVD</h3>
+  <pre><code>TruncatedSVD(n_components=100)
+# Varianza explicada acumulada: ~67.3%
+# Reduce de 5000D → 100D
+# Eliminando dimensiones ruidosas mejora generalización</code></pre>
+
+  <h3>Features manuales normativas (7 features)</h3>
+  <div class="features-grid">
+    <div class="feature-item">
+      <div class="fi-label">num_palabras</div>
+      <div class="fi-val">Longitud en palabras</div>
+    </div>
+    <div class="feature-item">
+      <div class="fi-label">num_caracteres</div>
+      <div class="fi-val">Longitud en caracteres</div>
+    </div>
+    <div class="feature-item">
+      <div class="fi-label">kw_inaceptable</div>
+      <div class="fi-val">Keywords Art. 5 (inferir, vigilancia, facial…)</div>
+    </div>
+    <div class="feature-item">
+      <div class="fi-label">kw_alto_riesgo</div>
+      <div class="fi-val">Keywords Anexo III (crediticio, diagnóstico, migración…)</div>
+    </div>
+    <div class="feature-item">
+      <div class="fi-label">kw_riesgo_limitado</div>
+      <div class="fi-val">Keywords Art. 50 (chatbot, deepfake, sintético…)</div>
+    </div>
+    <div class="feature-item">
+      <div class="fi-label">kw_riesgo_minimo</div>
+      <div class="fi-val">Keywords Art. 95 (spam, juego, borrador…)</div>
+    </div>
+    <div class="feature-item">
+      <div class="fi-label">kw_salvaguarda</div>
+      <div class="fi-val">Supervisión humana (supervisión, auditoría, humano…)</div>
+    </div>
+  </div>
+  <p><strong>Total features:</strong> 100 (SVD) + 7 (manual) = <strong>107 features</strong></p>
+
+  <h3>Hiperparámetros optimizados (Grid Search)</h3>
+  <pre><code>param_grid = {
+    "n_estimators"  : [100, 200, 300],
+    "max_depth"     : [3, 5, 7],
+    "learning_rate" : [0.05, 0.1, 0.2],
+    "subsample"     : [0.7, 0.8, 1.0],
+}
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+# Mejores parámetros encontrados:
+best_params = {
+    "n_estimators"  : 300,
+    "max_depth"     : 3,
+    "learning_rate" : 0.1,
+    "subsample"     : 0.8,
+    "eval_metric"   : "mlogloss",
+}</code></pre>
+
+  <h3>Reentrenamiento incremental (<code>retrain.py</code>)</h3>
+  <p>
+    El script <code>retrain.py</code> permite reentrenamiento con datos aumentados del Anexo III.
+    Implementa una política de promoción conservadora: los artefactos sólo se sobreescriben si el
+    nuevo modelo mejora el F1-macro en <code>≥ 0.005</code> sobre el modelo en producción.
+  </p>
+  <pre><code># Criterio de promoción
+if new_f1_macro - current_f1_macro >= 0.005:
+    save_artifacts(model, vectorizer, svd, encoder)
+    log_mlflow(experiment="clasificador_riesgo_dataset_fusionado")
+else:
+    logger.info("Modelo no promovido — sin mejora suficiente")</code></pre>
+
+  <div class="alert alert-success">
+    <strong>Tracking MLflow</strong>
+    Cada experimento registra métricas (F1, accuracy, ROC-AUC), parámetros, artefactos y el classification
+    report completo en el servidor MLflow remoto (<code>MLFLOW_TRACKING_URI</code>).
+  </div>
+</section>
+
+<!-- ── BERT ── -->
+<section id="bert">
+  <h2>BERT Fine-tuning</h2>
+
+  <h3>Modelo base</h3>
+  <div class="alert alert-info">
+    <strong>dccuchile/bert-base-spanish-wwm-cased</strong>
+    BERT pre-entrenado en corpus español de Wikipedia y Common Crawl (Whole-Word Masking).
+    Seleccionado por su superior soporte del idioma español sobre modelos multilingüe (mBERT) o inglés.
+  </div>
+
+  <h3>Configuración de entrenamiento</h3>
+  <pre><code>TrainingArguments(
+    num_train_epochs        = 4,
+    per_device_train_batch_size = 16,
+    learning_rate           = 2e-5,
+    weight_decay            = 0.01,
+    max_seq_length          = 256,       # tokens
+    warmup_ratio            = 0.1,
+    evaluation_strategy     = "epoch",
+    metric_for_best_model   = "f1_macro",
+    load_best_model_at_end  = True,
+    # Early stopping
+    callbacks = [EarlyStoppingCallback(early_stopping_patience=2)]
+)</code></pre>
+
+  <h3>Manejo del desbalanceo de clases</h3>
+  <pre><code># WeightedTrainer personalizado
+class WeightedTrainer(Trainer):
+    def compute_loss(self, model, inputs, return_outputs=False):
+        labels = inputs.get("labels")
+        outputs = model(**inputs)
+        logits = outputs.get("logits")
+        # Class weights calculados con scikit-learn
+        class_weights = compute_class_weight(
+            class_weight="balanced",
+            classes=np.unique(labels.cpu()),
+            y=labels.cpu()
+        )
+        loss_fct = CrossEntropyLoss(weight=torch.tensor(class_weights).float().to(logits.device))
+        loss = loss_fct(logits, labels)
+        return (loss, outputs) if return_outputs else loss</code></pre>
+
+  <h3>Resultados del fine-tuning</h3>
+  <div class="metric-row">
+    <div class="metric">
+      <div class="label">F1-macro (test)</div>
+      <div class="value yellow">0.7289</div>
+      <div class="sub">checkpoint-800</div>
+    </div>
+    <div class="metric">
+      <div class="label">Accuracy (test)</div>
+      <div class="value yellow">72.5%</div>
+      <div class="sub">época 4</div>
+    </div>
+    <div class="metric">
+      <div class="label">Eval loss</div>
+      <div class="value blue">0.6999</div>
+      <div class="sub">mejor checkpoint</div>
+    </div>
+    <div class="metric">
+      <div class="label">Checkpoints</div>
+      <div class="value purple">4</div>
+      <div class="sub">200 / 400 / 600 / 800</div>
+    </div>
+  </div>
+
+  <h3>Split para BERT (con data augmentation)</h3>
+  <div class="metric-row">
+    <div class="metric"><div class="label">Train</div><div class="value blue">~3200</div><div class="sub">80%</div></div>
+    <div class="metric"><div class="label">Validación</div><div class="value yellow">~400</div><div class="sub">10%</div></div>
+    <div class="metric"><div class="label">Test</div><div class="value green">~400</div><div class="sub">10%</div></div>
+    <div class="metric"><div class="label">Total</div><div class="value purple">~4000</div><div class="sub">con augmentation</div></div>
+  </div>
+
+  <h3>Artefactos guardados</h3>
+  <pre><code>bert_pipeline/models/
+├── bert_model/
+│   ├── pytorch_model.bin       (~439 MB)
+│   ├── config.json
+│   ├── tokenizer.json
+│   ├── model_metadata.json     {"f1_macro": 0.7289, "accuracy": 0.725}
+│   └── training_args.bin
+├── checkpoints/
+│   ├── checkpoint-200/
+│   ├── checkpoint-400/
+│   ├── checkpoint-600/
+│   └── checkpoint-800/         ✅ Mejor checkpoint
+├── label_encoder.joblib        (mapeo id2label)
+└── test_split.joblib           (para evaluate.py)</code></pre>
+</section>
+
+<!-- ── DATA AUGMENTATION ── -->
+<section id="augmentation">
+  <h2>Data Augmentation</h2>
+
+  <p>
+    El dataset original de ~200 ejemplos es insuficiente para entrenar BERT desde cero.
+    Se implementó un pipeline de aumentación de datos masivo que multiplica el dataset por un factor ~4–5x,
+    preservando la semántica y la etiqueta de riesgo.
+  </p>
+
+  <div class="cards">
+    <div class="card">
+      <h4>Dataset original</h4>
+      <div class="val red">~200</div>
+      <div class="sub">ejemplos etiquetados manualmente</div>
+    </div>
+    <div class="card">
+      <h4>Dataset aumentado</h4>
+      <div class="val green">~4000</div>
+      <div class="sub">original + paráfrasis + back-translation</div>
+    </div>
+    <div class="card">
+      <h4>Factor multiplicador</h4>
+      <div class="val blue">×5</div>
+      <div class="sub">1 original + 3 paráfrasis + 1 BT</div>
+    </div>
+  </div>
+
+  <h3>Técnica 1: Paráfrasis con LLM (Bedrock Nova Lite)</h3>
+  <p>
+    El script <code>paraphrase_llm.py</code> usa Amazon Bedrock (Nova Lite v1) para generar <em>n</em>
+    paráfrasis de cada ejemplo, con un prompt anclado a la etiqueta de riesgo para garantizar que
+    la paráfrasis no cambie el nivel de riesgo de la descripción.
+  </p>
+  <pre><code># paraphrase_llm.py
+model_id = "eu.amazon.nova-lite-v1:0"
+
+prompt = f"""Genera {n} paráfrasis del siguiente texto sobre sistemas de IA.
+Mantén el nivel de riesgo: '{risk_label}'.
+No cambies el significado, sólo la expresión.
+Texto: {text}"""
+
+# Parámetros de generación
+temperature = 0.8      # Suficiente variación léxica
+max_tokens  = 1024</code></pre>
+
+  <h3>Técnica 2: Back-translation (ES → EN → ES)</h3>
+  <p>
+    El script <code>back_translation.py</code> traduce el texto al inglés y de vuelta al español
+    usando <code>GoogleTranslator</code> (deep-translator), generando variaciones léxicas naturales
+    sin alterar el significado. Los ejemplos donde la re-traducción es idéntica al original son descartados.
+  </p>
+  <pre><code># back_translation.py
+from deep_translator import GoogleTranslator
+
+def back_translate(text: str) -> str:
+    en = GoogleTranslator(source="es", target="en").translate(text)
+    es = GoogleTranslator(source="en", target="es").translate(en)
+    # Filtrado: si es idéntico al original, descartar
+    if es.strip() == text.strip():
+        return None
+    return es</code></pre>
+
+  <h3>Orquestador de aumentación</h3>
+  <pre><code># run_augmentation.py
+for example in original_dataset:
+    output.append({**example, "source": "original"})
+
+    # Paráfrasis (×3)
+    for i, para in enumerate(generate_paraphrases(example["text"], n=3)):
+        output.append({**example, "text": para, "source": f"paraphrase_{i+1}"})
+
+    # Back-translation (×1)
+    bt = back_translate(example["text"])
+    if bt:
+        output.append({**example, "text": bt, "source": "back_translation"})
+
+# Guarda en dataset_augmented.jsonl (~4000 ejemplos)</code></pre>
+
+  <div class="alert alert-warning">
+    <strong>Nota de calidad</strong>
+    El prompt de paráfrasis incluye la etiqueta de riesgo como ancla para evitar que el LLM
+    genere descripciones que cambien el nivel de riesgo (ej., de "inaceptable" a "alto riesgo").
+    Esto es crítico para preservar la integridad del dataset.
+  </div>
+</section>
+
+<!-- ── FEATURES NORMATIVAS ── -->
+<section id="features">
+  <h2>Feature Engineering Normativo</h2>
+
+  <h3>Features del Art. 5 EU AI Act (<code>create_normative_features.py</code>)</h3>
+  <p>
+    Además de las features estadísticas (TF-IDF, SVD), se generan 6 features binarias basadas en
+    patrones regex específicos del artículo 5 del EU AI Act (prácticas prohibidas).
+    Estas features permiten al modelo detectar casos canónicos sin depender exclusivamente del
+    aprendizaje estadístico.
+  </p>
+
+  <table class="compare">
+    <thead>
+      <tr><th>Feature</th><th>Artículo</th><th>Detecta</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>contains_subliminal</code></td>
+        <td>Art. 5.1.a</td>
+        <td>Manipulación subliminal, técnicas engañosas de conducta</td>
+      </tr>
+      <tr>
+        <td><code>contains_exploitation_vuln</code></td>
+        <td>Art. 5.1.b</td>
+        <td>Explotación de vulnerabilidades (menores, discapacidad, edad)</td>
+      </tr>
+      <tr>
+        <td><code>contains_social_scoring</code></td>
+        <td>Art. 5.1.c</td>
+        <td>Puntuación social ciudadana por autoridades públicas</td>
+      </tr>
+      <tr>
+        <td><code>contains_real_time_biometric</code></td>
+        <td>Art. 5.1.d</td>
+        <td>Identificación biométrica en tiempo real en espacios públicos</td>
+      </tr>
+      <tr>
+        <td><code>contains_predictive_profiling</code></td>
+        <td>Art. 5.1.e</td>
+        <td>Perfilado policial predictivo sin indicios objetivos</td>
+      </tr>
+      <tr>
+        <td><code>article_5_flag</code></td>
+        <td>Art. 5 (agregado)</td>
+        <td>OR de las 5 anteriores — "contiene práctica prohibida"</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Override determinista del Anexo III</h3>
+  <p>
+    En inferencia (no en training), se aplica un override determinista <em>post-predicción</em>
+    para garantizar clasificación correcta en los casos canónicos del Anexo III,
+    independientemente de lo que prediga el modelo ML.
+  </p>
+  <pre><code># Aplicado DESPUÉS de la predicción ML
+# Comprueba texto ORIGINAL (sin limpiar)
+_ANNEX3_PATTERNS = {
+    "alto_riesgo": [
+        (r"(cv|currículum).{0,60}(screening|selección)", "Anexo III cat. 4.a — selección personal"),
+        (r"(scoring|puntuación).{0,40}(creditici|solvencia)", "Anexo III cat. 5.b — evaluación crediticia"),
+        (r"(recidiv|reincidenci)",                           "Anexo III cat. 6 — justicia penal"),
+        (r"admisión.{0,40}(universitari|educativ)",         "Anexo III cat. 3 — educación"),
+        (r"(solicitud|evaluación).{0,40}(asilo|migración)", "Anexo III cat. 7 — migración"),
+    ],
+    "inaceptable": [
+        (r"manipulación.{0,20}subliminal",                  "Art. 5.1.a"),
+        (r"(exploit|explotar).{0,30}(vulnerabilidad|menor)","Art. 5.1.b"),
+        (r"puntuación.{0,30}social.{0,30}ciudadano",        "Art. 5.1.c"),
+        (r"(reconocimiento|identificación).{0,30}(facial|biométric).{0,50}(espacio|tiempo|real)", "Art. 5.1.d"),
+        (r"predicción.{0,40}(delito|peligrosidad).{0,40}sin.{0,20}(indicio|prueba)", "Art. 5.1.e"),
+    ]
+}
+
+# Si hay coincidencia: sobrescribe resultado con confidence=0.85
+# y documenta: annex3_override=True, annex3_ref="Art. 5.1.d", ml_prediction={...}</code></pre>
+
+  <div class="alert alert-info">
+    <strong>Rationale del override</strong>
+    El modelo ML puede equivocarse en casos edge por insuficiencia del dataset. Los patrones del
+    Anexo III son <em>normativamente vinculantes</em> — la clasificación correcta aquí es
+    literalmente lo que dice la ley. El override garantiza cumplimiento legal incluso si el modelo
+    estadístico falla.
+  </div>
+
+  <h3>Constantes centralizadas (<code>_constants.py</code>)</h3>
+  <p>
+    Todas las listas de keywords y etiquetas están centralizadas en <code>_constants.py</code>
+    sin dependencias pesadas, importado por <code>main.py</code>, <code>functions.py</code>
+    y <code>retrain.py</code> para evitar divergencias entre training e inferencia.
+  </p>
+  <pre><code># _constants.py — Fuente única de verdad
+RISK_LABELS: dict[str, str] = {
+    "0": "inaceptable",
+    "1": "alto_riesgo",
+    "2": "riesgo_limitado",
+    "3": "riesgo_minimo",
+}
+
+KEYWORDS_DOMINIO: dict[str, list[str]] = {
+    "inaceptable":     ["inferir", "vender", "manipular", "biométrico", "facial", "vigilancia", ...],
+    "alto_riesgo":     ["penitenciario", "juez", "crediticio", "diagnóstico", "migración", ...],
+    "riesgo_limitado": ["chatbot", "deepfake", "sintético", "revelar", ...],
+    "riesgo_minimo":   ["sugerir", "borrador", "juego", "spam", "mantenimiento", ...],
+}
+
+PALABRAS_SUPERVISION: list[str] = [
+    "supervisión", "supervisar", "revisar", "garantía",
+    "criterio", "auditoría", "humano", "médico"
+]
+
+# Columnas que causan data leakage — NUNCA incluir en training
+LEAKAGE_COLUMNS: frozenset[str] = frozenset({
+    "violation", "severity", "ambiguity", "explanation", "split"
+})</code></pre>
+</section>
+
+<!-- ── RESULTADOS ── -->
+<section id="resultados">
+  <h2>Resultados y métricas</h2>
+
+  <h3>XGBoost — Modelo de producción</h3>
+  <div class="metric-row">
+    <div class="metric">
+      <div class="label">F1-macro</div>
+      <div class="value green">0.8822</div>
+      <div class="sub">test (60 ej.)</div>
+    </div>
+    <div class="metric">
+      <div class="label">Accuracy</div>
+      <div class="value green">87.78%</div>
+      <div class="sub">test</div>
+    </div>
+    <div class="metric">
+      <div class="label">ROC-AUC</div>
+      <div class="value green">0.9668</div>
+      <div class="sub">multiclase OvR</div>
+    </div>
+    <div class="metric">
+      <div class="label">Features</div>
+      <div class="value blue">107</div>
+      <div class="sub">100 SVD + 7 manual</div>
+    </div>
+  </div>
+
+  <h3>BERT — Backend semántico</h3>
+  <div class="metric-row">
+    <div class="metric">
+      <div class="label">F1-macro</div>
+      <div class="value yellow">0.7289</div>
+      <div class="sub">test (~400 ej.)</div>
+    </div>
+    <div class="metric">
+      <div class="label">Accuracy</div>
+      <div class="value yellow">72.5%</div>
+      <div class="sub">test</div>
+    </div>
+    <div class="metric">
+      <div class="label">Eval loss</div>
+      <div class="value blue">0.6999</div>
+      <div class="sub">checkpoint-800</div>
+    </div>
+    <div class="metric">
+      <div class="label">Epochs</div>
+      <div class="value purple">4</div>
+      <div class="sub">con early stopping</div>
+    </div>
+  </div>
+
+  <h3>Comparativa de F1 por modelo</h3>
+  <div class="progress-wrap">
+    <div class="progress-label"><span class="name">XGBoost + TF-IDF + SVD (fusionado)</span><span class="pct">88.2%</span></div>
+    <div class="bar"><div class="bar-fill" style="width:88.2%; background:var(--green)"></div></div>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-label"><span class="name">BERT fine-tuned (dccuchile)</span><span class="pct">72.9%</span></div>
+    <div class="bar"><div class="bar-fill" style="width:72.9%; background:var(--yellow)"></div></div>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-label"><span class="name">Experimentos dataset real</span><span class="pct">~65% (referencia)</span></div>
+    <div class="bar"><div class="bar-fill" style="width:65%; background:var(--accent)"></div></div>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-label"><span class="name">Experimentos dataset artificial</span><span class="pct">~70% (referencia)</span></div>
+    <div class="bar"><div class="bar-fill" style="width:70%; background:var(--orange)"></div></div>
+  </div>
+
+  <h3>Artefactos en disco (modelo XGBoost)</h3>
+  <pre><code>classifier_dataset_fusionado/model/
+├── modelo_xgboost.joblib        (2.3 MB)
+├── tfidf_vectorizer.joblib      (224 KB)
+├── svd_transformer.joblib
+├── label_encoder.joblib         (535 B)
+├── mejor_modelo_seleccion.json  ← incluye pipeline_type
+└── model_metadata.json</code></pre>
+</section>
+
+<!-- ── EXPLICABILIDAD ── -->
+<section id="explicabilidad">
+  <h2>Explicabilidad (SHAP)</h2>
+
+  <p>
+    El modelo XGBoost expone contribuciones por feature para cada predicción, permitiendo justificar
+    la clasificación al usuario y alinearla con obligaciones normativas específicas.
+  </p>
+
+  <h3>Cálculo de contribuciones</h3>
+  <pre><code># En XGBoost: usando pred_contribs del booster (nativo, sin librería SHAP)
+booster = model.get_booster()
+contribs = booster.predict(dmatrix, pred_contribs=True)
+# → array de shape (n_samples, n_features + 1)
+
+# Top-5 features con mayor contribución absoluta
+# Filtrado: se excluyen svd_N (no interpretables), num_palabras, num_caracteres
+# Se mantienen: keywords de dominio (crediticio, facial, supervisión...)
+
+# Output en predict_risk()
+"shap_top_features": [
+    {"feature": "supervisi",  "contribution": 0.342},
+    {"feature": "crediticio", "contribution": 0.215},
+    {"feature": "scoring",    "contribution": 0.198},
+    ...
+],
+"shap_explanation": "Factores principales para 'alto_riesgo': crediticio, solvencia, scoring"</code></pre>
+
+  <h3>Mapeado a obligaciones normativas</h3>
+  <p>
+    El módulo <code>src/checklist/main.py</code> usa las top features de SHAP para generar
+    recomendaciones específicas mapeadas a artículos del EU AI Act:
+  </p>
+  <div class="features-grid">
+    <div class="feature-item">
+      <div class="fi-label">Feature "crediticio"</div>
+      <div class="fi-val">→ Anexo III cat. 5.b</div>
+    </div>
+    <div class="feature-item">
+      <div class="fi-label">Feature "recidivismo"</div>
+      <div class="fi-val">→ Anexo III cat. 6 (justicia)</div>
+    </div>
+    <div class="feature-item">
+      <div class="fi-label">Feature "facial"</div>
+      <div class="fi-val">→ Art. 5.1.d (biometría)</div>
+    </div>
+    <div class="feature-item">
+      <div class="fi-label">Feature "diagnóstico"</div>
+      <div class="fi-val">→ Anexo III cat. 2 (sanidad)</div>
+    </div>
+    <div class="feature-item">
+      <div class="fi-label">Feature "supervisión"</div>
+      <div class="fi-val">→ Art. 14 (supervisión humana)</div>
+    </div>
+    <div class="feature-item">
+      <div class="fi-label">Feature "chatbot"</div>
+      <div class="fi-val">→ Art. 50 (transparencia)</div>
+    </div>
+  </div>
+
+  <h3>Detección de casos borderline</h3>
+  <pre><code># Si la probabilidad de la clase superior al resultado ≥ 20% del resultado:
+if probas[next_higher_class] >= 0.20:
+    warning = f"Advertencia: sistema próximo a '{next_higher_class}'"
+    # Ejemplo: alto_riesgo con P(inaceptable)=0.18 → alerta de revisión</code></pre>
+</section>
+
+<!-- ── PRODUCCIÓN ── -->
+<section id="produccion">
+  <h2>Pipeline de producción</h2>
+
+  <h3>Flujo de inferencia (<code>src/classifier/main.py</code>)</h3>
+  <pre><code>def predict_risk(text: str) -> dict:
+    # 1. Validación (Pydantic) — min 1, max 5000 caracteres
+    validated = _TextInput(text=text)
+
+    # 2. Selección de backend + lazy loading thread-safe
+    if CLASSIFIER_BACKEND == "bert":
+        result = _predict_bert(text)       # fallback a XGBoost si falla
+    else:
+        result = _predict_xgboost(text)
+
+    # 3. Override determinista Anexo III (post-procesado)
+    result = _annex3_override(text, result)
+
+    # 4. Observabilidad Langfuse
+    langfuse.score(name="classifier_confidence", value=result["confidence"])
+
+    return result
+
+# Output:
+{
+    "risk_level"       : "alto_riesgo",
+    "confidence"       : 0.87,
+    "probabilities"    : {"inaceptable": 0.05, "alto_riesgo": 0.87, ...},
+    "shap_top_features": [...],
+    "shap_explanation" : "Factores: crediticio, solvencia",
+    "backend"          : "xgboost",
+    # Si override aplicado:
+    "annex3_override"  : True,
+    "annex3_ref"       : "Anexo III cat. 5.b",
+    "ml_prediction"    : {"risk_level": "riesgo_limitado", ...},
+}</code></pre>
+
+  <h3>Checklist de cumplimiento (<code>src/checklist/main.py</code>)</h3>
+  <p>
+    El output del clasificador alimenta el módulo de checklist, que genera obligaciones normativas
+    específicas según el nivel de riesgo detectado.
+  </p>
+  <div class="risk-grid">
+    <div class="risk-card risk-inaceptable">
+      <h4>Inaceptable</h4>
+      <ul><li>Art. 5: Prohibición absoluta</li><li>Debe cesar desarrollo/uso inmediatamente</li></ul>
+    </div>
+    <div class="risk-card risk-alto">
+      <h4>Alto riesgo</h4>
+      <ul>
+        <li>Art. 9: Gestión de riesgos</li>
+        <li>Art. 10: Gobernanza de datos</li>
+        <li>Art. 11: Documentación técnica</li>
+        <li>Art. 12: Registro de actividades</li>
+        <li>Art. 13: Transparencia</li>
+        <li>Art. 14: Supervisión humana</li>
+        <li>Art. 43: Evaluación de conformidad</li>
+      </ul>
+    </div>
+    <div class="risk-card risk-limitado">
+      <h4>Riesgo limitado</h4>
+      <ul><li>Art. 50: Transparencia (informar que es IA)</li><li>Etiquetar deepfakes</li></ul>
+    </div>
+    <div class="risk-card risk-minimo">
+      <h4>Riesgo mínimo</h4>
+      <ul><li>Art. 95: Códigos de conducta voluntarios</li></ul>
+    </div>
+  </div>
+
+  <h3>Integración en el orquestador ReAct</h3>
+  <pre><code># src/orchestrator/main.py
+@tool
+def classify_risk(ai_system_description: str) -> dict:
+    """Clasifica un sistema de IA por nivel de riesgo EU AI Act."""
+    prediction = predict_risk(ai_system_description)
+    checklist  = build_compliance_checklist(prediction, ai_system_description)
+    return {**prediction, "checklist": checklist}
+
+# El agente ReAct (LangGraph + Bedrock Nova Lite) decide cuándo invocar esta tool</code></pre>
+
+  <h3>Observabilidad</h3>
+  <div class="features-grid">
+    <div class="feature-item">
+      <div class="fi-label">MLflow</div>
+      <div class="fi-val">Tracking de experimentos (métricas, parámetros, artefactos)</div>
+    </div>
+    <div class="feature-item">
+      <div class="fi-label">Langfuse</div>
+      <div class="fi-val">Observabilidad en producción (confidence scoring, traces)</div>
+    </div>
+    <div class="feature-item">
+      <div class="fi-label">Logging</div>
+      <div class="fi-val">Python logging nativo en main.py y retrain.py</div>
+    </div>
+  </div>
+
+  <h3>Stack tecnológico ML</h3>
+  <div class="tags">
+    <span class="tag tag-blue">Python 3.12</span>
+    <span class="tag tag-green">XGBoost 3.2</span>
+    <span class="tag tag-purple">BERT / transformers 4.48</span>
+    <span class="tag tag-yellow">PyTorch 2.1+</span>
+    <span class="tag tag-blue">scikit-learn 1.5.2</span>
+    <span class="tag tag-green">spaCy 3.8 (es_core_news_sm)</span>
+    <span class="tag tag-purple">PEFT / QLoRA 0.14</span>
+    <span class="tag tag-yellow">MLflow 2.17</span>
+    <span class="tag tag-blue">SHAP 0.47</span>
+    <span class="tag tag-green">Langfuse</span>
+    <span class="tag tag-purple">AWS Bedrock (Nova Lite)</span>
+    <span class="tag tag-yellow">DVC (versionado datos)</span>
+  </div>
+</section>
+
+<!-- ── LIMITACIONES ── -->
+<section id="limitaciones">
+  <h2>Limitaciones conocidas y decisiones de diseño</h2>
+
+  <div class="alert alert-warning">
+    <strong>Dataset pequeño (limitación crítica documentada)</strong>
+    El dataset original cuenta con ~200 ejemplos etiquetados manualmente. Esto requirió:
+    data augmentation masivo (×5) para BERT, <code>class_weight="balanced"</code> en XGBoost,
+    y cross-validation estricta (5-fold estratificado). El tamaño del dataset es una limitación
+    reconocida en el proyecto.
+  </div>
+
+  <table class="compare">
+    <thead>
+      <tr><th>#</th><th>Limitación</th><th>Impacto</th><th>Mitigación</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>L1</td>
+        <td>Dataset pequeño (200 ej. originales)</td>
+        <td class="red">Alto</td>
+        <td>Data augmentation ×5, class_weight balanced, cross-val</td>
+      </tr>
+      <tr>
+        <td>L2</td>
+        <td>BERT F1 (0.729) inferior a XGBoost (0.882)</td>
+        <td class="yellow">Medio</td>
+        <td>XGBoost como fallback y modelo principal. BERT backend semántico</td>
+      </tr>
+      <tr>
+        <td>L3</td>
+        <td>Sin explicabilidad SHAP para BERT</td>
+        <td class="yellow">Medio</td>
+        <td>Confidence + probabilidades + backend XGBoost explicable</td>
+      </tr>
+      <tr>
+        <td>L4</td>
+        <td>Divergencia de patrones Art. 5 entre training e inferencia</td>
+        <td class="yellow">Medio</td>
+        <td>Documentado en audit_errores [I1]. Override post-predicción actúa igual</td>
+      </tr>
+      <tr>
+        <td>L5</td>
+        <td>Sin reentrenamiento automático (CI/CD)</td>
+        <td class="accent" style="color:var(--accent)">Bajo</td>
+        <td>retrain.py manual con política de promoción conservadora (≥0.005)</td>
+      </tr>
+      <tr>
+        <td>L6</td>
+        <td>Modelo BERT base anterior a 2024 (Art. 5.1.e post-AIA)</td>
+        <td class="accent" style="color:var(--accent)">Bajo</td>
+        <td>Fine-tuning con datos manuales sobre Art. 5.1.e + override determinista</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Decisiones de diseño destacadas</h3>
+  <ul>
+    <li><strong>Lazy loading thread-safe:</strong> los modelos se cargan en el primer uso con double-check locking y <code>threading.Lock</code>, esencial para Streamlit multi-threaded.</li>
+    <li><strong>F1-macro como métrica principal:</strong> captura el rendimiento en clases minoritarias, más representativo que accuracy para datasets desbalanceados.</li>
+    <li><strong>Override post-predicción (no pre-procesado):</strong> el modelo ML siempre predice; el override solo corrige casos canónicos con certeza normativa absoluta.</li>
+    <li><strong><code>LEAKAGE_COLUMNS</code> explícito:</strong> frozenset centralizado en <code>_constants.py</code> que protege contra data leakage accidental durante el entrenamiento.</li>
+    <li><strong>Dos backends paralelos:</strong> XGBoost más interpretable y preciso; BERT más semántico y robusto a variaciones léxicas. Fallback automático garantiza disponibilidad.</li>
+  </ul>
+
+  <div class="alert alert-success">
+    <strong>Auditoría de errores completada</strong>
+    Se realizó una auditoría formal de errores (<code>audit_errores_classifier.md</code>).
+    Los 3 errores críticos (alta severidad) fueron corregidos: centralización de <code>_RISK_LABELS</code>,
+    corrección del índice en LogReg, y persistencia de <code>pipeline_type</code> en JSON.
+  </div>
+</section>
+
+</main>
+
+<!-- ══════════ FOOTER ══════════ -->
+<footer>
+  <p>NormaBot · Proyecto Final Bootcamp ML/IA KeepCoding · Presentación: 12 marzo 2026</p>
+  <p style="margin-top:6px">
+    <em>Informe preliminar generado por IA. Consulte profesional jurídico.</em>
+  </p>
+</footer>
+
+</body>
+</html>
