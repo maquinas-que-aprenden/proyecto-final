@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import uuid
 from pathlib import Path
 import numpy as np
@@ -14,7 +15,8 @@ MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI")
 MLFLOW_EXPERIMENT = "normabot-ragas-eval"
 THRESHOLDS = {
     "faithfulness": 0.80,
-    "answer_relevancy": 0.85,
+    # answer_relevancy excluida: Nova Lite no sigue el prompt de RAGAS
+    # (devuelve JSON incompleto sin el campo "question"), lo que produce NaN siempre.
     "context_precision": 0.70,
     "context_recall": 0.70,
 }
@@ -94,16 +96,82 @@ def build_ragas_dataset(rows: list[dict]):
     from datasets import Dataset
     return Dataset.from_list(rows)
 
+def _fix_nova_json(text: str) -> str:
+    """Corrige el JSON que devuelve Nova Lite para que RAGAS pueda parsearlo.
+
+    Nova Lite confunde el formato pedido con un JSON Schema y devuelve:
+        {"properties": {"statements": [...]}, "type": "object"}
+    en vez del valor esperado:
+        {"statements": [...]}
+
+    También elimina bloques ```json ... ``` si los hay.
+    """
+    # 1. Quitar fences de markdown
+    text = re.sub(r"```(?:json)?\s*([\s\S]*?)```", r"\1", text).strip()
+
+    # 2. Desenvuelve {"properties": {...}} → {...}
+    try:
+        data = json.loads(text)
+        if (
+            isinstance(data, dict)
+            and "properties" in data
+            and isinstance(data["properties"], dict)
+            and len(data) <= 3  # solo "properties", "type", "title"
+        ):
+            return json.dumps(data["properties"])
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    return text
+
+
 def get_ragas_llm():
     """Devuelve un LLM compatible con RAGAS usando Bedrock Nova Lite.
 
-    RAGAS necesita un LLM para calcular faithfulness y answer_relevancy.
+    RAGAS necesita un LLM para calcular faithfulness, context_precision y context_recall.
     Usamos el mismo modelo que el agente para consistencia.
+
+    Nova Lite tiene dos incompatibilidades con los prompts de RAGAS:
+    1. Devuelve {"properties": {"statements": [...]}} en vez de {"statements": [...]}
+    2. A veces devuelve JSON dentro de bloques ```json ... ```
+    _NovaChatWrapper aplica _fix_nova_json para corregir ambos casos.
+    Los ejemplos donde Nova Lite devuelve texto plano (no JSON) siguen
+    fallando individualmente y producen NaN, que se registra en los logs.
     """
     from langchain_aws import ChatBedrockConverse
+    from langchain_core.messages import AIMessage
+    from langchain_core.outputs import ChatGeneration
     from ragas.llms import LangchainLLMWrapper
 
-    llm = ChatBedrockConverse(
+    class _NovaChatWrapper(ChatBedrockConverse):
+        """Subclase que normaliza el JSON de Nova Lite para RAGAS."""
+
+        def _clean(self, result):
+            cleaned = []
+            for gen in result.generations:
+                if isinstance(gen, ChatGeneration) and isinstance(gen.message.content, str):
+                    clean_text = _fix_nova_json(gen.message.content)
+                    new_msg = AIMessage(
+                        content=clean_text,
+                        response_metadata=gen.message.response_metadata,
+                    )
+                    cleaned.append(ChatGeneration(
+                        text=clean_text,
+                        message=new_msg,
+                        generation_info=gen.generation_info,
+                    ))
+                else:
+                    cleaned.append(gen)
+            result.generations = cleaned
+            return result
+
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            return self._clean(super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs))
+
+        async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+            return self._clean(await super()._agenerate(messages, stop=stop, run_manager=run_manager, **kwargs))
+
+    llm = _NovaChatWrapper(
         model=os.getenv("BEDROCK_MODEL_ID", "eu.amazon.nova-lite-v1:0"),
         region_name=os.getenv("AWS_REGION", "eu-west-1"),
         temperature=0.0,
@@ -133,24 +201,16 @@ def get_ragas_embeddings():
 
 def run_ragas(ragas_dataset) -> dict:
     from ragas import evaluate
-    from ragas.metrics import Faithfulness, AnswerRelevancy, ContextPrecision, ContextRecall
+    from ragas.metrics import Faithfulness, ContextPrecision, ContextRecall
 
     ragas_llm = get_ragas_llm()
 
-    # Cargar embeddings para evitar error de OpenAI
-    try:
-        ragas_embeddings = get_ragas_embeddings()
-        logger.info("Embeddings sentence-transformers cargados correctamente.")
-    except Exception as e:
-        logger.warning("No se pudieron cargar embeddings, AnswerRelevancy fallará: %s", e)
-        ragas_embeddings = None
-
     logger.info("Calculando métricas RAGAS...")
 
-    # Definimos las métricas pasando los embeddings explícitamente
+    # AnswerRelevancy excluida: Nova Lite no sigue el prompt few-shot de RAGAS
+    # y devuelve JSON sin el campo "question", produciendo NaN en todos los ejemplos.
     metrics = [
         Faithfulness(llm=ragas_llm),
-        AnswerRelevancy(llm=ragas_llm, embeddings=ragas_embeddings),
         ContextPrecision(llm=ragas_llm),
         ContextRecall(llm=ragas_llm),
     ]
@@ -173,7 +233,6 @@ def run_ragas(ragas_dataset) -> dict:
 
     metrics = {
         "faithfulness": round(float(np.nanmean(results["faithfulness"])), 4),
-        "answer_relevancy": round(float(np.nanmean(results["answer_relevancy"])), 4),
         "context_precision": round(float(np.nanmean(results["context_precision"])), 4),
         "context_recall": round(float(np.nanmean(results["context_recall"])), 4),
     }
