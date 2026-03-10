@@ -45,13 +45,16 @@ def main(ci_mode: bool = False, retriever_only: bool = False) -> int:
     """Ejecuta la evaluación RAGAS en dos fases.
 
     Phase A (retriever): Context Precision + Context Recall.
-        No requiere Bedrock — sólo ChromaDB + Ollama.
+        La recogida de contextos (get_retriever_rows) sólo necesita ChromaDB + Ollama.
+        La evaluación RAGAS (run_ragas_retriever) sí requiere Bedrock, porque
+        ContextPrecision y ContextRecall son métricas evaluadas por LLM.
     Phase B (E2E): Faithfulness.
         Reutiliza los contextos de Phase A para que ambas fases sean comparables.
 
     Args:
         ci_mode: Si True, falla con exit code 1 si alguna métrica no supera el umbral.
-        retriever_only: Si True, salta Phase B. Útil en entornos sin Bedrock.
+        retriever_only: Si True, salta Phase B (Faithfulness). Ambas fases siguen
+            requiriendo Bedrock para la evaluación RAGAS.
 
     Returns:
         0 si todo OK, 1 si alguna métrica falla el umbral (bloquea CI).
@@ -152,7 +155,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--retriever-only",
         action="store_true",
-        help="Salta Phase B (Faithfulness). Útil en entornos sin Bedrock.",
+        help="Salta Phase B (Faithfulness). La evaluación RAGAS sigue requiriendo Bedrock.",
     )
     args = parser.parse_args()
     sys.exit(main(ci_mode=args.ci, retriever_only=args.retriever_only))

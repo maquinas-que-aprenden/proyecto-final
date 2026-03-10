@@ -49,23 +49,28 @@ def get_retriever_rows(dataset: list[dict]) -> list[dict]:
     """
     try:
         from src.rag.main import retrieve, grade
-        use_retriever = True
-    except ImportError:
-        use_retriever = False
-        logger.warning("Módulo src.rag.main no disponible — usando contextos estáticos del dataset")
+    except ImportError as exc:
+        # Sin el módulo RAG no podemos evaluar el retriever en absoluto.
+        # Usar contextos estáticos del dataset contaminaría Context Precision/Recall
+        # con datos gold, invalidando Phase A por completo.
+        raise RuntimeError(
+            "Módulo src.rag.main no disponible. "
+            "Instala las dependencias de RAG antes de ejecutar la evaluación del retriever."
+        ) from exc
 
     rows = []
     for item in dataset:
         question = item["question"]
-        contexts = item["contexts"]  # fallback a contextos estáticos
-        if use_retriever:
-            try:
-                docs = retrieve(question)
-                relevant = grade(question, docs)
-                if relevant:
-                    contexts = [d["doc"] for d in relevant]
-            except Exception:
-                logger.exception("Error en retrieval para '%s' — usando contextos estáticos", question[:50])
+        try:
+            docs = retrieve(question)
+            relevant = grade(question, docs)
+            contexts = [d["doc"] for d in relevant] if relevant else item["contexts"]
+        except Exception as exc:
+            # No usar contextos estáticos como fallback: contaminarían las métricas
+            # del retriever con datos gold y harían que Phase A fuera engañosa.
+            raise RuntimeError(
+                f"Error en retrieval para '{question[:80]}': {exc}"
+            ) from exc
 
         rows.append({
             "question": question,
@@ -107,8 +112,15 @@ def get_agent_answers(
         use_retriever = False
         logger.warning("Módulo src.rag.main no disponible — usando contextos estáticos del dataset")
 
+    # Indexar retriever_rows por pregunta para evitar alineación posicional frágil:
+    # la caché podría tener distinto orden o longitud si el dataset cambió.
+    retriever_index: dict[str, list[str]] = {}
+    if retriever_rows is not None:
+        for row in retriever_rows:
+            retriever_index[row["question"]] = row["contexts"]
+
     rows = []
-    for i, item in enumerate(dataset):
+    for item in dataset:
         question = item["question"]
 
         if use_agent:
@@ -123,11 +135,16 @@ def get_agent_answers(
             # Fallback mock: usamos ground_truth como answer para que RAGAS pueda correr
             answer = item.get("ground_truth", "")
 
-        # Reutilizar contextos de Phase A para garantizar que Faithfulness
-        # se evalúa sobre los mismos documentos que Context Precision/Recall.
-        if retriever_rows is not None:
-            contexts = retriever_rows[i]["contexts"]
+        # Reutilizar contextos de Phase A (lookup por pregunta) para garantizar que
+        # Faithfulness se evalúa sobre los mismos documentos que Context Precision/Recall.
+        if question in retriever_index:
+            contexts = retriever_index[question]
         else:
+            if retriever_rows is not None:
+                logger.warning(
+                    "Pregunta no encontrada en retriever_rows — regenerando contextos: '%s'",
+                    question[:50],
+                )
             # Fallback: recuperar contextos en línea si no hay Phase A disponible.
             contexts = item["contexts"]  # contextos estáticos del dataset
             if use_retriever:
@@ -352,7 +369,6 @@ def run_ragas_e2e(ragas_dataset) -> dict:
         logger.warning("Métricas con NaN (Phase B): %s — se registran como NaN", nan_metrics)
     return scores
 
-# Cuando se apruebe PR#36 lo añado a observabilidad
 def log_to_mlflow(metrics: dict, n_examples: int, git_sha: str) -> None:
     """Loguea los resultados en MLflow (EC2)."""
     import mlflow
@@ -487,7 +503,10 @@ def check_thresholds(metrics: dict) -> list[str]:
     """
     failures = []
     for metric, threshold in THRESHOLDS.items():
-        value = metrics.get(metric, 0.0)
+        if metric not in metrics:
+            # Métrica no producida en esta ejecución (p.ej. faithfulness con --retriever-only).
+            continue
+        value = metrics[metric]
         if np.isnan(value):
             failures.append(f"{metric}: NaN (métrica no calculada correctamente)")
         elif value < threshold:
