@@ -64,7 +64,11 @@ def get_retriever_rows(dataset: list[dict]) -> list[dict]:
         try:
             docs = retrieve(question)
             relevant = grade(question, docs)
-            contexts = [d["doc"] for d in relevant] if relevant else item["contexts"]
+            # Lista vacía si grade() no clasifica ningún doc como relevante:
+            # RAGAS puntuará precision=0 / recall=0, que refleja correctamente
+            # el resultado del retriever. No usar item["contexts"] como fallback
+            # porque contaminaría las métricas con datos gold.
+            contexts = [d["doc"] for d in relevant]
         except Exception as exc:
             # No usar contextos estáticos como fallback: contaminarían las métricas
             # del retriever con datos gold y harían que Phase A fuera engañosa.
