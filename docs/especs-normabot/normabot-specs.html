@@ -165,11 +165,11 @@ body{font-family:'Inter',sans-serif;background:var(--paper);color:var(--text);li
 <section class="hero">
   <div class="hero-icon">⚖️</div>
   <h1>Norma<span>Bot</span></h1>
-  <p class="hero-sub">Agentic RAG sobre normativa española (BOE + EU AI Act) con MLOps completo. LangGraph, Corrective RAG, clasificador ML, fine-tuning QLoRA, Langfuse, CI/CD y deploy en HuggingFace Spaces. Coste: 0€.</p>
+  <p class="hero-sub">Agentic RAG sobre normativa española (BOE + EU AI Act) con MLOps completo. LangGraph ReAct Agent, Corrective RAG, clasificador XGBoost, checklist determinista, Langfuse, CI/CD y deploy en AWS EC2.</p>
   <div class="hero-tags">
     <span class="hero-tag">Proyecto Final IA</span>
     <span class="hero-tag">3.5 Semanas · 4 Personas</span>
-    <span class="hero-tag">100% Python · 0€</span>
+    <span class="hero-tag">100% Python</span>
     <span class="hero-tag">EU AI Act Compliance</span>
     <span class="hero-tag">Agentic RAG</span>
   </div>
@@ -177,13 +177,13 @@ body{font-family:'Inter',sans-serif;background:var(--paper);color:var(--text);li
 </section>
 
 <nav class="nav-sticky"><div class="nav-inner">
-  <button class="nav-tab active" data-section="overview">Visión General</button>
-  <button class="nav-tab" data-section="modules">Módulos</button>
+  <button class="nav-tab active" data-section="overview">Vision General</button>
+  <button class="nav-tab" data-section="modules">Modulos</button>
   <button class="nav-tab" data-section="data">Datos</button>
   <button class="nav-tab" data-section="architecture">Arquitectura</button>
-  <button class="nav-tab" data-section="stack">Stack (0€)</button>
+  <button class="nav-tab" data-section="stack">Stack</button>
   <button class="nav-tab" data-section="bootcamp">Cobertura Bootcamp</button>
-  <button class="nav-tab" data-section="roadmap">Roadmap</button>
+  <button class="nav-tab" data-section="roadmap">Desarrollo</button>
   <button class="nav-tab" data-section="team">Equipo (4)</button>
   <button class="nav-tab" data-section="deploy">Despliegue</button>
   <button class="nav-tab" data-section="risks">KPIs y Riesgos</button>
@@ -191,226 +191,159 @@ body{font-family:'Inter',sans-serif;background:var(--paper);color:var(--text);li
 
 <!-- OVERVIEW -->
 <div id="overview" class="section active"><div class="container">
-  <div class="sh"><h2>El proyecto que abre puertas en España</h2><p>NormaBot es un sistema Agentic RAG que permite consultar en lenguaje natural el BOE, el EU AI Act y regulaciones sectoriales, clasificar sistemas de IA por nivel de riesgo y generar informes de cumplimiento. Apunta al sector que más contrata IA: banca, seguros y consultoría.</p></div>
+  <div class="sh"><h2>El proyecto que abre puertas en regulacion IA</h2><p>NormaBot es un sistema Agentic RAG que permite consultar en lenguaje natural el BOE y el EU AI Act, clasificar sistemas de IA por nivel de riesgo y generar checklists de cumplimiento deterministas. Apunta al sector que mas contrata IA: banca, seguros y consultoria.</p></div>
 
-  <div class="ub"><h3>🔥 Por qué este proyecto, por qué ahora</h3><p>Desde febrero 2025, el EU AI Act prohíbe prácticas de riesgo inaceptable. En agosto 2025 entran obligaciones para modelos de propósito general. AESIA ya está operativa. Las empresas necesitan urgentemente entender qué regulaciones les afectan.</p>
-    <div class="fb"><div class="fc"><div class="v">35M€</div><div class="l">Multa máxima</div></div><div class="fc"><div class="v">7%</div><div class="l">Facturación global</div></div><div class="fc"><div class="v">454%</div><div class="l">↑ Ofertas IA (2019-23)</div></div><div class="fc"><div class="v">138k</div><div class="l">Vacantes IA España 2025</div></div></div>
-  </div>
-
-  <div class="mb"><h3>📊 Lo que piden las ofertas reales (903 ofertas AI Engineer)</h3>
-    <div class="ms"><div class="mst"><div class="v">28%</div><div class="l">Deep Learning</div></div><div class="mst"><div class="v">20%</div><div class="l">NLP / LLMs</div></div><div class="mst"><div class="v">14%</div><div class="l">RAG</div></div><div class="mst"><div class="v">11%</div><div class="l">AI Agents</div></div><div class="mst"><div class="v">18%</div><div class="l">Kubernetes</div></div><div class="mst"><div class="v">15%</div><div class="l">Docker</div></div></div>
+  <div class="ub"><h3>Por que este proyecto, por que ahora</h3><p>Desde febrero 2025, el EU AI Act prohibe practicas de riesgo inaceptable. En agosto 2025 entran obligaciones para modelos de proposito general. AESIA ya esta operativa. Las empresas necesitan urgentemente entender que regulaciones les afectan.</p>
+    <div class="fb"><div class="fc"><div class="v">35M€</div><div class="l">Multa maxima</div></div><div class="fc"><div class="v">7%</div><div class="l">Facturacion global</div></div><div class="fc"><div class="v">454%</div><div class="l">↑ Ofertas IA (2019-23)</div></div><div class="fc"><div class="v">138k</div><div class="l">Vacantes IA España 2025</div></div></div>
   </div>
 
   <div class="fc0"><div class="fl">Flujo principal</div>
-    <div class="fr"><div class="fx u">💬 Consulta sobre normativa</div><span class="fa">→</span><div class="fx p">🧭 Orquestador LangGraph</div></div>
+    <div class="fr"><div class="fx u">Consulta sobre normativa</div><span class="fa">→</span><div class="fx p">ReAct Agent (LangGraph)</div></div>
     <div class="fa d">↓</div>
-    <div class="fr"><div class="fx a">📚 Agente RAG (Corrective)</div><span class="fa">→</span><div class="fx o">Arts. BOE + EU AI Act</div></div>
+    <div class="fr"><div class="fx a">Tool: search_legal_docs (Corrective RAG)</div><span class="fa">→</span><div class="fx o">Arts. BOE + EU AI Act</div></div>
     <div class="fa d">↓</div>
-    <div class="fr"><div class="fx a">⚠️ Agente Clasificador Riesgo</div><span class="fa">→</span><div class="fx o">ML: "Alto riesgo — Anexo III"</div></div>
+    <div class="fr"><div class="fx a">Tool: classify_risk (XGBoost + SHAP)</div><span class="fa">→</span><div class="fx o">Nivel riesgo + checklist</div></div>
     <div class="fa d">↓</div>
-    <div class="fr"><div class="fx a">📋 Agente de Informes</div><span class="fa">→</span><div class="fx o">Informe cumplimiento + citas</div></div>
-    <div class="fa d">↓</div>
-    <div class="fr"><div class="fx u">👤 Respuesta + fuentes + riesgo + recomendaciones</div></div>
+    <div class="fr"><div class="fx u">Respuesta + citas verificadas + clasificacion + recomendaciones</div></div>
   </div>
 
-  <div class="mg"><div class="mc"><div class="mv">3</div><div class="ml">Agentes LangGraph</div></div><div class="mc"><div class="mv">0€</div><div class="ml">Coste total stack</div></div><div class="mc"><div class="mv">4</div><div class="ml">Niveles riesgo</div></div><div class="mc"><div class="mv">17</div><div class="ml">Días desarrollo</div></div><div class="mc"><div class="mv">HF</div><div class="ml">Deploy vivo gratis</div></div></div>
+  <div class="mg"><div class="mc"><div class="mv">1</div><div class="ml">ReAct Agent</div></div><div class="mc"><div class="mv">4</div><div class="ml">Tools</div></div><div class="mc"><div class="mv">4</div><div class="ml">Niveles riesgo</div></div><div class="mc"><div class="mv">~3700</div><div class="ml">Lineas de codigo</div></div><div class="mc"><div class="mv">AWS</div><div class="ml">Deploy EC2 + Docker</div></div></div>
 </div></div>
 
 <!-- MODULES -->
 <div id="modules" class="section"><div class="container">
-  <div class="sh"><h2>Módulos del Sistema</h2><p>Tres agentes LangGraph + NLP pipeline + MLOps completo + interfaz Streamlit. Cada módulo demuestra competencias diferentes del bootcamp.</p></div>
+  <div class="sh"><h2>Modulos del Sistema</h2><p>Un ReAct agent con 4 tools + pipeline ML + checklist determinista + MLOps completo + interfaz Streamlit. Cada modulo demuestra competencias diferentes del bootcamp.</p></div>
   <div class="mog">
-    <div class="moc"><div class="mob rag"></div><div class="mbd"><div class="icon">📚</div><div class="nm">Agente RAG Normativo (Corrective RAG)</div><div class="tk">LangGraph · LangChain · ChromaDB · Groq API · Self-Reflection</div>
-      <h4>Corrective RAG Pipeline</h4><ul><li><strong>Retrieve:</strong> ChromaDB → top-k chunks legislación</li><li><strong>Grade:</strong> LLM evalúa si chunks son relevantes</li><li><strong>Transform query:</strong> reformula si no hay docs buenos</li><li><strong>Web fallback:</strong> búsqueda web si sigue sin resultados</li><li><strong>Generate:</strong> respuesta con citas exactas (artículo, sección)</li><li><strong>Self-reflection:</strong> verifica respuesta soportada por fuentes</li></ul>
-      <h4>Chunking inteligente legal</h4><ul><li>Por artículo/sección, no tokens arbitrarios</li><li>Metadata: ley, artículo, fecha, BOE número</li><li>Embeddings: paraphrase-multilingual-MiniLM-L12-v2 (CPU)</li></ul>
+    <div class="moc"><div class="mob rag"></div><div class="mbd"><div class="icon">📚</div><div class="nm">RAG Normativo (Corrective RAG)</div><div class="tk">ChromaDB · multilingual-e5-base · Ollama Qwen 2.5 3B · Score Fallback</div>
+      <h4>Corrective RAG Pipeline</h4><ul><li><strong>Retrieve:</strong> ChromaDB con intfloat/multilingual-e5-base → top-k chunks legislacion</li><li><strong>Grade:</strong> Ollama Qwen 2.5 3B (local) evalua relevancia de cada documento</li><li><strong>Score fallback:</strong> si Ollama no responde, fallback a puntuacion por similitud</li><li><strong>Format context:</strong> documentos relevantes preparados para el orquestador</li><li><strong>Generate:</strong> el orquestador (Bedrock Nova Lite) genera la respuesta final con citas</li></ul>
+      <h4>Chunking legal</h4><ul><li>Por articulo/seccion, no tokens arbitrarios</li><li>Metadata: ley, articulo, fecha, fuente</li><li>Embeddings: intfloat/multilingual-e5-base (CPU)</li><li>Modos de busqueda: base (semantica directa) y soft (priorizada por fuente)</li></ul>
     </div></div>
-    <div class="moc"><div class="mob clf"></div><div class="mbd"><div class="icon">⚠️</div><div class="nm">Agente Clasificador de Riesgo (ML)</div><div class="tk">scikit-learn · XGBoost · Grid Search · k-fold · MLflow · SHAP</div>
-      <h4>Pipeline ML</h4><ul><li><strong>Dataset:</strong> ~200-300 descripciones de sistemas etiquetadas manualmente</li><li><strong>Features:</strong> TF-IDF + embeddings + features manuales (sector, tipo datos)</li><li><strong>Modelos:</strong> XGBoost vs Random Forest vs LogReg</li><li><strong>Validación:</strong> Stratified k-fold (k=5), Grid Search</li><li><strong>Tracking:</strong> MLflow registra cada experimento</li><li><strong>Explicabilidad:</strong> SHAP features relevantes</li></ul>
-      <h4>4 clases EU AI Act</h4><ul><li>Inaceptable (prohibido)</li><li>Alto riesgo (obligaciones fuertes)</li><li>Riesgo limitado (transparencia)</li><li>Riesgo mínimo (sin obligaciones)</li></ul>
+    <div class="moc"><div class="mob clf"></div><div class="mbd"><div class="icon">⚠️</div><div class="nm">Clasificador de Riesgo (ML)</div><div class="tk">XGBoost · TF-IDF + SVD · spaCy · Grid Search · StratifiedKFold · SHAP · MLflow</div>
+      <h4>Pipeline ML completo</h4><ul><li><strong>Dataset:</strong> ~200-300 descripciones etiquetadas (real + sintetico fusionado)</li><li><strong>Preprocesamiento:</strong> limpieza spaCy (es_core_news_sm), stopwords, lematizacion</li><li><strong>Features:</strong> TF-IDF + SVD (reduccion dimensionalidad) + keywords de dominio manuales</li><li><strong>Modelo:</strong> XGBoost con Grid Search + StratifiedKFold (k=5)</li><li><strong>Tracking:</strong> MLflow registra cada experimento (3 datasets: real, artificial, fusionado)</li><li><strong>Explicabilidad:</strong> SHAP features relevantes por prediccion</li><li><strong>Override determinista:</strong> Anexo III EU AI Act (bypass ML para casos claros)</li><li><strong>Reentrenamiento:</strong> pipeline incremental con augmented data (retrain.py)</li></ul>
+      <h4>4 clases EU AI Act</h4><ul><li>Inaceptable (prohibido)</li><li>Alto riesgo (obligaciones fuertes)</li><li>Riesgo limitado (transparencia)</li><li>Riesgo minimo (sin obligaciones)</li></ul>
     </div></div>
-    <div class="moc"><div class="mob rpt"></div><div class="mbd"><div class="icon">📋</div><div class="nm">Agente de Informes de Cumplimiento</div><div class="tk">LLM (Groq/Gemini) · Templates · Markdown/PDF export</div>
-      <h4>Estructura del informe generado</h4><ul><li><strong>Resumen ejecutivo:</strong> qué normativa aplica y por qué</li><li><strong>Clasificación de riesgo:</strong> nivel + justificación + artículos</li><li><strong>Obligaciones:</strong> requisitos EU AI Act para ese nivel</li><li><strong>Citas legales:</strong> artículos exactos BOE + EU AI Act</li><li><strong>Recomendaciones:</strong> pasos concretos de cumplimiento</li><li><strong>Disclaimer:</strong> "Informe preliminar, consulte profesional jurídico"</li></ul>
+    <div class="moc"><div class="mob rpt"></div><div class="mbd"><div class="icon">📋</div><div class="nm">Checklist de Cumplimiento (Determinista)</div><div class="tk">Python puro · Sin LLM · 469 lineas · 23 tests</div>
+      <h4>Generacion determinista (sin LLM)</h4><ul><li><strong>Obligaciones:</strong> checklist hardcoded por nivel de riesgo EU AI Act</li><li><strong>Recomendaciones SHAP:</strong> basadas en features relevantes de la prediccion ML</li><li><strong>Deteccion borderline:</strong> alerta cuando la confianza del clasificador es baja</li><li><strong>100% testeable:</strong> 23 tests unitarios puros, sin dependencia de LLM</li><li><strong>Disclaimer:</strong> "Informe preliminar generado por IA. Consulte profesional juridico."</li></ul>
     </div></div>
-    <div class="moc"><div class="mob nlp"></div><div class="mbd"><div class="icon">🔤</div><div class="nm">NLP Pipeline + Fine-tuning QLoRA</div><div class="tk">spaCy · HuggingFace · Unsloth · Llama 3.2 3B · Google Colab T4</div>
-      <h4>NLP</h4><ul><li>NER de entidades legales españolas con spaCy (leyes, artículos, organismos)</li><li>Clasificación de artículos por tema con modelo fine-tuned</li></ul>
-      <h4>Fine-tuning QLoRA</h4><ul><li><strong>Base model:</strong> Llama 3.2 3B</li><li><strong>Framework:</strong> Unsloth (2-4x más rápido)</li><li><strong>Hardware:</strong> Google Colab free T4 GPU</li><li><strong>Task:</strong> clasificar artículos legales por tema/relevancia</li><li><strong>Dataset:</strong> ~500 artículos etiquetados del BOE</li></ul>
+    <div class="moc"><div class="mob nlp"></div><div class="mbd"><div class="icon">🧠</div><div class="nm">Orquestador ReAct Agent</div><div class="tk">LangGraph · Amazon Bedrock Nova Lite · ContextVar Side-Channel · SQLite Memory</div>
+      <h4>Arquitectura del agente</h4><ul><li><strong>ReAct:</strong> create_react_agent de LangGraph con tool calling</li><li><strong>LLM:</strong> Amazon Bedrock Nova Lite v1 (orquestacion + generacion de respuestas)</li><li><strong>4 tools:</strong> search_legal_docs, classify_risk, save_user_preference, get_user_preferences</li><li><strong>Side-channel ContextVar:</strong> transporta citas y metadata verificadas fuera del LLM</li><li><strong>SQLite checkpointer:</strong> persistencia de conversaciones (fallback a MemorySaver)</li><li><strong>Pre-model hook:</strong> recorta historial a 30K tokens antes de cada llamada LLM</li></ul>
     </div></div>
-    <div class="moc"><div class="mob ops"></div><div class="mbd"><div class="icon">🔬</div><div class="nm">MLOps + Observabilidad</div><div class="tk">MLflow · DVC · GitHub Actions · Langfuse · EvidentlyAI · RAGAS</div>
-      <h4>Pipeline completo</h4><ul><li><strong>MLflow:</strong> tracking experimentos clasificador + fine-tuning, model registry</li><li><strong>DVC:</strong> versionado corpus legal con Google Drive como remote</li><li><strong>GitHub Actions:</strong> CI/CD → test → lint → eval RAGAS → build → deploy HF</li><li><strong>Langfuse:</strong> trazas de cada llamada LLM (5.000 trazas/mes gratis)</li><li><strong>EvidentlyAI:</strong> dashboards de drift y calidad de datos</li><li><strong>RAGAS + DeepEval:</strong> faithfulness, relevance, hallucination automáticos</li></ul>
+    <div class="moc"><div class="mob ops"></div><div class="mbd"><div class="icon">🔬</div><div class="nm">MLOps + Observabilidad</div><div class="tk">MLflow · DVC · GitHub Actions · Langfuse · RAGAS · CodeRabbit</div>
+      <h4>Pipeline completo</h4><ul><li><strong>MLflow:</strong> tracking experimentos clasificador (3 datasets), model registry</li><li><strong>DVC:</strong> versionado corpus legal con S3 como remote</li><li><strong>GitHub Actions:</strong> 5 workflows (pr_lint, ci-develop, cicd-main, eval, deploy-manual)</li><li><strong>Langfuse:</strong> trazas de cada llamada LLM (degradacion graceful si no disponible)</li><li><strong>RAGAS:</strong> evaluacion RAG automatica (context_precision, context_recall, faithfulness)</li><li><strong>CodeRabbit:</strong> code review automatizado en PRs (logica, seguridad, rendimiento)</li></ul>
     </div></div>
-    <div class="moc"><div class="mob ui"></div><div class="mbd"><div class="icon">🖥️</div><div class="nm">Streamlit UI</div><div class="tk">Streamlit · HuggingFace Spaces · Docker SDK</div>
-      <h4>Interfaz</h4><ul><li>Chat conversacional con fuentes citadas (artículos BOE)</li><li>Panel de clasificación de riesgo (input: describe tu sistema → output: nivel)</li><li>Generador de informe de cumplimiento (descargable)</li><li>Visualización de métricas RAG (faithfulness, relevance)</li></ul>
+    <div class="moc"><div class="mob ui"></div><div class="mbd"><div class="icon">🖥️</div><div class="nm">Streamlit UI</div><div class="tk">Streamlit · Docker · AWS EC2</div>
+      <h4>Interfaz</h4><ul><li>Chat conversacional con st.chat_message</li><li>Citas verificadas en expanders (side-channel, no LLM)</li><li>Panel de clasificacion de riesgo con metadata</li><li>Persistencia de sesion via session_id + user_id</li><li>Healthcheck en /_stcore/health</li></ul>
     </div></div>
   </div>
 </div></div>
 
 <!-- DATA -->
 <div id="data" class="section"><div class="container">
-  <div class="sh"><h2>Datos y Fuentes (todo público y gratuito)</h2><p>BOE scrappeable, EU AI Act en EUR-Lex en español, AESIA con documentos públicos. Dataset de clasificación etiquetado manualmente por el equipo.</p></div>
-  <div class="dtw"><table class="dt"><thead><tr><th>Dato</th><th>Módulo</th><th>Fuente</th><th>Obtención</th><th>Volumen</th></tr></thead><tbody>
-    <tr><td><strong>BOE — legislación IA, protección datos, sector financiero</strong></td><td>RAG</td><td>boe.es</td><td><span class="bdg scr">Scraping</span></td><td>50-100 artículos clave</td></tr>
-    <tr><td><strong>EU AI Act completo (Reglamento UE 2024/1689)</strong></td><td>RAG + ML</td><td>EUR-Lex (español)</td><td><span class="bdg pub">Público</span></td><td>~180 artículos + anexos</td></tr>
-    <tr><td><strong>Guías AESIA + sandbox regulatorio</strong></td><td>RAG</td><td>aesia.gob.es</td><td><span class="bdg pub">Público</span></td><td>10-15 documentos</td></tr>
-    <tr><td><strong>Dataset clasificación riesgo (etiquetado manual)</strong></td><td>ML</td><td>Elaboración propia</td><td><span class="bdg man">Manual (equipo)</span></td><td>200-300 descripciones</td></tr>
-    <tr><td><strong>Artículos BOE etiquetados por tema</strong></td><td>Fine-tuning</td><td>BOE + etiquetado manual</td><td><span class="bdg man">Manual</span></td><td>~500 artículos</td></tr>
-    <tr><td><strong>Normativa LOPD-GDD, RGPD español</strong></td><td>RAG</td><td>boe.es / aepd.es</td><td><span class="bdg pub">Público</span></td><td>~30 artículos</td></tr>
-    <tr><td><strong>Regulación sectorial (banca, seguros)</strong></td><td>RAG</td><td>BOE / CNMV / BdE</td><td><span class="bdg scr">Scraping</span></td><td>20-30 docs</td></tr>
+  <div class="sh"><h2>Datos y Fuentes</h2><p>BOE y EU AI Act como fuentes legislativas principales. Dataset de clasificacion con datos reales etiquetados manualmente + datos sinteticos. Versionado con DVC + S3.</p></div>
+  <div class="dtw"><table class="dt"><thead><tr><th>Dato</th><th>Modulo</th><th>Fuente</th><th>Obtencion</th><th>Volumen</th></tr></thead><tbody>
+    <tr><td><strong>EU AI Act completo (Reglamento UE 2024/1689)</strong></td><td>RAG + ML</td><td>EUR-Lex (español)</td><td><span class="bdg pub">Publico</span></td><td>~180 articulos + anexos</td></tr>
+    <tr><td><strong>BOE — legislacion IA, proteccion datos</strong></td><td>RAG</td><td>boe.es</td><td><span class="bdg scr">Scraping + PDF</span></td><td>Articulos clave</td></tr>
+    <tr><td><strong>Dataset clasificacion riesgo (real)</strong></td><td>ML</td><td>Etiquetado manual</td><td><span class="bdg man">Manual (equipo)</span></td><td>~100-150 descripciones</td></tr>
+    <tr><td><strong>Dataset clasificacion riesgo (sintetico)</strong></td><td>ML</td><td>Generado + curado</td><td><span class="bdg man">Augmentation</span></td><td>~100-150 descripciones</td></tr>
+    <tr><td><strong>Dataset fusionado (produccion)</strong></td><td>ML</td><td>Real + sintetico</td><td><span class="bdg man">Fusion</span></td><td>~200-300 total</td></tr>
+    <tr><td><strong>Chunks legales procesados</strong></td><td>RAG</td><td>Pipeline ingest.py</td><td><span class="bdg free">ETL</span></td><td>JSONL versionado DVC</td></tr>
+    <tr><td><strong>Vectorstore ChromaDB</strong></td><td>RAG</td><td>Pipeline index.py</td><td><span class="bdg free">Embeddings</span></td><td>Coleccion normabot_legal_chunks</td></tr>
   </tbody></table></div>
+
+  <div class="on"><strong>Pipeline de datos:</strong> <code>data/ingest.py</code> (raw → chunks JSONL) → <code>data/index.py</code> (chunks → embeddings → ChromaDB). Todo versionado con DVC, remote en S3 (eu-west-1). Datos raw y procesados gitignored.</div>
 </div></div>
 
 <!-- ARCHITECTURE -->
 <div id="architecture" class="section"><div class="container">
-  <div class="sh"><h2>Arquitectura del Sistema</h2><p>LangGraph como orquestador de 3 agentes, ChromaDB como vector store, MLflow + Langfuse como capa de observabilidad, CI/CD con GitHub Actions y deploy en HuggingFace Spaces.</p></div>
+  <div class="sh"><h2>Arquitectura del Sistema</h2><p>Un ReAct agent (LangGraph) orquesta 4 tools. Bedrock Nova Lite como LLM principal, Ollama Qwen 2.5 3B para grading local. ChromaDB como vector store, MLflow + Langfuse como capa de observabilidad. CI/CD con GitHub Actions, deploy en AWS EC2 via Docker.</p></div>
   <div class="ag">
-    <div class="al fe"><div class="ll">Presentación</div><div class="lt">Streamlit en HuggingFace Spaces</div><div class="lc"><span class="cc">Streamlit</span><span class="cc">st.chat_message</span><span class="cc">Panel clasificación</span><span class="cc">Export informes</span></div><div class="ld">Chat, clasificador de riesgo, generador de informes. Deploy en HF Spaces con Docker SDK (2 CPU, 16GB RAM, siempre activo, gratis).</div></div>
-    <div class="al ap"><div class="ll">Orquestación</div><div class="lt">LangGraph — Grafo de agentes</div><div class="lc"><span class="cc">LangGraph</span><span class="cc">Agente RAG</span><span class="cc">Agente Clasificador</span><span class="cc">Agente Informes</span><span class="cc">Routing condicional</span></div><div class="ld">Grafo de estados con routing: analiza la consulta → decide qué agente(s) activar → orquesta el flujo → sintetiza respuesta. Corrective RAG con self-reflection en el agente normativo.</div></div>
-    <div class="al ia"><div class="ll">Inteligencia</div><div class="lt">LLMs + ML + NLP</div><div class="lc"><span class="cc">Groq API (Llama 3.3 70B)</span><span class="cc">Gemini fallback</span><span class="cc">XGBoost (clasificador)</span><span class="cc">spaCy NER</span><span class="cc">QLoRA fine-tuned</span></div><div class="ld">Groq como LLM principal (14.400 req/día gratis). Gemini como fallback. XGBoost para clasificación de riesgo. spaCy para NER legal. QLoRA fine-tuned para clasificación de artículos.</div></div>
-    <div class="al da"><div class="ll">Datos</div><div class="lt">Almacenamiento + Versionado</div><div class="lc"><span class="cc">ChromaDB (vectores)</span><span class="cc">DVC + Google Drive</span><span class="cc">MLflow (experiments)</span></div><div class="ld">ChromaDB embebido para vectores del corpus legal. DVC para versionado del corpus (remote en Google Drive). MLflow para tracking de experimentos y model registry.</div></div>
-    <div class="al ex"><div class="ll">Observabilidad + CI/CD</div><div class="lt">Monitoring + Deploy automático</div><div class="lc"><span class="cc">Langfuse (trazas LLM)</span><span class="cc">EvidentlyAI (drift)</span><span class="cc">RAGAS (eval RAG)</span><span class="cc">GitHub Actions</span></div><div class="ld">Langfuse traza cada llamada al LLM. EvidentlyAI monitorea drift. RAGAS evalúa calidad RAG automáticamente en CI. GitHub Actions: test → lint → eval → build Docker → deploy HF Spaces.</div></div>
+    <div class="al fe"><div class="ll">Presentacion</div><div class="lt">Streamlit en AWS EC2</div><div class="lc"><span class="cc">Streamlit</span><span class="cc">st.chat_message</span><span class="cc">Expanders metadata</span><span class="cc">Docker</span></div><div class="ld">Chat conversacional con citas verificadas. Deploy en AWS EC2 con Docker. Healthcheck en /_stcore/health. Puerto 8080.</div></div>
+    <div class="al ap"><div class="ll">Orquestacion</div><div class="lt">LangGraph ReAct Agent</div><div class="lc"><span class="cc">create_react_agent</span><span class="cc">Tool calling</span><span class="cc">ContextVar side-channel</span><span class="cc">SQLite checkpointer</span><span class="cc">Pre-model hook 30K tokens</span></div><div class="ld">ReAct agent con 4 tools: search_legal_docs (RAG), classify_risk (ML + checklist), save_user_preference y get_user_preferences (memoria). ContextVar transporta citas verificadas fuera del LLM para evitar alucinaciones.</div></div>
+    <div class="al ia"><div class="ll">Inteligencia</div><div class="lt">LLMs + ML</div><div class="lc"><span class="cc">Bedrock Nova Lite v1</span><span class="cc">Ollama Qwen 2.5 3B</span><span class="cc">XGBoost</span><span class="cc">spaCy</span><span class="cc">SHAP</span></div><div class="ld">Bedrock Nova Lite como LLM principal (orquestacion + generacion de respuestas RAG). Ollama Qwen 2.5 3B local para grading de documentos (tarea binaria, sin API keys). XGBoost para clasificacion de riesgo con SHAP. spaCy para preprocesamiento de texto.</div></div>
+    <div class="al da"><div class="ll">Datos</div><div class="lt">Almacenamiento + Versionado</div><div class="lc"><span class="cc">ChromaDB (vectores)</span><span class="cc">DVC + S3</span><span class="cc">MLflow (experiments)</span><span class="cc">SQLite (memoria)</span></div><div class="ld">ChromaDB PersistentClient para vectores del corpus legal. DVC para versionado (remote S3 eu-west-1). MLflow para tracking de 3 experimentos (real, artificial, fusionado). SQLite para persistencia de conversaciones.</div></div>
+    <div class="al ex"><div class="ll">Observabilidad + CI/CD</div><div class="lt">Monitoring + Deploy automatico</div><div class="lc"><span class="cc">Langfuse (trazas LLM)</span><span class="cc">RAGAS (eval RAG)</span><span class="cc">GitHub Actions (5 workflows)</span><span class="cc">CodeRabbit</span></div><div class="ld">Langfuse traza cada llamada al LLM (degradacion graceful). RAGAS evalua calidad RAG en CI (context_precision, context_recall >= 0.70, faithfulness >= 0.80). 5 workflows GitHub Actions. CodeRabbit review automatizado.</div></div>
   </div>
 </div></div>
 
 <!-- STACK -->
 <div id="stack" class="section"><div class="container">
-  <div class="sh"><h2>Stack Tecnológico — Todo gratuito</h2><p>Cada herramienta del stack tiene coste 0€. Esto es intencional: demuestra que se puede construir un sistema de producción sin presupuesto.</p></div>
+  <div class="sh"><h2>Stack Tecnologico</h2><p>Python 3.12 end-to-end. AWS para infraestructura cloud, herramientas open-source para ML/NLP, servicios gratuitos para observabilidad.</p></div>
   <div class="sg">
-    <div class="sc"><h4>🤖 LLM Inference</h4><div class="si"><div><div class="sn">Groq API (Llama 3.3 70B)</div><div class="sw">14.400 req/día gratis. Rapidísimo</div></div></div><div class="si"><div><div class="sn">Google Gemini (fallback)</div><div class="sw">1.000 RPD gratis</div></div></div><div class="si"><div><div class="sn">Mistral free tier</div><div class="sw">Tercer fallback si falla todo</div></div></div></div>
-    <div class="sc"><h4>🧠 Agentes + RAG</h4><div class="si"><div><div class="sn">LangGraph</div><div class="sw">Orquestación multi-agente con grafos</div></div></div><div class="si"><div><div class="sn">LangChain</div><div class="sw">Document loaders, chains, retrieval</div></div></div><div class="si"><div><div class="sn">ChromaDB</div><div class="sw">Vector store embebido, persistido</div></div></div><div class="si"><div><div class="sn">sentence-transformers</div><div class="sw">Embeddings multilingüe en CPU</div></div></div></div>
-    <div class="sc"><h4>📊 ML + NLP</h4><div class="si"><div><div class="sn">scikit-learn + XGBoost</div><div class="sw">Clasificador riesgo, Grid Search, k-fold</div></div></div><div class="si"><div><div class="sn">spaCy (es_core_news_lg)</div><div class="sw">NER entidades legales español</div></div></div><div class="si"><div><div class="sn">HF Transformers + Unsloth</div><div class="sw">Fine-tuning QLoRA en Colab T4</div></div></div></div>
-    <div class="sc"><h4>🔬 MLOps</h4><div class="si"><div><div class="sn">MLflow</div><div class="sw">Tracking + model registry</div></div></div><div class="si"><div><div class="sn">DVC + Google Drive</div><div class="sw">Versionado corpus legal</div></div></div><div class="si"><div><div class="sn">GitHub Actions</div><div class="sw">CI/CD ilimitado (repo público)</div></div></div></div>
-    <div class="sc"><h4>👁️ Observabilidad</h4><div class="si"><div><div class="sn">Langfuse</div><div class="sw">Trazas LLM (5.000/mes gratis)</div></div></div><div class="si"><div><div class="sn">EvidentlyAI</div><div class="sw">Dashboards drift (open-source)</div></div></div><div class="si"><div><div class="sn">RAGAS + DeepEval</div><div class="sw">Eval RAG automático</div></div></div></div>
-    <div class="sc"><h4>🚀 Deploy</h4><div class="si"><div><div class="sn">HuggingFace Spaces</div><div class="sw">2 CPU, 16GB RAM, siempre activo, $0</div></div></div><div class="si"><div><div class="sn">Docker SDK</div><div class="sw">Container para HF Spaces</div></div></div><div class="si"><div><div class="sn">Colab free (T4 GPU)</div><div class="sw">Fine-tuning QLoRA</div></div></div></div>
+    <div class="sc"><h4>LLM Inference</h4><div class="si"><div><div class="sn">Amazon Bedrock (Nova Lite v1)</div><div class="sw">Orquestador + generacion respuestas RAG</div></div></div><div class="si"><div><div class="sn">Ollama (Qwen 2.5 3B)</div><div class="sw">Grading local de documentos RAG. Sin API keys</div></div></div></div>
+    <div class="sc"><h4>Agentes + RAG</h4><div class="si"><div><div class="sn">LangGraph</div><div class="sw">ReAct agent con tool calling</div></div></div><div class="si"><div><div class="sn">LangChain</div><div class="sw">Document loaders, retrieval</div></div></div><div class="si"><div><div class="sn">ChromaDB</div><div class="sw">Vector store embebido, PersistentClient</div></div></div><div class="si"><div><div class="sn">sentence-transformers</div><div class="sw">intfloat/multilingual-e5-base (CPU)</div></div></div></div>
+    <div class="sc"><h4>ML + NLP</h4><div class="si"><div><div class="sn">XGBoost + scikit-learn</div><div class="sw">Clasificador riesgo, Grid Search, StratifiedKFold</div></div></div><div class="si"><div><div class="sn">spaCy (es_core_news_sm)</div><div class="sw">Preprocesamiento texto legal español</div></div></div><div class="si"><div><div class="sn">SHAP</div><div class="sw">Explicabilidad de predicciones ML</div></div></div></div>
+    <div class="sc"><h4>MLOps</h4><div class="si"><div><div class="sn">MLflow</div><div class="sw">Tracking 3 experimentos + model registry</div></div></div><div class="si"><div><div class="sn">DVC + S3</div><div class="sw">Versionado corpus legal</div></div></div><div class="si"><div><div class="sn">GitHub Actions</div><div class="sw">5 workflows CI/CD</div></div></div></div>
+    <div class="sc"><h4>Observabilidad</h4><div class="si"><div><div class="sn">Langfuse</div><div class="sw">Trazas LLM (tier gratuito)</div></div></div><div class="si"><div><div class="sn">RAGAS</div><div class="sw">Eval RAG automatica en CI</div></div></div><div class="si"><div><div class="sn">CodeRabbit</div><div class="sw">Code review automatizado en PRs</div></div></div></div>
+    <div class="sc"><h4>Infraestructura</h4><div class="si"><div><div class="sn">AWS EC2</div><div class="sw">Servidor de produccion</div></div></div><div class="si"><div><div class="sn">Docker + Docker Compose</div><div class="sw">Containerizacion + dev local</div></div></div><div class="si"><div><div class="sn">Terraform + Ansible</div><div class="sw">IaC: VPC, EC2, S3, IAM, nginx, MLflow</div></div></div><div class="si"><div><div class="sn">ghcr.io</div><div class="sw">Container registry (GitHub Packages)</div></div></div></div>
   </div>
 </div></div>
 
 <!-- BOOTCAMP COVERAGE -->
 <div id="bootcamp" class="section"><div class="container">
-  <div class="sh"><h2>Cobertura de Módulos del Bootcamp</h2><p>Este proyecto toca TODOS los módulos de forma significativa, no superficial. Es la razón principal de su elección.</p></div>
+  <div class="sh"><h2>Cobertura de Modulos del Bootcamp</h2><p>Este proyecto cubre los modulos principales del bootcamp de forma significativa y funcional.</p></div>
   <div class="bg">
-    <div class="bc llm"><h4>LLM Engineering</h4><p>RAG avanzado (Corrective RAG con self-reflection), agentes LangGraph, prompting de sistema por agente, MCP potencial, fine-tuning QLoRA con Unsloth.</p></div>
-    <div class="bc mlops"><h4>MLOps / LLMOps</h4><p>MLflow (tracking + registry), DVC (versionado corpus), GitHub Actions (CI/CD completo), Langfuse (trazas LLM), EvidentlyAI (monitoring).</p></div>
-    <div class="bc nlp"><h4>NLP</h4><p>HuggingFace Transformers (embeddings multilingüe, fine-tuning), spaCy (NER español), chunking inteligente legal, procesamiento texto legislativo.</p></div>
-    <div class="bc ml"><h4>ML / Data Science</h4><p>scikit-learn (XGBoost clasificador riesgo), k-fold cross-validation, Grid Search, métricas de evaluación, feature engineering sobre texto legal.</p></div>
-    <div class="bc dl"><h4>Deep Learning</h4><p>Fine-tuning QLoRA (Llama 3.2 3B), transfer learning del modelo base, evaluación del modelo fine-tuned vs base.</p></div>
-    <div class="bc etl"><h4>Datos / ETL / Despliegue</h4><p>Scraping BOE, parsing legislativo, ETL ingestión → limpieza → chunking → embedding → ChromaDB. Docker, HF Spaces, CI/CD automatizado.</p></div>
+    <div class="bc llm"><h4>LLM Engineering</h4><p>RAG avanzado (Corrective RAG con grading), ReAct agent LangGraph con tool calling, prompting de sistema, side-channel para citas verificadas, Ollama local para tareas ligeras.</p></div>
+    <div class="bc mlops"><h4>MLOps / LLMOps</h4><p>MLflow (tracking 3 experimentos + registry), DVC (versionado corpus con S3), GitHub Actions (5 workflows CI/CD), Langfuse (trazas LLM), RAGAS (eval automatica).</p></div>
+    <div class="bc nlp"><h4>NLP</h4><p>Embeddings multilingue (multilingual-e5-base), spaCy preprocesamiento legal (lematizacion, stopwords), chunking inteligente por articulo, procesamiento texto legislativo.</p></div>
+    <div class="bc ml"><h4>ML / Data Science</h4><p>XGBoost clasificador riesgo, StratifiedKFold cross-validation, Grid Search, SHAP explicabilidad, feature engineering (TF-IDF + SVD + keywords dominio), 3 datasets experimentales.</p></div>
+    <div class="bc etl"><h4>Datos / ETL / Despliegue</h4><p>Pipeline ingest.py (raw → chunks JSONL) + index.py (chunks → embeddings → ChromaDB). Docker, AWS EC2, Terraform + Ansible IaC, CI/CD automatizado, ghcr.io registry.</p></div>
   </div>
 </div></div>
 
-<!-- ROADMAP -->
+<!-- ROADMAP / DEVELOPMENT -->
 <div id="roadmap" class="section"><div class="container">
-  <div class="sh"><h2>Roadmap — 3.5 Semanas, 4 Personas</h2><p><strong>17 días laborables</strong>. La 4ª persona permite separar MLOps/observabilidad como track independiente, lo que eleva mucho la calidad del pipeline.</p></div>
-  <div class="mg"><div class="mc"><div class="mv">3.5</div><div class="ml">Semanas</div></div><div class="mc"><div class="mv">17</div><div class="ml">Días laborables</div></div><div class="mc"><div class="mv">4</div><div class="ml">Personas</div></div><div class="mc"><div class="mv">~68</div><div class="ml">Persona-días</div></div></div>
+  <div class="sh"><h2>Desarrollo — 3.5 Semanas, 4 Personas</h2><p>4 tracks paralelos durante el desarrollo. Ownership claro por modulo. Integracion iterativa.</p></div>
+  <div class="mg"><div class="mc"><div class="mv">3.5</div><div class="ml">Semanas</div></div><div class="mc"><div class="mv">4</div><div class="ml">Personas</div></div><div class="mc"><div class="mv">~3700</div><div class="ml">Lineas de codigo</div></div><div class="mc"><div class="mv">~70</div><div class="ml">Tests</div></div></div>
   <div class="tl">
-    <div class="ti"><div class="tp">Sprint 0 — Día 1</div><div class="tt">Kickoff, repo y contratos</div><div class="td">📅 1 día (los 4 juntos)</div><div class="tks"><span class="tk">Repo GitHub + estructura</span><span class="tk">GitHub Actions base (lint+test)</span><span class="tk">Schemas Pydantic</span><span class="tk">Dockerfile base</span><span class="tk">AEMET API key / Groq key</span><span class="tk">Repartir issues</span></div></div>
-    <div class="ti"><div class="tp">Sprint 1 — Desarrollo paralelo</div><div class="tt">4 tracks independientes</div><div class="td">📅 Días 2–10 (9 días)</div><div class="tks"><span class="tk">🅰️ Datos + RAG + ChromaDB</span><span class="tk">🅱️ ML clasificador + NLP</span><span class="tk">🅲 LangGraph agentes + LLM</span><span class="tk">🅳 MLOps + CI/CD + Observabilidad</span><span class="tk">Sync diario 15 min</span></div></div>
-    <div class="ti"><div class="tp">Sprint 2 — Integración + UI</div><div class="tt">Conectar los 3 agentes + Streamlit</div><div class="td">📅 Días 11–14 (4 días)</div><div class="tks"><span class="tk">LangGraph orquesta RAG+ML+Informes</span><span class="tk">Streamlit: chat + clasificador + informes</span><span class="tk">RAGAS eval en CI</span><span class="tk">Langfuse trazas reales</span><span class="tk">Tests E2E</span></div></div>
-    <div class="ti"><div class="tp">Sprint 3 — Deploy + cierre</div><div class="tt">HF Spaces + docs + demo</div><div class="td">📅 Días 15–17 (3 días)</div><div class="tks"><span class="tk">Deploy HF Spaces (Docker)</span><span class="tk">CI/CD completo → auto-deploy</span><span class="tk">README + diagrama arquitectura</span><span class="tk">Vídeo demo 2 min</span><span class="tk">Post LinkedIn/Medium</span></div></div>
+    <div class="ti"><div class="tp">Fase 1 — Fundamentos</div><div class="tt">Setup, datos y modulos base</div><div class="td">Repo, CI base, schemas, corpus legal, ChromaDB, dataset clasificacion</div><div class="tks"><span class="tk">Repo GitHub + estructura</span><span class="tk">GitHub Actions (lint + test)</span><span class="tk">Scraping BOE + EU AI Act</span><span class="tk">ChromaDB + embeddings</span><span class="tk">Dataset etiquetado manual</span><span class="tk">MLflow setup</span></div></div>
+    <div class="ti"><div class="tp">Fase 2 — Desarrollo paralelo</div><div class="tt">4 tracks independientes</div><div class="td">RAG pipeline, clasificador ML, orquestador, infraestructura</div><div class="tks"><span class="tk">Corrective RAG (retrieve + grade)</span><span class="tk">XGBoost + Grid Search + SHAP</span><span class="tk">ReAct agent LangGraph</span><span class="tk">Terraform + Ansible</span><span class="tk">DVC + S3</span><span class="tk">Langfuse</span></div></div>
+    <div class="ti"><div class="tp">Fase 3 — Integracion + UI</div><div class="tt">Conectar modulos + Streamlit</div><div class="td">Tool calling, side-channel, memoria, UI, tests E2E</div><div class="tks"><span class="tk">4 tools en orquestador</span><span class="tk">ContextVar side-channel</span><span class="tk">SQLite checkpointer</span><span class="tk">Streamlit chat UI</span><span class="tk">Checklist determinista</span><span class="tk">RAGAS eval en CI</span></div></div>
+    <div class="ti"><div class="tp">Fase 4 — Deploy + cierre</div><div class="tt">AWS EC2 + Docker + docs</div><div class="td">Deploy produccion, CI/CD completo, documentacion</div><div class="tks"><span class="tk">Docker build + ghcr.io</span><span class="tk">Deploy EC2 via SSH</span><span class="tk">5 workflows GitHub Actions</span><span class="tk">CodeRabbit reviews</span><span class="tk">README + documentacion</span></div></div>
   </div>
-
-  <div class="fc0"><div class="fl">Desglose día a día</div>
-  <div class="dtw" style="border:none;margin:0;"><table class="dt"><thead><tr><th>Día</th><th>🅰️ P.A — Datos + RAG</th><th>🅱️ P.B — ML + NLP</th><th>🅲 P.C — Agentes + LLM</th><th>🅳 P.D — MLOps + Obs.</th></tr></thead><tbody>
-    <tr><td><strong>1</strong></td><td colspan="4" style="text-align:center;color:var(--royal-dark);font-weight:600;">🚀 Kickoff: repo, estructura, Actions, Dockerfile, keys API, schemas, issues</td></tr>
-    <tr style="background:#f8f9fc;"><td colspan="5" style="font-weight:700;color:var(--ink);font-size:.7rem;letter-spacing:1px;text-transform:uppercase;">Sprint 1 — Desarrollo paralelo (4 tracks)</td></tr>
-    <tr><td><strong>2</strong></td><td>Scraper BOE (secciones IA, datos, financiero). Descargar EU AI Act EUR-Lex</td><td>Diseñar dataset clasificación riesgo. Empezar etiquetado manual (100 ejemplos)</td><td>Setup LangGraph. Diseñar grafo de estados con routing</td><td>Configurar MLflow (tracking server local). Setup DVC + Google Drive remote</td></tr>
-    <tr><td><strong>3</strong></td><td>Chunking inteligente: por artículo/sección. Metadata rica (ley, art, fecha)</td><td>Completar etiquetado (200-300 total entre 2 personas). NER spaCy español</td><td>Agente RAG: Corrective RAG pipeline. Retrieve → Grade → Transform</td><td>GitHub Actions: workflow test + lint (ruff) + pytest. DVC pipeline first commit</td></tr>
-    <tr><td><strong>4</strong></td><td>Embeddings multilingual-MiniLM. Poblar ChromaDB. Test retrieval</td><td>TF-IDF + features manuales. Train LogReg baseline. MLflow log Exp 1</td><td>Agente RAG: web fallback + self-reflection. Probar con 10 queries</td><td>Langfuse setup. Primeras trazas de test. Dashboard EvidentlyAI base</td></tr>
-    <tr><td><strong>5</strong></td><td>Refinar retrieval: ajustar k, probar reranking. Añadir AESIA docs</td><td>XGBoost + Grid Search + k-fold. MLflow log Exp 2. Comparar modelos</td><td>Agente Clasificador: recibe descripción → invoca ML → contextualiza con RAG</td><td>RAGAS setup: faithfulness, relevance, hallucination. Script de evaluación</td></tr>
-    <tr><td><strong>6</strong></td><td>Añadir LOPD/RGPD al corpus. Chunking regulación sectorial</td><td>SHAP explicabilidad. Serializar mejor modelo (joblib). MLflow registry</td><td>Agente Informes: template + LLM genera informe con citas</td><td>GitHub Actions: añadir RAGAS eval como step del CI. DeepEval config</td></tr>
-    <tr><td><strong>7</strong></td><td>Tests unitarios RAG (retrieval relevante para 20 queries tipo)</td><td>Fine-tuning QLoRA: preparar dataset 500 artículos etiquetados. Colab T4</td><td>Integrar 3 agentes en LangGraph. Routing condicional: consulta → agente(s)</td><td>EvidentlyAI: dashboard drift corpus. Langfuse: dashboards custom</td></tr>
-    <tr><td><strong>8</strong></td><td>Optimizar ChromaDB: ajustar embeddings, metadata filters</td><td>Fine-tuning QLoRA: entrenar en Colab (~2-3h). Evaluar vs base model</td><td>Test flujo completo: consulta → routing → agente(s) → respuesta</td><td>Dockerfile completo para HF Spaces. Test build local. CI: build step</td></tr>
-    <tr><td><strong>9</strong></td><td>Fix bugs RAG. Probar con queries complejas (análisis cruzado)</td><td>Tests unitarios ML + NLP. Fix bugs. Documentar pipeline</td><td>Fallback multi-proveedor: Groq → Gemini → Mistral. Error handling</td><td>CI/CD completo: push → test → lint → RAGAS → build → deploy HF</td></tr>
-    <tr><td><strong>10</strong></td><td>Fix bugs. Documentar corpus + chunking strategy</td><td>Fix bugs. Documentar métricas ML + fine-tuning results</td><td>Fix bugs. Refinar prompts de cada agente con 15 queries tipo</td><td>Fix bugs pipeline. Verificar que CI/CD funciona end-to-end</td></tr>
-    <tr style="background:#f8f9fc;"><td colspan="5" style="font-weight:700;color:var(--ink);font-size:.7rem;letter-spacing:1px;text-transform:uppercase;">Sprint 2 — Integración + Streamlit</td></tr>
-    <tr><td><strong>11</strong></td><td>Conectar ChromaDB real con Agente RAG en LangGraph</td><td>Conectar clasificador ML con Agente Clasificador en LangGraph</td><td>Streamlit: página chat (st.chat_message + fuentes citadas)</td><td>Langfuse: trazas reales de integración. Dashboards de producción</td></tr>
-    <tr><td><strong>12</strong></td><td>Test RAG end-to-end: 20 queries → respuestas con citas correctas</td><td>Test clasificador E2E: 10 descripciones → nivel riesgo correcto</td><td>Streamlit: panel clasificación (input sistema → output nivel + SHAP)</td><td>RAGAS eval en datos reales: métricas baseline documentadas</td></tr>
-    <tr><td><strong>13</strong></td><td>Optimizar calidad respuestas. Ajustar prompts con A</td><td>Integrar fine-tuned model para clasificación artículos</td><td>Streamlit: generador informes (botón → LLM → preview → descarga)</td><td>EvidentlyAI: reporte final de calidad. Fix alertas</td></tr>
-    <tr><td><strong>14</strong></td><td>Fix bugs integración. Pulir citas legales</td><td>Fix bugs. Verificar métricas finales ML</td><td>Fix bugs UI. Test cruzado entre los 4</td><td>Fix CI/CD. Verificar deploy automático funciona</td></tr>
-    <tr style="background:#f8f9fc;"><td colspan="5" style="font-weight:700;color:var(--ink);font-size:.7rem;letter-spacing:1px;text-transform:uppercase;">Sprint 3 — Deploy + cierre</td></tr>
-    <tr><td><strong>15</strong></td><td>Deploy HF Spaces con Docker SDK. Verificar app online</td><td>User testing (3-4 personas). Probar con queries no vistas</td><td>README exhaustivo: arquitectura, instrucciones, métricas, diagrama</td><td>Monitoring en prod: Langfuse activo, alertas configuradas</td></tr>
-    <tr><td><strong>16</strong></td><td>Pruebas de estrés. Rate limiting. Fix bugs producción</td><td>Documentar resultados ML + fine-tuning para la memoria</td><td>Vídeo demo 2 minutos. Preparar slides presentación</td><td>Documentación MLOps: pipeline CI/CD, monitoring, eval automática</td></tr>
-    <tr><td><strong>17</strong></td><td colspan="4" style="text-align:center;font-weight:600;color:var(--royal-dark);">🎯 Todos: Ensayo presentación, demo en vivo, post LinkedIn/Medium, entrega</td></tr>
-  </tbody></table></div></div>
-
-  <div class="on"><strong>⚡ Ventaja de 4 personas:</strong> La persona D se dedica FULL TIME a MLOps/observabilidad — esto es lo que diferencia un proyecto de bootcamp de un proyecto de producción real. Sin persona D, el CI/CD y monitoring se harían a medias. Con persona D, el pipeline es profesional: cada push pasa tests + RAGAS eval + build + auto-deploy. Eso impresiona en entrevistas.</div>
 </div></div>
 
 <!-- TEAM -->
 <div id="team" class="section"><div class="container">
-  <div class="sh"><h2>Distribución del Equipo — 4 Personas</h2><p>4 tracks paralelos durante el Sprint 1. Ownership claro. La persona D como MLOps Engineer es el diferenciador.</p></div>
+  <div class="sh"><h2>Equipo — 4 Personas</h2><p>4 tracks paralelos con ownership claro. Cada miembro es responsable de un area funcional completa.</p></div>
   <div class="teg">
-    <div class="tec"><div class="teb a"></div><div class="ted"><div class="ter a">Persona A</div><div class="ten">Data + RAG Engineer</div><div class="tem"><span class="tep p">Scraping BOE</span><span class="tep p">Chunking legal</span><span class="tep p">ChromaDB</span><span class="tep s">Deploy HF</span></div><div class="tet"><ul><li>Scraper BOE + descarga EU AI Act + AESIA</li><li>Chunking inteligente por artículo/sección</li><li>Embeddings multilingüe → ChromaDB</li><li>Retrieval optimization + metadata filters</li><li>Deploy HF Spaces con Docker SDK</li></ul></div></div></div>
-    <div class="tec"><div class="teb b"></div><div class="ted"><div class="ter b">Persona B</div><div class="ten">ML + NLP Engineer</div><div class="tem"><span class="tep p">Clasificador riesgo</span><span class="tep p">NER spaCy</span><span class="tep p">Fine-tuning QLoRA</span><span class="tep s">User testing</span></div><div class="tet"><ul><li>Dataset clasificación riesgo (etiquetado manual)</li><li>XGBoost + Grid Search + k-fold + SHAP</li><li>NER entidades legales con spaCy</li><li>Fine-tuning QLoRA Llama 3.2 3B en Colab</li><li>User testing + documentación resultados</li></ul></div></div></div>
-    <div class="tec"><div class="teb c"></div><div class="ted"><div class="ter c">Persona C</div><div class="ten">Agents + UI Lead</div><div class="tem"><span class="tep p">LangGraph</span><span class="tep p">3 Agentes</span><span class="tep p">Streamlit</span><span class="tep s">Prompts + README</span></div><div class="tet"><ul><li>Grafo LangGraph con routing condicional</li><li>3 agentes: RAG, Clasificador, Informes</li><li>Corrective RAG + self-reflection</li><li>Streamlit UI completa (chat + panel + informes)</li><li>README + diagrama + vídeo demo</li></ul></div></div></div>
-    <div class="tec"><div class="teb d"></div><div class="ted"><div class="ter d">Persona D</div><div class="ten">MLOps + Observabilidad</div><div class="tem"><span class="tep p">MLflow</span><span class="tep p">CI/CD</span><span class="tep p">Langfuse</span><span class="tep p">RAGAS eval</span><span class="tep s">Docs MLOps</span></div><div class="tet"><ul><li>MLflow: tracking todos los experimentos + registry</li><li>DVC: versionado corpus con Google Drive</li><li>GitHub Actions: pipeline CI/CD completo</li><li>Langfuse + EvidentlyAI: monitoring producción</li><li>RAGAS + DeepEval: eval RAG automática en CI</li><li>Dockerfile + auto-deploy HF Spaces</li></ul></div></div></div>
+    <div class="tec"><div class="teb a"></div><div class="ted"><div class="ter a">Dani</div><div class="ten">Data + RAG Engineer</div><div class="tem"><span class="tep p">ChromaDB</span><span class="tep p">Embeddings</span><span class="tep p">Corpus legal</span><span class="tep s">RAG pipeline</span></div><div class="tet"><ul><li>Scraping BOE + descarga EU AI Act</li><li>Pipeline ingest.py (raw → chunks JSONL)</li><li>Pipeline index.py (chunks → embeddings → ChromaDB)</li><li>Embeddings intfloat/multilingual-e5-base</li><li>Retriever con modos base y soft</li></ul></div></div></div>
+    <div class="tec"><div class="teb b"></div><div class="ted"><div class="ter b">Ruben</div><div class="ten">ML + NLP Engineer</div><div class="tem"><span class="tep p">Clasificador riesgo</span><span class="tep p">spaCy</span><span class="tep p">SHAP</span><span class="tep s">MLflow</span></div><div class="tet"><ul><li>Dataset clasificacion riesgo (real + sintetico + fusionado)</li><li>XGBoost + Grid Search + StratifiedKFold</li><li>TF-IDF + SVD + keywords dominio</li><li>SHAP explicabilidad + Annex III override</li><li>Pipeline reentrenamiento incremental</li></ul></div></div></div>
+    <div class="tec"><div class="teb c"></div><div class="ted"><div class="ter c">Maru</div><div class="ten">Agents + UI Lead</div><div class="tem"><span class="tep p">LangGraph</span><span class="tep p">Orquestador</span><span class="tep p">Streamlit</span><span class="tep s">Integracion</span></div><div class="tet"><ul><li>ReAct agent con create_react_agent</li><li>4 tools: RAG, clasificador, preferencias</li><li>ContextVar side-channel para citas verificadas</li><li>Streamlit chat UI con expanders</li><li>Checklist determinista de cumplimiento</li></ul></div></div></div>
+    <div class="tec"><div class="teb d"></div><div class="ted"><div class="ter d">Nati</div><div class="ten">MLOps + Observabilidad</div><div class="tem"><span class="tep p">CI/CD</span><span class="tep p">Langfuse</span><span class="tep p">RAGAS</span><span class="tep p">Docker</span><span class="tep s">IaC</span></div><div class="tet"><ul><li>5 workflows GitHub Actions</li><li>Langfuse trazas LLM + observabilidad</li><li>RAGAS evaluacion automatica en CI</li><li>Docker + ghcr.io + deploy EC2</li><li>Terraform (VPC, EC2, S3, IAM) + Ansible</li><li>MLflow tracking server</li></ul></div></div></div>
   </div>
-  <div class="on"><strong>🔗 Compartido:</strong> Día 1 kickoff (los 4). Días 2-3: B etiqueta dataset con ayuda de A. Sync diario 15 min. Code reviews vía PR. Día 10 = checkpoint (cada módulo standalone). Día 17 = ensayo presentación.</div>
 </div></div>
 
 <!-- DEPLOY -->
 <div id="deploy" class="section"><div class="container">
-  <div class="sh"><h2>Despliegue — HuggingFace Spaces (0€)</h2><p>"Un enlace vivo a HuggingFace Spaces vale más que mil líneas de código en un notebook."</p></div>
-  <div class="do rec"><div class="db r">✅ Recomendado (y gratuito)</div><div class="dti">HuggingFace Spaces con Docker SDK</div><div class="dco">💰 0€/mes — 2 CPU, 16GB RAM, siempre activo, HTTPS automático</div>
-    <div class="dd"><h4>Por qué HF Spaces</h4><ul><li>Gratuito, sin tarjeta de crédito, sin límite de tiempo</li><li>2 CPU + 16GB RAM = suficiente para Streamlit + ChromaDB + modelos</li><li>HTTPS automático + URL pública permanente</li><li>Docker SDK: control total del entorno</li><li>Integración nativa con HF Hub (modelos, datasets)</li><li>El recruiter hace clic y ve el proyecto funcionando</li></ul>
-    <h4>Dockerfile para HF Spaces</h4>
-    <div class="cb"><span class="c"># Dockerfile</span>
-FROM python:3.11-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-<span class="c"># Pre-descargar embeddings al build</span>
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')"
-
-COPY . .
-EXPOSE 7860
-CMD ["streamlit", "run", "app.py", "--server.port=7860", "--server.address=0.0.0.0"]</div>
-    <h4>CI/CD: push → auto-deploy</h4>
-    <div class="cb"><span class="c"># .github/workflows/deploy.yml</span>
-<span class="k">name:</span> Deploy NormaBot
-<span class="k">on:</span> push: branches: [main]
-<span class="k">jobs:</span>
-  <span class="f">test:</span>
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: pip install -r requirements-test.txt
-      - run: ruff check .
-      - run: pytest tests/ -v
-      - run: python eval/run_ragas.py  <span class="c"># Eval RAG automática</span>
-  <span class="f">deploy:</span>
-    needs: test
-    steps:
-      - uses: actions/checkout@v4
-      - name: Push to HF Spaces
-        env: HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          git remote add hf https://huggingface.co/spaces/$HF_USER/normabot
-          git push hf main --force</div>
+  <div class="sh"><h2>Despliegue — AWS EC2 + Docker</h2><p>Infraestructura como codigo con Terraform + Ansible. CI/CD automatizado con GitHub Actions. Container registry en ghcr.io.</p></div>
+  <div class="do rec"><div class="db r">Produccion</div><div class="dti">AWS EC2 con Docker</div><div class="dco">Python 3.12-slim · Puerto 8080 · Ollama en container · Non-root user</div>
+    <div class="dd"><h4>Arquitectura de deploy</h4><ul><li>Docker: python:3.12-slim, Ollama con SHA256 verification</li><li>Entrypoint: ollama-entrypoint.sh (inicia Ollama + Streamlit)</li><li>Healthcheck en /_stcore/health</li><li>Non-root user (appuser) por seguridad</li><li>Docker Compose para dev local con volumes</li></ul>
+    <h4>Infrastructure as Code</h4><ul><li>Terraform: VPC, EC2, S3, IAM para Bedrock</li><li>Ansible: docker-compose deploy, nginx, MLflow server</li><li>Container registry: ghcr.io/maquinas-que-aprenden/proyecto-final</li></ul>
+    <h4>CI/CD Pipeline (5 workflows)</h4><ul><li><strong>pr_lint.yml:</strong> ruff en archivos .py/.ipynb modificados</li><li><strong>ci-develop.yml:</strong> lint → Docker build → push ghcr.io :develop</li><li><strong>cicd-main.yml:</strong> lint → Docker build → deploy EC2 via SSH</li><li><strong>deploy-manual.yml:</strong> deploy manual trigger</li><li><strong>eval.yml:</strong> pipeline RAGAS evaluacion automatica</li></ul>
     </div>
   </div>
-  <div class="do alt"><div class="db a">🔄 Alternativa</div><div class="dti">Google Cloud Run (300$ créditos)</div><div class="dco">💰 0€ con créditos. Serverless, escala a 0</div><div class="dd"><ul><li>Más control: FastAPI backend + Streamlit frontend separados</li><li>Ventaja si necesitas más RAM (Cloud Run hasta 32GB)</li><li>HTTPS automático, dominio personalizable</li></ul></div></div>
 </div></div>
 
 <!-- RISKS + KPIs -->
 <div id="risks" class="section"><div class="container">
-  <div class="sh"><h2>KPIs del Proyecto</h2><p>Métricas que demuestran calidad de producción, no solo "funciona".</p></div>
-  <div class="mg"><div class="mc"><div class="mv">≥0.80</div><div class="ml">RAGAS Faithfulness</div></div><div class="mc"><div class="mv">≥0.80</div><div class="ml">F1-macro clasificador</div></div><div class="mc"><div class="mv">≥0.85</div><div class="ml">RAGAS Answer Relevance</div></div><div class="mc"><div class="mv">≤5s</div><div class="ml">Latencia respuesta</div></div><div class="mc"><div class="mv">100%</div><div class="ml">CI/CD funcional</div></div></div>
+  <div class="sh"><h2>KPIs del Proyecto</h2><p>Metricas que demuestran calidad de produccion.</p></div>
+  <div class="mg"><div class="mc"><div class="mv">≥0.80</div><div class="ml">RAGAS Faithfulness</div></div><div class="mc"><div class="mv">≥0.70</div><div class="ml">Context Precision</div></div><div class="mc"><div class="mv">≥0.70</div><div class="ml">Context Recall</div></div><div class="mc"><div class="mv">~70</div><div class="ml">Tests (23 checklist + 24 orchestrator + mas)</div></div><div class="mc"><div class="mv">5</div><div class="ml">Workflows CI/CD</div></div></div>
   <div class="sh"><h2>Riesgos y Mitigaciones</h2></div>
   <div class="rg">
-    <div class="rc"><div class="rl h">Riesgo alto</div><h4>Complejidad del dominio legal</h4><p>El texto legislativo es denso, con referencias cruzadas y terminología específica. El chunking puede romper la coherencia.</p><div class="mt"><strong>Mitigación:</strong> Chunking por artículo, no por tokens. Metadata rica. Self-reflection para verificar que la respuesta es coherente. Probar con abogados/juristas si es posible.</div></div>
-    <div class="rc"><div class="rl h">Riesgo alto</div><h4>Alucinaciones en dominio legal</h4><p>Un LLM que inventa artículos del BOE puede ser peligroso. Las citas deben ser exactas.</p><div class="mt"><strong>Mitigación:</strong> Corrective RAG con self-reflection. RAGAS evalúa faithfulness automáticamente. Disclaimer visible: "informe preliminar". Citas con link al BOE original.</div></div>
-    <div class="rc"><div class="rl m">Riesgo medio</div><h4>Rate limiting Groq (14.400 req/día)</h4><p>Si hay muchos usuarios simultáneos, Groq puede rate-limitear.</p><div class="mt"><strong>Mitigación:</strong> Fallback Groq → Gemini → Mistral free tier. Cache de respuestas frecuentes. Para demo es más que suficiente.</div></div>
-    <div class="rc"><div class="rl m">Riesgo medio</div><h4>Dataset clasificación pequeño</h4><p>200-300 ejemplos etiquetados manualmente es poco para ML clásico.</p><div class="mt"><strong>Mitigación:</strong> Augmentation con paráfrasis (LLM). class_weight='balanced'. El clasificador es complementario al contexto RAG. Documentar como limitación + proponer expansión.</div></div>
-    <div class="rc"><div class="rl m">Riesgo medio</div><h4>Coordinación 4 personas</h4><p>4 tracks paralelos requieren buena comunicación.</p><div class="mt"><strong>Mitigación:</strong> Schemas Pydantic día 1. Sync diario 15 min. PRs obligatorios. Día 10 checkpoint. Persona D es "glue" — su CI/CD integra el trabajo de todos.</div></div>
-    <div class="rc"><div class="rl lo">Riesgo bajo</div><h4>Fine-tuning en Colab free</h4><p>La T4 gratuita puede desconectarse. QLoRA puede no converger.</p><div class="mt"><strong>Mitigación:</strong> Guardar checkpoints frecuentes en Drive. Si falla: usar modelo base sin fine-tuning (funciona, menos accuracy). QLoRA con Unsloth es muy eficiente en T4.</div></div>
+    <div class="rc"><div class="rl h">Riesgo alto</div><h4>Alucinaciones en dominio legal</h4><p>Un LLM que inventa articulos del BOE puede ser peligroso. Las citas deben ser exactas.</p><div class="mt"><strong>Mitigacion:</strong> Side-channel ContextVar — las citas vienen directamente de metadata ChromaDB, no del LLM. RAGAS evalua faithfulness automaticamente. Disclaimer visible obligatorio.</div></div>
+    <div class="rc"><div class="rl h">Riesgo alto</div><h4>Complejidad del dominio legal</h4><p>El texto legislativo es denso, con referencias cruzadas y terminologia especifica.</p><div class="mt"><strong>Mitigacion:</strong> Chunking por articulo, no por tokens. Metadata rica. Corrective RAG con grading de relevancia. Ollama local para evaluacion rapida.</div></div>
+    <div class="rc"><div class="rl m">Riesgo medio</div><h4>Dataset clasificacion pequeño</h4><p>200-300 ejemplos etiquetados es poco para ML clasico.</p><div class="mt"><strong>Mitigacion:</strong> Dataset fusionado (real + sintetico). StratifiedKFold. Override determinista Annex III para casos claros. Documentado como limitacion conocida.</div></div>
+    <div class="rc"><div class="rl m">Riesgo medio</div><h4>Dependencia de Ollama local</h4><p>El grading RAG depende de Ollama Qwen 2.5 3B corriendo en el servidor.</p><div class="mt"><strong>Mitigacion:</strong> Score-based fallback si Ollama no responde. Ollama instalado en container Docker con SHA256 verification. Entrypoint script lo inicia automaticamente.</div></div>
+    <div class="rc"><div class="rl lo">Riesgo bajo</div><h4>Latencia de respuesta</h4><p>Multiples llamadas LLM (grading + orquestacion) pueden sumar latencia.</p><div class="mt"><strong>Mitigacion:</strong> Qwen 2.5 3B local es rapido para grading (~5 docs por query). Pre-model hook limita historial a 30K tokens. Score fallback elimina llamadas LLM si es necesario.</div></div>
+    <div class="rc"><div class="rl lo">Riesgo bajo</div><h4>Coordinacion 4 personas</h4><p>4 tracks paralelos requieren buena comunicacion.</p><div class="mt"><strong>Mitigacion:</strong> PRs obligatorios con CodeRabbit review. CI/CD automatico. Modulos desacoplados con interfaces claras (@tool functions).</div></div>
   </div>
 
-  <div class="on" style="margin-top:2rem;"><strong>📝 Para maximizar impacto en entrevistas:</strong> (1) README con diagrama de arquitectura y métricas de negocio. (2) Enlace vivo a HF Spaces. (3) Vídeo demo 2 min. (4) Post LinkedIn/Medium sobre decisiones de arquitectura y EU AI Act. El 70% de recruiters en España descubre candidatos por LinkedIn (Manfred).</div>
+  <div class="on" style="margin-top:2rem;"><strong>Limitaciones conocidas documentadas:</strong> (1) Dataset clasificacion pequeño (~200-300 ejemplos). (2) Corpus legal limitado a EU AI Act + BOE seleccionado. (3) Ollama requiere ~3GB RAM adicional en el servidor. (4) Sin NER especializado para entidades legales (spaCy solo para preprocesamiento). (5) Checklist determinista — no se adapta a casos no previstos.</div>
 </div></div>
 
 <footer class="footer">
   <strong>NormaBot</strong> — Agentic RAG sobre Normativa Española · EU AI Act Compliance<br>
-  ⚖️ LangGraph · Corrective RAG · MLOps · 0€ · HuggingFace Spaces · Febrero 2026
+  LangGraph · Corrective RAG · XGBoost · MLOps · AWS EC2 · Marzo 2026
 </footer>
 
 <script>
