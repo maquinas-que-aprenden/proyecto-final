@@ -1,0 +1,111 @@
+- name: Configurar EBS en NormaBot (solo al crear la instancia desde cero)
+  hosts: normabot_gpu
+  become: true
+  vars:
+    project_path: "/home/ubuntu/normabot"
+    ebs_fstype: "ext4"
+
+  tasks:
+    - name: Detectar el dispositivo EBS de datos (el que no es raíz ni está montado)
+      shell: |
+        lsblk -dpno NAME,TYPE | awk '$2=="disk" {print $1}' | while read dev; do
+          mountpoint=$(lsblk -no MOUNTPOINTS "$dev" 2>/dev/null | grep -v '^$' | head -1)
+          if [ -z "$mountpoint" ]; then
+            echo "$dev"
+            break
+          fi
+        done
+      register: ebs_device_raw
+      changed_when: false
+
+    - name: Formatear volumen de datos (solo si no tiene filesystem)
+      community.general.filesystem:
+        fstype: "{{ ebs_fstype }}"
+        dev: "{{ ebs_device_raw.stdout }}"
+        force: false
+
+    - name: Obtener UUID del volumen por dispositivo
+      command: blkid -s UUID -o value {{ ebs_device_raw.stdout }}
+      register: ebs_uuid
+      changed_when: false
+
+    - name: Crear directorio de montaje si no existe
+      ansible.builtin.file:
+        path: "{{ project_path }}"
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: "0755"
+
+    - name: Montar EBS usando UUID (independiente del nombre de dispositivo)
+      mount:
+        path: "{{ project_path }}"
+        src: "UUID={{ ebs_uuid.stdout }}"
+        fstype: ext4
+        opts: defaults,nofail
+        state: mounted
+
+    - name: Asegurar permisos tras el montaje
+      ansible.builtin.file:
+        path: "{{ project_path }}"
+        owner: ubuntu
+        group: ubuntu
+        mode: "0755"
+        state: directory
+
+    - name: Crear directorio docker-data en el EBS
+      ansible.builtin.file:
+        path: "{{ project_path }}/docker-data"
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: "0755"
+
+    - name: Crear directorio containerd-data en el EBS
+      ansible.builtin.file:
+        path: "{{ project_path }}/containerd-data"
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: "0755"
+
+    - name: Configurar Docker data-root en el EBS
+      ansible.builtin.copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "data-root": "{{ project_path }}/docker-data"
+          }
+        mode: "0644"
+      notify: Restart Docker
+
+    - name: Generar configuración base de containerd
+      shell: containerd config default > /etc/containerd/config.toml
+      args:
+        creates: /etc/containerd/config.toml
+
+    - name: Configurar containerd para usar el EBS
+      ansible.builtin.replace:
+        path: /etc/containerd/config.toml
+        regexp: "root = '.*'"
+        replace: "root = '{{ project_path }}/containerd-data'"
+      notify: Restart Containerd
+
+    - name: Recargar systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Mensaje final
+      ansible.builtin.debug:
+        msg: "EBS montado en {{ project_path }} con UUID={{ ebs_uuid.stdout }}. Docker y containerd configurados."
+
+  handlers:
+    - name: Restart Docker
+      ansible.builtin.systemd:
+        name: docker
+        state: restarted
+
+    - name: Restart Containerd
+      ansible.builtin.systemd:
+        name: containerd
+        state: restarted
