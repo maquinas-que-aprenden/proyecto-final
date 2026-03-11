@@ -1,11 +1,11 @@
 ---
 - name: Configurar DVC y datos en NormaBot
-  hosts: normabot
+  hosts: normabot_gpu
   become: true
 
   vars:
     project_path: "/home/ubuntu/normabot"
-    git_branch: "main"
+    git_branch: "main"  # sobreescribir con -e git_branch=develop para experimentación
 
   tasks:
     - name: Instalar pipx
@@ -30,7 +30,7 @@
         path: "{{ project_path }}/.dvc/config"
       register: dvc_config
 
-    - name: Clonar repositorio (shallow)
+    - name: Clonar repositorio (shallow) y quedarse en rama correcta
       become: false
       shell: |
         cd {{ project_path }}
@@ -40,7 +40,7 @@
         git remote remove origin 2>/dev/null || true
         git remote add origin https://github.com/maquinas-que-aprenden/proyecto-final.git
         git fetch --depth 1 origin {{ git_branch }}
-        git checkout FETCH_HEAD
+        git checkout -B {{ git_branch }} FETCH_HEAD
       when: not dvc_config.stat.exists
 
     - name: Corregir permisos de lost+found (creado por root al formatear EBS)
@@ -51,7 +51,7 @@
         mode: "0755"
       ignore_errors: true
 
-    - name: Corregir permisos del directorio .dvc (puede quedar con permisos de root)
+    - name: Corregir permisos del directorio .dvc
       ansible.builtin.file:
         path: "{{ project_path }}/.dvc"
         owner: ubuntu
@@ -59,7 +59,7 @@
         recurse: true
       ignore_errors: true
 
-    - name: Corregir permisos del directorio data (datos gestionados por DVC)
+    - name: Corregir permisos del directorio data
       ansible.builtin.file:
         path: "{{ project_path }}/data"
         owner: ubuntu
