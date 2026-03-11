@@ -1,0 +1,62 @@
+---
+- name: Configurar GPU NVIDIA en NormaBot (g4dn.xlarge - Tesla T4)
+  hosts: normabot_gpu
+  become: true
+
+  tasks:
+    - name: Instalar driver NVIDIA 535
+      apt:
+        name:
+          - nvidia-driver-535
+          - nvidia-utils-535
+        state: present
+        install_recommends: false
+      register: nvidia_driver_installed
+
+    - name: Añadir GPG key de nvidia-container-toolkit
+      shell: |
+        curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
+          gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+      args:
+        creates: /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+
+    - name: Añadir repositorio de nvidia-container-toolkit
+      shell: |
+        curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+          sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+          tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+      args:
+        creates: /etc/apt/sources.list.d/nvidia-container-toolkit.list
+
+    - name: Actualizar caché apt
+      apt:
+        update_cache: yes
+
+    - name: Instalar nvidia-container-toolkit
+      apt:
+        name: nvidia-container-toolkit
+        state: present
+
+    - name: Configurar Docker runtime para NVIDIA
+      shell: nvidia-ctk runtime configure --runtime=docker
+      notify: Restart Docker
+
+    - name: Reiniciar si se instalaron drivers nuevos
+      ansible.builtin.reboot:
+        reboot_timeout: 120
+      when: nvidia_driver_installed.changed
+
+    - name: Verificar que nvidia-smi funciona
+      command: nvidia-smi
+      register: nvidia_smi_output
+      changed_when: false
+
+    - name: Mensaje final
+      debug:
+        msg: "{{ nvidia_smi_output.stdout_lines[0] }}"
+
+  handlers:
+    - name: Restart Docker
+      ansible.builtin.systemd:
+        name: docker
+        state: restarted

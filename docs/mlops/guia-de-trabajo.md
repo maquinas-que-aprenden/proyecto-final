@@ -114,12 +114,15 @@ Para desplegar o destruir hay que tener permisos para crear los recursos en AWS,
 * Estos son los ficheros actuales:
 ```
 .
-├── inventory.ini           # inventario de servidores, generado automáticamente por terraform (no se sube a github)
-├── mlflow_deploy.yaml      # configuración de mlflow
-├── mlflow_ebs.yaml         # configuración de ebs de mlflow
-├── normabot_ebs.yaml       # monta el EBS de normabot y mueve el data-root de Docker al EBS
-├── normabot_data.yaml      # instala DVC, clona el repo y descarga el vectorstore desde S3
-├── playbook.yaml           # configuración general de ambos servidores
+├── inventory.ini               # inventario de servidores, generado automáticamente por terraform (no se sube a github)
+├── mlflow_deploy.yaml          # configuración de mlflow
+├── mlflow_ebs.yaml             # configuración de ebs de mlflow
+├── normabot_ebs.yaml           # monta el EBS por UUID, configura docker-data y containerd en el EBS
+├── normabot_data.yaml          # instala DVC, clona el repo (main) y descarga el vectorstore desde S3
+├── normabot_gpu.yaml           # instala drivers NVIDIA 535 + nvidia-container-toolkit (g4dn.xlarge / Tesla T4)
+├── normabot_gpu_ebs.yaml       # igual que normabot_ebs.yaml pero con auto-detección del dispositivo EBS
+├── normabot_gpu_data.yaml      # igual que normabot_data.yaml pero apunta a hosts: normabot_gpu
+├── playbook.yaml               # configuración base de todos los servidores (docker, git, aws cli)
 └── templates
     ├── docker-compose.yml.j2   # necesario para despliegue de mlflow
     └── nginx.conf.j2           # necesario para securizar acceso a mlflow
@@ -136,7 +139,6 @@ Para desplegar o destruir hay que tener permisos para crear los recursos en AWS,
 <IP> ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/aws.pem
 
 ```
-**Nota**: los playbooks `normabot_ebs.yaml` y `normabot_data.yaml` tienen `hosts: normabot`. Para ejecutarlos contra el servidor GPU hay que añadir su IP al grupo `[normabot]` (o al grupo `[normabot_gpu]` y cambiar el `hosts:` del playbook).
 
 #### Cómo ejecutar
 Existe un orden para ejecutarlos.
@@ -148,9 +150,17 @@ ansible-playbook -i inventory.ini playbook.yaml
 ansible-playbook -i inventory.ini mlflow_ebs.yaml
 ansible-playbook -i inventory.ini mlflow_deploy.yaml -e "mlflow_password=<password>"
 
-# Para normabot (solo la primera vez o si se recrea desde cero la instancia):
+# Para normabot CPU (solo la primera vez o si se recrea desde cero la instancia):
 ansible-playbook -i inventory.ini normabot_ebs.yaml
 ansible-playbook -i inventory.ini normabot_data.yaml
+
+# Para normabot GPU (g4dn.xlarge — solo la primera vez o si se recrea desde cero):
+ansible-playbook -i inventory.ini playbook.yaml          # base: docker, git, aws cli
+ansible-playbook -i inventory.ini normabot_gpu.yaml      # nvidia drivers + container toolkit (hace reboot si instala drivers nuevos)
+ansible-playbook -i inventory.ini normabot_gpu_ebs.yaml  # monta EBS por UUID, configura docker-data y containerd
+ansible-playbook -i inventory.ini normabot_gpu_data.yaml # clona repo (main), instala dvc, hace pull del vectorstore
+# Para clonar develop en lugar de main:
+ansible-playbook -i inventory.ini normabot_gpu_data.yaml -e "git_branch=develop"
 ```
 En el caso de `mlflow_deploy` es necesario pasar la contraseña para que nginx impida acceder a cualquiera. La contraseña está en nuestro gestor de contraseñas compartido.
 
