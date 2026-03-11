@@ -1,0 +1,36 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-context.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/remind-tests.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Revisa si durante esta sesión se hicieron cambios significativos al código fuente en src/ (no documentación ni configuración). Si se implementó algo nuevo o se modificó un módulo importante, responde {\"ok\": false, \"reason\": \"Se detectaron cambios en src/. Considera ejecutar /progreso para actualizar el tracking o /diagnostico para verificar el estado.\"} Si solo fue conversación, lectura, o cambios menores, responde {\"ok\": true}."
+          }
+        ]
+      }
+    ]
+  }
+}

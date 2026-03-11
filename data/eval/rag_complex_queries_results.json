@@ -1,0 +1,132 @@
+[
+  {
+    "id": "Q1_mapa_obligaciones_alto_riesgo",
+    "mode": "soft",
+    "k": 5,
+    "query": "Resume requisitos de un sistema de IA de alto riesgo y relaciónalos con obligaciones de documentación, supervisión humana y gestión de riesgos.",
+    "sources_topk": [
+      "eu_ai_act",
+      "eu_ai_act",
+      "eu_ai_act",
+      "eu_ai_act",
+      "eu_ai_act"
+    ]
+  },
+  {
+    "id": "Q2_base_legal_datos_y_supervision",
+    "mode": "soft",
+    "k": 5,
+    "query": "Si un sistema de IA procesa datos personales, ¿qué base legal y medidas pide RGPD/LOPDGDD y qué exige el Reglamento de IA sobre supervisión?",
+    "sources_topk": [
+      "eu_ai_act",
+      "eu_ai_act",
+      "eu_ai_act",
+      "eu_ai_act",
+      "eu_ai_act"
+    ]
+  },
+  {
+    "id": "Q3_incidente_y_notificacion",
+    "mode": "soft",
+    "k": 5,
+    "query": "Ante un incidente grave en un sistema de IA de alto riesgo, ¿qué obligaciones de notificación y medidas correctoras aplican (Reglamento IA + marco español si existe)?",
+    "sources_topk": [
+      "eu_ai_act",
+      "eu_ai_act",
+      "eu_ai_act",
+      "eu_ai_act",
+      "eu_ai_act"
+    ]
+  },
+  {
+    "id": "Q4_evaluacion_conformidad_ce",
+    "mode": "soft",
+    "k": 5,
+    "query": "¿Qué es la evaluación de conformidad y el marcado CE en sistemas de IA de alto riesgo y qué evidencias/documentación deben guardarse?",
+    "sources_topk": [
+      "eu_ai_act",
+      "eu_ai_act",
+      "eu_ai_act",
+      "eu_ai_act",
+      "eu_ai_act"
+    ]
+  },
+  {
+    "id": "Q5_rol_proveedor_vs_desplegador",
+    "mode": "soft",
+    "k": 5,
+    "query": "Diferencia obligaciones del proveedor y del desplegador (deployer) en IA de alto riesgo y cómo afecta si hay tratamiento de datos personales.",
+    "sources_topk": [
+      "eu_ai_act",
+      "eu_ai_act",
+      "eu_ai_act",
+      "eu_ai_act",
+      "eu_ai_act"
+    ]
+  },
+  {
+    "id": "Q6_registro_logs_trazabilidad",
+    "mode": "soft",
+    "k": 5,
+    "query": "¿Qué dice el Reglamento de IA sobre registro/logs y trazabilidad y cómo encaja con principios de protección de datos?",
+    "sources_topk": [
+      "eu_ai_act",
+      "eu_ai_act",
+      "eu_ai_act",
+      "eu_ai_act",
+      "eu_ai_act"
+    ]
+  },
+  {
+    "id": "Q7_gobernanza_datos_y_calidad",
+    "mode": "soft",
+    "k": 5,
+    "query": "¿Qué requisitos hay sobre gobernanza de datos y calidad del dataset para IA de alto riesgo y qué riesgos legales cubre esto?",
+    "sources_topk": [
+      "eu_ai_act",
+      "eu_ai_act",
+      "eu_ai_act",
+      "eu_ai_act",
+      "eu_ai_act"
+    ]
+  },
+  {
+    "id": "Q8_supervision_poscomercializacion",
+    "mode": "soft",
+    "k": 5,
+    "query": "¿Qué establece AESIA (o guía española) sobre evaluación, supervisión o vigilancia poscomercialización de sistemas de IA?",
+    "sources_topk": [
+      "aesia",
+      "aesia",
+      "aesia",
+      "aesia",
+      "aesia"
+    ]
+  },
+  {
+    "id": "Q9_transparencia_y_usuarios",
+    "mode": "soft",
+    "k": 5,
+    "query": "Obligaciones de transparencia: qué informar al usuario final y qué pasa si el sistema usa datos personales.",
+    "sources_topk": [
+      "lopd_rgpd",
+      "lopd_rgpd",
+      "lopd_rgpd",
+      "lopd_rgpd",
+      "lopd_rgpd"
+    ]
+  },
+  {
+    "id": "Q10_sanciones_y_riesgos",
+    "mode": "soft",
+    "k": 5,
+    "query": "Riesgos y sanciones: enumera qué podría pasar por incumplir Reglamento IA y RGPD en un caso de IA de alto riesgo.",
+    "sources_topk": [
+      "eu_ai_act",
+      "eu_ai_act",
+      "eu_ai_act",
+      "eu_ai_act",
+      "eu_ai_act"
+    ]
+  }
+]
