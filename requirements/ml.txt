@@ -1,0 +1,38 @@
+# Dependencias para entrenamiento del clasificador de riesgo
+-r base.txt
+
+# NLP
+spacy==3.8.2
+packaging==24.2
+deep-translator==1.11.4
+
+# Machine Learning
+scikit-learn==1.5.2
+xgboost==3.2.0
+joblib==1.4.2
+scipy==1.14.1
+
+# Deep Learning / Fine-tuning QLoRA
+# Windows (CPU-only): instalar con:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+# Linux/Mac (CUDA): cambiar por torch==2.5.1 sin --index-url
+torch
+# CVE-2024-11392/11393/11394: versión mínima segura
+transformers>=4.48.0
+peft==0.14.0
+trl==0.13.0
+datasets==3.2.0
+accelerate==1.2.1
+bitsandbytes>=0.42.0
+
+# Visualización
+matplotlib==3.9.2
+seaborn==0.13.2
+wordcloud==1.9.4
+shap==0.47.0
+
+# Tracking de experimentos
+mlflow==2.17.2
+
+# Utilidades
+tqdm==4.67.1

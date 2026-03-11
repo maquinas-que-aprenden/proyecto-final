@@ -1,0 +1,39 @@
+- name: Configurar EBS en MLflow (solo al crear la instancia desde cero)
+  hosts: mlflow
+  become: true
+  vars:
+    project_path: "/home/ubuntu/mlflow"
+    ebs_device: "/dev/nvme1n1"
+    ebs_fstype: "ext4"
+
+  tasks:
+    - name: Formatear volumen de datos (solo primera vez)
+      community.general.filesystem:
+        fstype: "{{ ebs_fstype }}"
+        dev: "{{ ebs_device }}"
+        force: false
+
+    - name: Obtener UUID del volumen
+      command: blkid -s UUID -o value /dev/nvme1n1
+      register: ebs_uuid
+      changed_when: false
+
+    - name: Montar EBS en project_path
+      mount:
+        path: "{{ project_path }}"
+        src: "UUID={{ ebs_uuid.stdout }}"
+        fstype: ext4
+        opts: defaults,nofail
+        state: mounted
+
+    - name: Asegurar permisos tras el montaje
+      ansible.builtin.file:
+        path: "{{ project_path }}"
+        owner: ubuntu
+        group: ubuntu
+        mode: "0755"
+        state: directory
+
+    - name: Mensaje final MLflow
+      ansible.builtin.debug:
+        msg: "EBS montado correctamente en {{ project_path }}."

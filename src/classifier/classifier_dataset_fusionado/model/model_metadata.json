@@ -1,0 +1,15 @@
+{
+  "fecha": "2026-02-24T18:29:03.688444",
+  "model_type": "XGBClassifier",
+  "tfidf_vocab_size": 5000,
+  "tfidf_ngram_range": "(1, 2)",
+  "tfidf_max_features": 5000,
+  "experimento": "2",
+  "nombre": "Exp 2: XGBoost + SVD + GS",
+  "test_f1_macro": 0.8822,
+  "test_accuracy": 0.8778,
+  "test_roc_auc": 0.9668,
+  "features": "tfidf_bigramas+manuales",
+  "tfidf_n_terms": 5000,
+  "criterio": "Mayor F1-macro en test entre los 3 experimentos"
+}

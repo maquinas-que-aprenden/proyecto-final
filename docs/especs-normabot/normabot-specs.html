@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NormaBot — Especificación de Proyecto</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#0F172A;--navy:#1E293B;--royal:#2563EB;--royal-dark:#1D4ED8;--royal-light:#60A5FA;--gold:#D97706;--gold-light:#FDE68A;--emerald:#059669;--emerald-light:#6EE7B7;--crimson:#DC2626;--crimson-light:#FCA5A5;--violet:#7C3AED;--violet-light:#C4B5FD;--slate:#64748B;--stone:#F1F5F9;--stone-dark:#E2E8F0;--paper:#FAFBFD;--text:#0F172A;--ts:#475569;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Inter',sans-serif;background:var(--paper);color:var(--text);line-height:1.6;overflow-x:hidden;}
+.hero{min-height:100vh;background:linear-gradient(155deg,var(--ink) 0%,#0C1629 35%,var(--navy) 60%,#1a2744 100%);display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:2rem;position:relative;overflow:hidden;}
+.hero::before{content:'';position:absolute;top:-30%;right:-20%;width:60vw;height:60vw;border-radius:50%;background:radial-gradient(circle,rgba(37,99,235,.1) 0%,transparent 70%);animation:p 9s ease-in-out infinite;}
+.hero::after{content:'';position:absolute;bottom:-25%;left:-15%;width:50vw;height:50vw;border-radius:50%;background:radial-gradient(circle,rgba(217,119,6,.06) 0%,transparent 70%);animation:p 11s ease-in-out infinite reverse;}
+@keyframes p{0%,100%{transform:scale(1);opacity:.4}50%{transform:scale(1.1);opacity:1}}
+.hero-icon{font-size:3.8rem;margin-bottom:1.5rem;animation:fl 5s ease-in-out infinite;position:relative;z-index:1;}
+@keyframes fl{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.hero h1{font-family:'Cormorant Garamond',serif;font-size:clamp(2.8rem,6vw,5rem);color:white;letter-spacing:-1px;position:relative;z-index:1;font-weight:700;}
+.hero h1 span{background:linear-gradient(135deg,var(--royal-light),var(--gold-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.hero-sub{font-size:1.08rem;color:rgba(255,255,255,.56);margin-top:1rem;font-weight:300;max-width:680px;position:relative;z-index:1;}
+.hero-tags{display:flex;gap:.6rem;flex-wrap:wrap;justify-content:center;margin-top:2rem;position:relative;z-index:1;}
+.hero-tag{padding:.38rem .95rem;border-radius:100px;font-size:.76rem;font-weight:600;letter-spacing:.5px;text-transform:uppercase;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.8);backdrop-filter:blur(10px);background:rgba(255,255,255,.04);}
+.scroll-hint{position:absolute;bottom:2rem;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.28);font-size:.72rem;text-transform:uppercase;letter-spacing:2px;animation:b 2s infinite;z-index:1;}
+@keyframes b{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(8px)}}
+.nav-sticky{position:sticky;top:0;z-index:100;background:rgba(250,251,253,.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--stone-dark);padding:0 1.5rem;}
+.nav-inner{max-width:1240px;margin:0 auto;display:flex;overflow-x:auto;scrollbar-width:none;}
+.nav-inner::-webkit-scrollbar{display:none;}
+.nav-tab{padding:.9rem 1rem;font-size:.74rem;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--ts);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .3s;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit;}
+.nav-tab:hover{color:var(--royal-dark);}
+.nav-tab.active{color:var(--royal-dark);border-bottom-color:var(--royal);}
+.section{display:none;animation:fadeIn .4s ease;}
+.section.active{display:block;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.container{max-width:1240px;margin:0 auto;padding:3rem 2rem;}
+.sh{margin-bottom:2.5rem;}
+.sh h2{font-family:'Cormorant Garamond',serif;font-size:2.2rem;color:var(--ink);margin-bottom:.4rem;font-weight:700;}
+.sh p{font-size:1rem;color:var(--ts);max-width:740px;font-weight:300;}
+.ub{background:linear-gradient(135deg,#FEF3C7 0%,#FEE2E2 100%);border-radius:16px;padding:1.8rem;border:2px solid var(--gold);margin-bottom:2rem;}
+.ub h3{font-family:'Cormorant Garamond',serif;font-size:1.25rem;color:#92400E;margin-bottom:.7rem;font-weight:700;}
+.ub p,.ub li{font-size:.84rem;color:#78350F;line-height:1.7;}
+.ub ul{list-style:none;padding:0;}.ub ul li{padding-left:1.4rem;position:relative;margin-bottom:.3rem;}.ub ul li::before{content:'⚡';position:absolute;left:0;font-size:.76rem;}
+.fb{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.8rem;margin-top:1rem;}
+.fc{text-align:center;padding:.9rem;background:rgba(255,255,255,.7);border-radius:10px;border:1px solid rgba(217,119,6,.2);}
+.fc .v{font-family:'Cormorant Garamond',serif;font-size:1.6rem;color:#991B1B;font-weight:700;}
+.fc .l{font-size:.72rem;color:#92400E;font-weight:500;}
+.mb{background:white;border-radius:16px;padding:1.8rem;border:1px solid var(--stone-dark);margin-bottom:2rem;}
+.mb h3{font-family:'Cormorant Garamond',serif;font-size:1.15rem;color:var(--ink);margin-bottom:.8rem;font-weight:700;}
+.ms{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.6rem;}
+.mst{text-align:center;padding:.65rem;background:var(--stone);border-radius:8px;}
+.mst .v{font-family:'Cormorant Garamond',serif;font-size:1.4rem;color:var(--royal-dark);font-weight:700;}
+.mst .l{font-size:.7rem;color:var(--ts);font-weight:500;}
+.fc0{background:white;border-radius:16px;padding:1.8rem;border:1px solid var(--stone-dark);overflow-x:auto;margin-bottom:2rem;}
+.fr{display:flex;align-items:center;justify-content:center;gap:.45rem;flex-wrap:wrap;margin-bottom:.9rem;}
+.fx{padding:.65rem 1rem;border-radius:10px;font-size:.76rem;font-weight:600;text-align:center;min-width:110px;border:2px solid;}
+.fx.u{background:#EFF6FF;border-color:var(--royal);color:var(--royal-dark);}
+.fx.p{background:#ECFDF5;border-color:var(--emerald);color:#166534;}
+.fx.a{background:#FFFBEB;border-color:var(--gold);color:#92400E;}
+.fx.o{background:#F5F3FF;border-color:var(--violet);color:#5B21B6;}
+.fa{font-size:1.1rem;color:var(--ts);}
+.fa.d{display:block;text-align:center;margin:.4rem 0;}
+.fl{text-align:center;font-size:.68rem;color:var(--ts);font-weight:600;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:.7rem;margin-top:.8rem;}
+.mg{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.9rem;margin-bottom:2rem;}
+.mc{background:white;border-radius:12px;padding:1.3rem;border:1px solid var(--stone-dark);text-align:center;}
+.mv{font-family:'Cormorant Garamond',serif;font-size:1.9rem;color:var(--royal-dark);font-weight:700;}
+.ml{font-size:.74rem;color:var(--ts);margin-top:.15rem;font-weight:500;}
+.mog{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:1.4rem;}
+.moc{background:white;border-radius:16px;overflow:hidden;border:1px solid var(--stone-dark);transition:transform .3s,box-shadow .3s;}
+.moc:hover{transform:translateY(-3px);box-shadow:0 14px 44px rgba(0,0,0,.06);}
+.mob{height:6px;}
+.mob.rag{background:linear-gradient(90deg,var(--royal),var(--royal-light));}
+.mob.clf{background:linear-gradient(90deg,var(--gold),var(--gold-light));}
+.mob.rpt{background:linear-gradient(90deg,var(--violet),var(--violet-light));}
+.mob.nlp{background:linear-gradient(90deg,var(--emerald),var(--emerald-light));}
+.mob.ops{background:linear-gradient(90deg,var(--crimson),var(--crimson-light));}
+.mob.ui{background:linear-gradient(90deg,#EC4899,#F9A8D4);}
+.mbd{padding:1.6rem;}
+.mbd .icon{font-size:1.8rem;margin-bottom:.6rem;}
+.mbd .nm{font-family:'Cormorant Garamond',serif;font-size:1.15rem;color:var(--ink);margin-bottom:.2rem;font-weight:700;}
+.mbd .tk{font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--ts);margin-bottom:.9rem;}
+.mbd h4{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--ts);margin-top:1rem;margin-bottom:.4rem;}
+.mbd p,.mbd li{font-size:.82rem;color:var(--ts);line-height:1.6;}
+.mbd ul{list-style:none;padding:0;}.mbd ul li{padding-left:1.1rem;position:relative;margin-bottom:.22rem;}.mbd ul li::before{content:'→';position:absolute;left:0;color:var(--royal);font-weight:600;}
+.dtw{overflow-x:auto;border-radius:14px;border:1px solid var(--stone-dark);background:white;margin-bottom:1.8rem;}
+.dt{width:100%;border-collapse:collapse;font-size:.82rem;}
+.dt thead{background:var(--stone);}
+.dt th{padding:.85rem 1rem;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--ts);border-bottom:2px solid var(--stone-dark);white-space:nowrap;}
+.dt td{padding:.75rem 1rem;border-bottom:1px solid var(--stone);color:var(--ts);vertical-align:top;}
+.dt tr:last-child td{border-bottom:none;}.dt tr:hover td{background:rgba(37,99,235,.02);}
+.bdg{display:inline-block;padding:.18rem .5rem;border-radius:6px;font-size:.68rem;font-weight:600;font-family:'JetBrains Mono',monospace;}
+.bdg.pub{background:#ECFDF5;color:#166534;}.bdg.free{background:#EFF6FF;color:var(--royal-dark);}.bdg.man{background:#F5F3FF;color:#5B21B6;}.bdg.scr{background:#FEF2F2;color:#991B1B;}
+.ag{display:grid;grid-template-columns:1fr;gap:1.3rem;}
+.al{background:white;border-radius:14px;padding:1.7rem;border:1px solid var(--stone-dark);position:relative;overflow:hidden;transition:transform .3s;}
+.al:hover{transform:translateY(-2px);box-shadow:0 10px 36px rgba(0,0,0,.05);}
+.al::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;}
+.al.fe::before{background:var(--royal);}.al.ap::before{background:var(--emerald);}.al.ia::before{background:var(--gold);}.al.da::before{background:var(--violet);}.al.ex::before{background:var(--crimson);}
+.ll{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:2px;margin-bottom:.35rem;}
+.al.fe .ll{color:var(--royal);}.al.ap .ll{color:var(--emerald);}.al.ia .ll{color:var(--gold);}.al.da .ll{color:var(--violet);}.al.ex .ll{color:var(--crimson);}
+.lt{font-family:'Cormorant Garamond',serif;font-size:1.25rem;margin-bottom:.7rem;color:var(--ink);font-weight:700;}
+.lc{display:flex;flex-wrap:wrap;gap:.4rem;}
+.cc{padding:.28rem .7rem;border-radius:8px;font-size:.74rem;font-family:'JetBrains Mono',monospace;font-weight:500;background:var(--stone);color:var(--ts);border:1px solid var(--stone-dark);}
+.ld{margin-top:.7rem;font-size:.84rem;color:var(--ts);line-height:1.7;}
+.sg{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:.9rem;}
+.sc{background:white;border-radius:12px;padding:1.3rem;border:1px solid var(--stone-dark);}
+.sc h4{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--ts);margin-bottom:.6rem;}
+.si{display:flex;gap:.6rem;padding:.4rem 0;border-bottom:1px solid var(--stone);align-items:center;}
+.si:last-child{border-bottom:none;}
+.sn{font-weight:600;font-size:.82rem;color:var(--ink);}
+.sw{font-size:.72rem;color:var(--ts);}
+.tl{position:relative;padding-left:2.8rem;}
+.tl::before{content:'';position:absolute;left:13px;top:0;bottom:0;width:2px;background:linear-gradient(to bottom,var(--royal),var(--gold),var(--emerald));border-radius:2px;}
+.ti{position:relative;margin-bottom:2.2rem;background:white;border-radius:14px;padding:1.6rem;border:1px solid var(--stone-dark);transition:transform .3s;}
+.ti:hover{transform:translateX(4px);}
+.ti::before{content:'';position:absolute;left:-2.15rem;top:1.7rem;width:11px;height:11px;border-radius:50%;border:3px solid white;box-shadow:0 0 0 2px var(--royal);background:var(--royal);}
+.tp{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:var(--royal-dark);margin-bottom:.15rem;}
+.tt{font-family:'Cormorant Garamond',serif;font-size:1.15rem;color:var(--ink);margin-bottom:.15rem;font-weight:700;}
+.td{font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--ts);margin-bottom:.6rem;}
+.tks{display:flex;flex-wrap:wrap;gap:.3rem;}
+.tk{padding:.25rem .6rem;background:var(--stone);border-radius:6px;font-size:.72rem;color:var(--ts);border:1px solid var(--stone-dark);}
+.rg{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:.9rem;}
+.rc{background:white;border-radius:12px;padding:1.3rem;border:1px solid var(--stone-dark);}
+.rl{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:.35rem;}
+.rl.h{color:var(--crimson);}.rl.m{color:var(--gold);}.rl.lo{color:var(--emerald);}
+.rc h4{font-family:'Cormorant Garamond',serif;font-size:1rem;color:var(--ink);margin-bottom:.35rem;font-weight:700;}
+.rc p{font-size:.8rem;color:var(--ts);line-height:1.6;}
+.mt{margin-top:.6rem;padding:.5rem .75rem;background:var(--stone);border-radius:8px;font-size:.76rem;color:var(--ts);border-left:3px solid var(--royal);}
+.teg{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.2rem;margin-bottom:2rem;}
+.tec{background:white;border-radius:14px;overflow:hidden;border:1px solid var(--stone-dark);transition:transform .3s;}
+.tec:hover{transform:translateY(-3px);box-shadow:0 10px 36px rgba(0,0,0,.05);}
+.teb{height:6px;}.teb.a{background:linear-gradient(90deg,var(--royal),var(--royal-light));}.teb.b{background:linear-gradient(90deg,var(--gold),var(--gold-light));}.teb.c{background:linear-gradient(90deg,var(--emerald),var(--emerald-light));}.teb.d{background:linear-gradient(90deg,var(--violet),var(--violet-light));}
+.ted{padding:1.5rem;}
+.ter{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:2px;margin-bottom:.15rem;}
+.ter.a{color:var(--royal-dark);}.ter.b{color:#92400E;}.ter.c{color:#166534;}.ter.d{color:#5B21B6;}
+.ten{font-family:'Cormorant Garamond',serif;font-size:1.12rem;color:var(--ink);margin-bottom:.6rem;font-weight:700;}
+.tem{display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.7rem;}
+.tep{padding:.22rem .55rem;border-radius:6px;font-size:.72rem;font-weight:600;font-family:'JetBrains Mono',monospace;}
+.tep.p{background:#EFF6FF;color:var(--royal-dark);}.tep.s{background:var(--stone);color:var(--ts);}
+.tet{font-size:.8rem;color:var(--ts);line-height:1.7;}
+.tet ul{list-style:none;padding:0;}.tet ul li{padding-left:1.1rem;position:relative;margin-bottom:.2rem;}.tet ul li::before{content:'→';position:absolute;left:0;color:var(--royal);font-weight:600;}
+.on{background:var(--stone);border-radius:12px;padding:1.3rem;border:1px solid var(--stone-dark);font-size:.82rem;color:var(--ts);line-height:1.7;border-left:4px solid var(--royal);margin-bottom:1.5rem;}
+.on strong{color:var(--ink);}
+.do{background:white;border-radius:16px;padding:1.8rem;border:1px solid var(--stone-dark);margin-bottom:1.3rem;position:relative;overflow:hidden;}
+.do::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;}
+.do.rec::before{background:var(--royal);}.do.alt::before{background:var(--gold);}
+.db{display:inline-block;padding:.2rem .65rem;border-radius:100px;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:.6rem;}
+.db.r{background:#EFF6FF;color:var(--royal-dark);}.db.a{background:#FFFBEB;color:#92400E;}
+.dti{font-family:'Cormorant Garamond',serif;font-size:1.25rem;color:var(--ink);margin-bottom:.35rem;font-weight:700;}
+.dco{font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--ts);margin-bottom:.9rem;}
+.dd{font-size:.82rem;color:var(--ts);line-height:1.7;}
+.dd h4{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--ts);margin-top:1rem;margin-bottom:.4rem;}
+.dd ul{list-style:none;padding:0;}.dd ul li{padding-left:1.1rem;position:relative;margin-bottom:.2rem;}.dd ul li::before{content:'→';position:absolute;left:0;color:var(--royal);font-weight:600;}
+.cb{background:var(--ink);color:var(--royal-light);border-radius:10px;padding:1.1rem;font-family:'JetBrains Mono',monospace;font-size:.72rem;line-height:1.8;overflow-x:auto;margin:.8rem 0;white-space:pre;}
+.cb .c{color:#475569;}.cb .k{color:#fde68a;}.cb .f{color:#60a5fa;}
+.bg{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:.9rem;margin-bottom:1.8rem;}
+.bc{background:white;border-radius:12px;padding:1.3rem;border:1px solid var(--stone-dark);}
+.bc h4{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:.4rem;}
+.bc.llm h4{color:var(--royal);}.bc.mlops h4{color:var(--crimson);}.bc.nlp h4{color:var(--emerald);}.bc.ml h4{color:var(--gold);}.bc.dl h4{color:var(--violet);}.bc.etl h4{color:var(--slate);}
+.bc p{font-size:.8rem;color:var(--ts);line-height:1.55;}
+.footer{background:var(--ink);color:rgba(255,255,255,.4);text-align:center;padding:2rem;font-size:.74rem;}
+.footer strong{color:rgba(255,255,255,.72);}
+@media(max-width:768px){.container{padding:2rem 1rem;}.mog,.teg,.bg{grid-template-columns:1fr;}.hero h1{font-size:2.3rem;}.tl{padding-left:2.3rem;}.fr{flex-direction:column;}.fa{transform:rotate(90deg);}.fb,.ms{grid-template-columns:1fr 1fr;}}
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <div class="hero-icon">⚖️</div>
+  <h1>Norma<span>Bot</span></h1>
+  <p class="hero-sub">Agentic RAG sobre normativa española (BOE + EU AI Act) con MLOps completo. LangGraph ReAct Agent, Corrective RAG, clasificador XGBoost, checklist determinista, Langfuse, CI/CD y deploy en AWS EC2.</p>
+  <div class="hero-tags">
+    <span class="hero-tag">Proyecto Final IA</span>
+    <span class="hero-tag">3.5 Semanas · 4 Personas</span>
+    <span class="hero-tag">100% Python</span>
+    <span class="hero-tag">EU AI Act Compliance</span>
+    <span class="hero-tag">Agentic RAG</span>
+  </div>
+  <div class="scroll-hint">↓ scroll</div>
+</section>
+
+<nav class="nav-sticky"><div class="nav-inner">
+  <button class="nav-tab active" data-section="overview">Vision General</button>
+  <button class="nav-tab" data-section="modules">Modulos</button>
+  <button class="nav-tab" data-section="data">Datos</button>
+  <button class="nav-tab" data-section="architecture">Arquitectura</button>
+  <button class="nav-tab" data-section="stack">Stack</button>
+  <button class="nav-tab" data-section="bootcamp">Cobertura Bootcamp</button>
+  <button class="nav-tab" data-section="roadmap">Desarrollo</button>
+  <button class="nav-tab" data-section="team">Equipo (4)</button>
+  <button class="nav-tab" data-section="deploy">Despliegue</button>
+  <button class="nav-tab" data-section="risks">KPIs y Riesgos</button>
+</div></nav>
+
+<!-- OVERVIEW -->
+<div id="overview" class="section active"><div class="container">
+  <div class="sh"><h2>El proyecto que abre puertas en regulacion IA</h2><p>NormaBot es un sistema Agentic RAG que permite consultar en lenguaje natural el BOE y el EU AI Act, clasificar sistemas de IA por nivel de riesgo y generar checklists de cumplimiento deterministas. Apunta al sector que mas contrata IA: banca, seguros y consultoria.</p></div>
+
+  <div class="ub"><h3>Por que este proyecto, por que ahora</h3><p>Desde febrero 2025, el EU AI Act prohibe practicas de riesgo inaceptable. En agosto 2025 entran obligaciones para modelos de proposito general. AESIA ya esta operativa. Las empresas necesitan urgentemente entender que regulaciones les afectan.</p>
+    <div class="fb"><div class="fc"><div class="v">35M€</div><div class="l">Multa maxima</div></div><div class="fc"><div class="v">7%</div><div class="l">Facturacion global</div></div><div class="fc"><div class="v">454%</div><div class="l">↑ Ofertas IA (2019-23)</div></div><div class="fc"><div class="v">138k</div><div class="l">Vacantes IA España 2025</div></div></div>
+  </div>
+
+  <div class="fc0"><div class="fl">Flujo principal</div>
+    <div class="fr"><div class="fx u">Consulta sobre normativa</div><span class="fa">→</span><div class="fx p">ReAct Agent (LangGraph)</div></div>
+    <div class="fa d">↓</div>
+    <div class="fr"><div class="fx a">Tool: search_legal_docs (Corrective RAG)</div><span class="fa">→</span><div class="fx o">Arts. BOE + EU AI Act</div></div>
+    <div class="fa d">↓</div>
+    <div class="fr"><div class="fx a">Tool: classify_risk (XGBoost + SHAP)</div><span class="fa">→</span><div class="fx o">Nivel riesgo + checklist</div></div>
+    <div class="fa d">↓</div>
+    <div class="fr"><div class="fx u">Respuesta + citas verificadas + clasificacion + recomendaciones</div></div>
+  </div>
+
+  <div class="mg"><div class="mc"><div class="mv">1</div><div class="ml">ReAct Agent</div></div><div class="mc"><div class="mv">4</div><div class="ml">Tools</div></div><div class="mc"><div class="mv">4</div><div class="ml">Niveles riesgo</div></div><div class="mc"><div class="mv">~3700</div><div class="ml">Lineas de codigo</div></div><div class="mc"><div class="mv">AWS</div><div class="ml">Deploy EC2 + Docker</div></div></div>
+</div></div>
+
+<!-- MODULES -->
+<div id="modules" class="section"><div class="container">
+  <div class="sh"><h2>Modulos del Sistema</h2><p>Un ReAct agent con 4 tools + pipeline ML + checklist determinista + MLOps completo + interfaz Streamlit. Cada modulo demuestra competencias diferentes del bootcamp.</p></div>
+  <div class="mog">
+    <div class="moc"><div class="mob rag"></div><div class="mbd"><div class="icon">📚</div><div class="nm">RAG Normativo (Corrective RAG)</div><div class="tk">ChromaDB · multilingual-e5-base · Ollama Qwen 2.5 3B · Score Fallback</div>
+      <h4>Corrective RAG Pipeline</h4><ul><li><strong>Retrieve:</strong> ChromaDB con intfloat/multilingual-e5-base → top-k chunks legislacion</li><li><strong>Grade:</strong> Ollama Qwen 2.5 3B (local) evalua relevancia de cada documento</li><li><strong>Score fallback:</strong> si Ollama no responde, fallback a puntuacion por similitud</li><li><strong>Format context:</strong> documentos relevantes preparados para el orquestador</li><li><strong>Generate:</strong> el orquestador (Bedrock Nova Lite) genera la respuesta final con citas</li></ul>
+      <h4>Chunking legal</h4><ul><li>Por articulo/seccion, no tokens arbitrarios</li><li>Metadata: ley, articulo, fecha, fuente</li><li>Embeddings: intfloat/multilingual-e5-base (CPU)</li><li>Modos de busqueda: base (semantica directa) y soft (priorizada por fuente)</li></ul>
+    </div></div>
+    <div class="moc"><div class="mob clf"></div><div class="mbd"><div class="icon">⚠️</div><div class="nm">Clasificador de Riesgo (ML)</div><div class="tk">XGBoost · TF-IDF + SVD · spaCy · Grid Search · StratifiedKFold · SHAP · MLflow</div>
+      <h4>Pipeline ML completo</h4><ul><li><strong>Dataset:</strong> ~200-300 descripciones etiquetadas (real + sintetico fusionado)</li><li><strong>Preprocesamiento:</strong> limpieza spaCy (es_core_news_sm), stopwords, lematizacion</li><li><strong>Features:</strong> TF-IDF + SVD (reduccion dimensionalidad) + keywords de dominio manuales</li><li><strong>Modelo:</strong> XGBoost con Grid Search + StratifiedKFold (k=5)</li><li><strong>Tracking:</strong> MLflow registra cada experimento (3 datasets: real, artificial, fusionado)</li><li><strong>Explicabilidad:</strong> SHAP features relevantes por prediccion</li><li><strong>Override determinista:</strong> Anexo III EU AI Act (bypass ML para casos claros)</li><li><strong>Reentrenamiento:</strong> pipeline incremental con augmented data (retrain.py)</li></ul>
+      <h4>4 clases EU AI Act</h4><ul><li>Inaceptable (prohibido)</li><li>Alto riesgo (obligaciones fuertes)</li><li>Riesgo limitado (transparencia)</li><li>Riesgo minimo (sin obligaciones)</li></ul>
+    </div></div>
+    <div class="moc"><div class="mob rpt"></div><div class="mbd"><div class="icon">📋</div><div class="nm">Checklist de Cumplimiento (Determinista)</div><div class="tk">Python puro · Sin LLM · 469 lineas · 23 tests</div>
+      <h4>Generacion determinista (sin LLM)</h4><ul><li><strong>Obligaciones:</strong> checklist hardcoded por nivel de riesgo EU AI Act</li><li><strong>Recomendaciones SHAP:</strong> basadas en features relevantes de la prediccion ML</li><li><strong>Deteccion borderline:</strong> alerta cuando la confianza del clasificador es baja</li><li><strong>100% testeable:</strong> 23 tests unitarios puros, sin dependencia de LLM</li><li><strong>Disclaimer:</strong> "Informe preliminar generado por IA. Consulte profesional juridico."</li></ul>
+    </div></div>
+    <div class="moc"><div class="mob nlp"></div><div class="mbd"><div class="icon">🧠</div><div class="nm">Orquestador ReAct Agent</div><div class="tk">LangGraph · Amazon Bedrock Nova Lite · ContextVar Side-Channel · SQLite Memory</div>
+      <h4>Arquitectura del agente</h4><ul><li><strong>ReAct:</strong> create_react_agent de LangGraph con tool calling</li><li><strong>LLM:</strong> Amazon Bedrock Nova Lite v1 (orquestacion + generacion de respuestas)</li><li><strong>4 tools:</strong> search_legal_docs, classify_risk, save_user_preference, get_user_preferences</li><li><strong>Side-channel ContextVar:</strong> transporta citas y metadata verificadas fuera del LLM</li><li><strong>SQLite checkpointer:</strong> persistencia de conversaciones (fallback a MemorySaver)</li><li><strong>Pre-model hook:</strong> recorta historial a 30K tokens antes de cada llamada LLM</li></ul>
+    </div></div>
+    <div class="moc"><div class="mob ops"></div><div class="mbd"><div class="icon">🔬</div><div class="nm">MLOps + Observabilidad</div><div class="tk">MLflow · DVC · GitHub Actions · Langfuse · RAGAS · CodeRabbit</div>
+      <h4>Pipeline completo</h4><ul><li><strong>MLflow:</strong> tracking experimentos clasificador (3 datasets), model registry</li><li><strong>DVC:</strong> versionado corpus legal con S3 como remote</li><li><strong>GitHub Actions:</strong> 5 workflows (pr_lint, ci-develop, cicd-main, eval, deploy-manual)</li><li><strong>Langfuse:</strong> trazas de cada llamada LLM (degradacion graceful si no disponible)</li><li><strong>RAGAS:</strong> evaluacion RAG automatica (context_precision, context_recall, faithfulness)</li><li><strong>CodeRabbit:</strong> code review automatizado en PRs (logica, seguridad, rendimiento)</li></ul>
+    </div></div>
+    <div class="moc"><div class="mob ui"></div><div class="mbd"><div class="icon">🖥️</div><div class="nm">Streamlit UI</div><div class="tk">Streamlit · Docker · AWS EC2</div>
+      <h4>Interfaz</h4><ul><li>Chat conversacional con st.chat_message</li><li>Citas verificadas en expanders (side-channel, no LLM)</li><li>Panel de clasificacion de riesgo con metadata</li><li>Persistencia de sesion via session_id + user_id</li><li>Healthcheck en /_stcore/health</li></ul>
+    </div></div>
+  </div>
+</div></div>
+
+<!-- DATA -->
+<div id="data" class="section"><div class="container">
+  <div class="sh"><h2>Datos y Fuentes</h2><p>BOE y EU AI Act como fuentes legislativas principales. Dataset de clasificacion con datos reales etiquetados manualmente + datos sinteticos. Versionado con DVC + S3.</p></div>
+  <div class="dtw"><table class="dt"><thead><tr><th>Dato</th><th>Modulo</th><th>Fuente</th><th>Obtencion</th><th>Volumen</th></tr></thead><tbody>
+    <tr><td><strong>EU AI Act completo (Reglamento UE 2024/1689)</strong></td><td>RAG + ML</td><td>EUR-Lex (español)</td><td><span class="bdg pub">Publico</span></td><td>~180 articulos + anexos</td></tr>
+    <tr><td><strong>BOE — legislacion IA, proteccion datos</strong></td><td>RAG</td><td>boe.es</td><td><span class="bdg scr">Scraping + PDF</span></td><td>Articulos clave</td></tr>
+    <tr><td><strong>Dataset clasificacion riesgo (real)</strong></td><td>ML</td><td>Etiquetado manual</td><td><span class="bdg man">Manual (equipo)</span></td><td>~100-150 descripciones</td></tr>
+    <tr><td><strong>Dataset clasificacion riesgo (sintetico)</strong></td><td>ML</td><td>Generado + curado</td><td><span class="bdg man">Augmentation</span></td><td>~100-150 descripciones</td></tr>
+    <tr><td><strong>Dataset fusionado (produccion)</strong></td><td>ML</td><td>Real + sintetico</td><td><span class="bdg man">Fusion</span></td><td>~200-300 total</td></tr>
+    <tr><td><strong>Chunks legales procesados</strong></td><td>RAG</td><td>Pipeline ingest.py</td><td><span class="bdg free">ETL</span></td><td>JSONL versionado DVC</td></tr>
+    <tr><td><strong>Vectorstore ChromaDB</strong></td><td>RAG</td><td>Pipeline index.py</td><td><span class="bdg free">Embeddings</span></td><td>Coleccion normabot_legal_chunks</td></tr>
+  </tbody></table></div>
+
+  <div class="on"><strong>Pipeline de datos:</strong> <code>data/ingest.py</code> (raw → chunks JSONL) → <code>data/index.py</code> (chunks → embeddings → ChromaDB). Todo versionado con DVC, remote en S3 (eu-west-1). Datos raw y procesados gitignored.</div>
+</div></div>
+
+<!-- ARCHITECTURE -->
+<div id="architecture" class="section"><div class="container">
+  <div class="sh"><h2>Arquitectura del Sistema</h2><p>Un ReAct agent (LangGraph) orquesta 4 tools. Bedrock Nova Lite como LLM principal, Ollama Qwen 2.5 3B para grading local. ChromaDB como vector store, MLflow + Langfuse como capa de observabilidad. CI/CD con GitHub Actions, deploy en AWS EC2 via Docker.</p></div>
+  <div class="ag">
+    <div class="al fe"><div class="ll">Presentacion</div><div class="lt">Streamlit en AWS EC2</div><div class="lc"><span class="cc">Streamlit</span><span class="cc">st.chat_message</span><span class="cc">Expanders metadata</span><span class="cc">Docker</span></div><div class="ld">Chat conversacional con citas verificadas. Deploy en AWS EC2 con Docker. Healthcheck en /_stcore/health. Puerto 8080.</div></div>
+    <div class="al ap"><div class="ll">Orquestacion</div><div class="lt">LangGraph ReAct Agent</div><div class="lc"><span class="cc">create_react_agent</span><span class="cc">Tool calling</span><span class="cc">ContextVar side-channel</span><span class="cc">SQLite checkpointer</span><span class="cc">Pre-model hook 30K tokens</span></div><div class="ld">ReAct agent con 4 tools: search_legal_docs (RAG), classify_risk (ML + checklist), save_user_preference y get_user_preferences (memoria). ContextVar transporta citas verificadas fuera del LLM para evitar alucinaciones.</div></div>
+    <div class="al ia"><div class="ll">Inteligencia</div><div class="lt">LLMs + ML</div><div class="lc"><span class="cc">Bedrock Nova Lite v1</span><span class="cc">Ollama Qwen 2.5 3B</span><span class="cc">XGBoost</span><span class="cc">spaCy</span><span class="cc">SHAP</span></div><div class="ld">Bedrock Nova Lite como LLM principal (orquestacion + generacion de respuestas RAG). Ollama Qwen 2.5 3B local para grading de documentos (tarea binaria, sin API keys). XGBoost para clasificacion de riesgo con SHAP. spaCy para preprocesamiento de texto.</div></div>
+    <div class="al da"><div class="ll">Datos</div><div class="lt">Almacenamiento + Versionado</div><div class="lc"><span class="cc">ChromaDB (vectores)</span><span class="cc">DVC + S3</span><span class="cc">MLflow (experiments)</span><span class="cc">SQLite (memoria)</span></div><div class="ld">ChromaDB PersistentClient para vectores del corpus legal. DVC para versionado (remote S3 eu-west-1). MLflow para tracking de 3 experimentos (real, artificial, fusionado). SQLite para persistencia de conversaciones.</div></div>
+    <div class="al ex"><div class="ll">Observabilidad + CI/CD</div><div class="lt">Monitoring + Deploy automatico</div><div class="lc"><span class="cc">Langfuse (trazas LLM)</span><span class="cc">RAGAS (eval RAG)</span><span class="cc">GitHub Actions (5 workflows)</span><span class="cc">CodeRabbit</span></div><div class="ld">Langfuse traza cada llamada al LLM (degradacion graceful). RAGAS evalua calidad RAG en CI (context_precision, context_recall >= 0.70, faithfulness >= 0.80). 5 workflows GitHub Actions. CodeRabbit review automatizado.</div></div>
+  </div>
+</div></div>
+
+<!-- STACK -->
+<div id="stack" class="section"><div class="container">
+  <div class="sh"><h2>Stack Tecnologico</h2><p>Python 3.12 end-to-end. AWS para infraestructura cloud, herramientas open-source para ML/NLP, servicios gratuitos para observabilidad.</p></div>
+  <div class="sg">
+    <div class="sc"><h4>LLM Inference</h4><div class="si"><div><div class="sn">Amazon Bedrock (Nova Lite v1)</div><div class="sw">Orquestador + generacion respuestas RAG</div></div></div><div class="si"><div><div class="sn">Ollama (Qwen 2.5 3B)</div><div class="sw">Grading local de documentos RAG. Sin API keys</div></div></div></div>
+    <div class="sc"><h4>Agentes + RAG</h4><div class="si"><div><div class="sn">LangGraph</div><div class="sw">ReAct agent con tool calling</div></div></div><div class="si"><div><div class="sn">LangChain</div><div class="sw">Document loaders, retrieval</div></div></div><div class="si"><div><div class="sn">ChromaDB</div><div class="sw">Vector store embebido, PersistentClient</div></div></div><div class="si"><div><div class="sn">sentence-transformers</div><div class="sw">intfloat/multilingual-e5-base (CPU)</div></div></div></div>
+    <div class="sc"><h4>ML + NLP</h4><div class="si"><div><div class="sn">XGBoost + scikit-learn</div><div class="sw">Clasificador riesgo, Grid Search, StratifiedKFold</div></div></div><div class="si"><div><div class="sn">spaCy (es_core_news_sm)</div><div class="sw">Preprocesamiento texto legal español</div></div></div><div class="si"><div><div class="sn">SHAP</div><div class="sw">Explicabilidad de predicciones ML</div></div></div></div>
+    <div class="sc"><h4>MLOps</h4><div class="si"><div><div class="sn">MLflow</div><div class="sw">Tracking 3 experimentos + model registry</div></div></div><div class="si"><div><div class="sn">DVC + S3</div><div class="sw">Versionado corpus legal</div></div></div><div class="si"><div><div class="sn">GitHub Actions</div><div class="sw">5 workflows CI/CD</div></div></div></div>
+    <div class="sc"><h4>Observabilidad</h4><div class="si"><div><div class="sn">Langfuse</div><div class="sw">Trazas LLM (tier gratuito)</div></div></div><div class="si"><div><div class="sn">RAGAS</div><div class="sw">Eval RAG automatica en CI</div></div></div><div class="si"><div><div class="sn">CodeRabbit</div><div class="sw">Code review automatizado en PRs</div></div></div></div>
+    <div class="sc"><h4>Infraestructura</h4><div class="si"><div><div class="sn">AWS EC2</div><div class="sw">Servidor de produccion</div></div></div><div class="si"><div><div class="sn">Docker + Docker Compose</div><div class="sw">Containerizacion + dev local</div></div></div><div class="si"><div><div class="sn">Terraform + Ansible</div><div class="sw">IaC: VPC, EC2, S3, IAM, nginx, MLflow</div></div></div><div class="si"><div><div class="sn">ghcr.io</div><div class="sw">Container registry (GitHub Packages)</div></div></div></div>
+  </div>
+</div></div>
+
+<!-- BOOTCAMP COVERAGE -->
+<div id="bootcamp" class="section"><div class="container">
+  <div class="sh"><h2>Cobertura de Modulos del Bootcamp</h2><p>Este proyecto cubre los modulos principales del bootcamp de forma significativa y funcional.</p></div>
+  <div class="bg">
+    <div class="bc llm"><h4>LLM Engineering</h4><p>RAG avanzado (Corrective RAG con grading), ReAct agent LangGraph con tool calling, prompting de sistema, side-channel para citas verificadas, Ollama local para tareas ligeras.</p></div>
+    <div class="bc mlops"><h4>MLOps / LLMOps</h4><p>MLflow (tracking 3 experimentos + registry), DVC (versionado corpus con S3), GitHub Actions (5 workflows CI/CD), Langfuse (trazas LLM), RAGAS (eval automatica).</p></div>
+    <div class="bc nlp"><h4>NLP</h4><p>Embeddings multilingue (multilingual-e5-base), spaCy preprocesamiento legal (lematizacion, stopwords), chunking inteligente por articulo, procesamiento texto legislativo.</p></div>
+    <div class="bc ml"><h4>ML / Data Science</h4><p>XGBoost clasificador riesgo, StratifiedKFold cross-validation, Grid Search, SHAP explicabilidad, feature engineering (TF-IDF + SVD + keywords dominio), 3 datasets experimentales.</p></div>
+    <div class="bc etl"><h4>Datos / ETL / Despliegue</h4><p>Pipeline ingest.py (raw → chunks JSONL) + index.py (chunks → embeddings → ChromaDB). Docker, AWS EC2, Terraform + Ansible IaC, CI/CD automatizado, ghcr.io registry.</p></div>
+  </div>
+</div></div>
+
+<!-- ROADMAP / DEVELOPMENT -->
+<div id="roadmap" class="section"><div class="container">
+  <div class="sh"><h2>Desarrollo — 3.5 Semanas, 4 Personas</h2><p>4 tracks paralelos durante el desarrollo. Ownership claro por modulo. Integracion iterativa.</p></div>
+  <div class="mg"><div class="mc"><div class="mv">3.5</div><div class="ml">Semanas</div></div><div class="mc"><div class="mv">4</div><div class="ml">Personas</div></div><div class="mc"><div class="mv">~3700</div><div class="ml">Lineas de codigo</div></div><div class="mc"><div class="mv">~70</div><div class="ml">Tests</div></div></div>
+  <div class="tl">
+    <div class="ti"><div class="tp">Fase 1 — Fundamentos</div><div class="tt">Setup, datos y modulos base</div><div class="td">Repo, CI base, schemas, corpus legal, ChromaDB, dataset clasificacion</div><div class="tks"><span class="tk">Repo GitHub + estructura</span><span class="tk">GitHub Actions (lint + test)</span><span class="tk">Scraping BOE + EU AI Act</span><span class="tk">ChromaDB + embeddings</span><span class="tk">Dataset etiquetado manual</span><span class="tk">MLflow setup</span></div></div>
+    <div class="ti"><div class="tp">Fase 2 — Desarrollo paralelo</div><div class="tt">4 tracks independientes</div><div class="td">RAG pipeline, clasificador ML, orquestador, infraestructura</div><div class="tks"><span class="tk">Corrective RAG (retrieve + grade)</span><span class="tk">XGBoost + Grid Search + SHAP</span><span class="tk">ReAct agent LangGraph</span><span class="tk">Terraform + Ansible</span><span class="tk">DVC + S3</span><span class="tk">Langfuse</span></div></div>
+    <div class="ti"><div class="tp">Fase 3 — Integracion + UI</div><div class="tt">Conectar modulos + Streamlit</div><div class="td">Tool calling, side-channel, memoria, UI, tests E2E</div><div class="tks"><span class="tk">4 tools en orquestador</span><span class="tk">ContextVar side-channel</span><span class="tk">SQLite checkpointer</span><span class="tk">Streamlit chat UI</span><span class="tk">Checklist determinista</span><span class="tk">RAGAS eval en CI</span></div></div>
+    <div class="ti"><div class="tp">Fase 4 — Deploy + cierre</div><div class="tt">AWS EC2 + Docker + docs</div><div class="td">Deploy produccion, CI/CD completo, documentacion</div><div class="tks"><span class="tk">Docker build + ghcr.io</span><span class="tk">Deploy EC2 via SSH</span><span class="tk">5 workflows GitHub Actions</span><span class="tk">CodeRabbit reviews</span><span class="tk">README + documentacion</span></div></div>
+  </div>
+</div></div>
+
+<!-- TEAM -->
+<div id="team" class="section"><div class="container">
+  <div class="sh"><h2>Equipo — 4 Personas</h2><p>4 tracks paralelos con ownership claro. Cada miembro es responsable de un area funcional completa.</p></div>
+  <div class="teg">
+    <div class="tec"><div class="teb a"></div><div class="ted"><div class="ter a">Dani</div><div class="ten">Data + RAG Engineer</div><div class="tem"><span class="tep p">ChromaDB</span><span class="tep p">Embeddings</span><span class="tep p">Corpus legal</span><span class="tep s">RAG pipeline</span></div><div class="tet"><ul><li>Scraping BOE + descarga EU AI Act</li><li>Pipeline ingest.py (raw → chunks JSONL)</li><li>Pipeline index.py (chunks → embeddings → ChromaDB)</li><li>Embeddings intfloat/multilingual-e5-base</li><li>Retriever con modos base y soft</li></ul></div></div></div>
+    <div class="tec"><div class="teb b"></div><div class="ted"><div class="ter b">Ruben</div><div class="ten">ML + NLP Engineer</div><div class="tem"><span class="tep p">Clasificador riesgo</span><span class="tep p">spaCy</span><span class="tep p">SHAP</span><span class="tep s">MLflow</span></div><div class="tet"><ul><li>Dataset clasificacion riesgo (real + sintetico + fusionado)</li><li>XGBoost + Grid Search + StratifiedKFold</li><li>TF-IDF + SVD + keywords dominio</li><li>SHAP explicabilidad + Annex III override</li><li>Pipeline reentrenamiento incremental</li></ul></div></div></div>
+    <div class="tec"><div class="teb c"></div><div class="ted"><div class="ter c">Maru</div><div class="ten">Agents + UI Lead</div><div class="tem"><span class="tep p">LangGraph</span><span class="tep p">Orquestador</span><span class="tep p">Streamlit</span><span class="tep s">Integracion</span></div><div class="tet"><ul><li>ReAct agent con create_react_agent</li><li>4 tools: RAG, clasificador, preferencias</li><li>ContextVar side-channel para citas verificadas</li><li>Streamlit chat UI con expanders</li><li>Checklist determinista de cumplimiento</li></ul></div></div></div>
+    <div class="tec"><div class="teb d"></div><div class="ted"><div class="ter d">Nati</div><div class="ten">MLOps + Observabilidad</div><div class="tem"><span class="tep p">CI/CD</span><span class="tep p">Langfuse</span><span class="tep p">RAGAS</span><span class="tep p">Docker</span><span class="tep s">IaC</span></div><div class="tet"><ul><li>5 workflows GitHub Actions</li><li>Langfuse trazas LLM + observabilidad</li><li>RAGAS evaluacion automatica en CI</li><li>Docker + ghcr.io + deploy EC2</li><li>Terraform (VPC, EC2, S3, IAM) + Ansible</li><li>MLflow tracking server</li></ul></div></div></div>
+  </div>
+</div></div>
+
+<!-- DEPLOY -->
+<div id="deploy" class="section"><div class="container">
+  <div class="sh"><h2>Despliegue — AWS EC2 + Docker</h2><p>Infraestructura como codigo con Terraform + Ansible. CI/CD automatizado con GitHub Actions. Container registry en ghcr.io.</p></div>
+  <div class="do rec"><div class="db r">Produccion</div><div class="dti">AWS EC2 con Docker</div><div class="dco">Python 3.12-slim · Puerto 8080 · Ollama en container · Non-root user</div>
+    <div class="dd"><h4>Arquitectura de deploy</h4><ul><li>Docker: python:3.12-slim, Ollama con SHA256 verification</li><li>Entrypoint: ollama-entrypoint.sh (inicia Ollama + Streamlit)</li><li>Healthcheck en /_stcore/health</li><li>Non-root user (appuser) por seguridad</li><li>Docker Compose para dev local con volumes</li></ul>
+    <h4>Infrastructure as Code</h4><ul><li>Terraform: VPC, EC2, S3, IAM para Bedrock</li><li>Ansible: docker-compose deploy, nginx, MLflow server</li><li>Container registry: ghcr.io/maquinas-que-aprenden/proyecto-final</li></ul>
+    <h4>CI/CD Pipeline (5 workflows)</h4><ul><li><strong>pr_lint.yml:</strong> ruff en archivos .py/.ipynb modificados</li><li><strong>ci-develop.yml:</strong> lint → Docker build → push ghcr.io :develop</li><li><strong>cicd-main.yml:</strong> lint → Docker build → deploy EC2 via SSH</li><li><strong>deploy-manual.yml:</strong> deploy manual trigger</li><li><strong>eval.yml:</strong> pipeline RAGAS evaluacion automatica</li></ul>
+    </div>
+  </div>
+</div></div>
+
+<!-- RISKS + KPIs -->
+<div id="risks" class="section"><div class="container">
+  <div class="sh"><h2>KPIs del Proyecto</h2><p>Metricas que demuestran calidad de produccion.</p></div>
+  <div class="mg"><div class="mc"><div class="mv">≥0.80</div><div class="ml">RAGAS Faithfulness</div></div><div class="mc"><div class="mv">≥0.70</div><div class="ml">Context Precision</div></div><div class="mc"><div class="mv">≥0.70</div><div class="ml">Context Recall</div></div><div class="mc"><div class="mv">~70</div><div class="ml">Tests (23 checklist + 24 orchestrator + mas)</div></div><div class="mc"><div class="mv">5</div><div class="ml">Workflows CI/CD</div></div></div>
+  <div class="sh"><h2>Riesgos y Mitigaciones</h2></div>
+  <div class="rg">
+    <div class="rc"><div class="rl h">Riesgo alto</div><h4>Alucinaciones en dominio legal</h4><p>Un LLM que inventa articulos del BOE puede ser peligroso. Las citas deben ser exactas.</p><div class="mt"><strong>Mitigacion:</strong> Side-channel ContextVar — las citas vienen directamente de metadata ChromaDB, no del LLM. RAGAS evalua faithfulness automaticamente. Disclaimer visible obligatorio.</div></div>
+    <div class="rc"><div class="rl h">Riesgo alto</div><h4>Complejidad del dominio legal</h4><p>El texto legislativo es denso, con referencias cruzadas y terminologia especifica.</p><div class="mt"><strong>Mitigacion:</strong> Chunking por articulo, no por tokens. Metadata rica. Corrective RAG con grading de relevancia. Ollama local para evaluacion rapida.</div></div>
+    <div class="rc"><div class="rl m">Riesgo medio</div><h4>Dataset clasificacion pequeño</h4><p>200-300 ejemplos etiquetados es poco para ML clasico.</p><div class="mt"><strong>Mitigacion:</strong> Dataset fusionado (real + sintetico). StratifiedKFold. Override determinista Annex III para casos claros. Documentado como limitacion conocida.</div></div>
+    <div class="rc"><div class="rl m">Riesgo medio</div><h4>Dependencia de Ollama local</h4><p>El grading RAG depende de Ollama Qwen 2.5 3B corriendo en el servidor.</p><div class="mt"><strong>Mitigacion:</strong> Score-based fallback si Ollama no responde. Ollama instalado en container Docker con SHA256 verification. Entrypoint script lo inicia automaticamente.</div></div>
+    <div class="rc"><div class="rl lo">Riesgo bajo</div><h4>Latencia de respuesta</h4><p>Multiples llamadas LLM (grading + orquestacion) pueden sumar latencia.</p><div class="mt"><strong>Mitigacion:</strong> Qwen 2.5 3B local es rapido para grading (~5 docs por query). Pre-model hook limita historial a 30K tokens. Score fallback elimina llamadas LLM si es necesario.</div></div>
+    <div class="rc"><div class="rl lo">Riesgo bajo</div><h4>Coordinacion 4 personas</h4><p>4 tracks paralelos requieren buena comunicacion.</p><div class="mt"><strong>Mitigacion:</strong> PRs obligatorios con CodeRabbit review. CI/CD automatico. Modulos desacoplados con interfaces claras (@tool functions).</div></div>
+  </div>
+
+  <div class="on" style="margin-top:2rem;"><strong>Limitaciones conocidas documentadas:</strong> (1) Dataset clasificacion pequeño (~200-300 ejemplos). (2) Corpus legal limitado a EU AI Act + BOE seleccionado. (3) Ollama requiere ~3GB RAM adicional en el servidor. (4) Sin NER especializado para entidades legales (spaCy solo para preprocesamiento). (5) Checklist determinista — no se adapta a casos no previstos.</div>
+</div></div>
+
+<footer class="footer">
+  <strong>NormaBot</strong> — Agentic RAG sobre Normativa Española · EU AI Act Compliance<br>
+  LangGraph · Corrective RAG · XGBoost · MLOps · AWS EC2 · Marzo 2026
+</footer>
+
+<script>
+const tabs=document.querySelectorAll('.nav-tab'),secs=document.querySelectorAll('.section');
+tabs.forEach(t=>{t.addEventListener('click',()=>{const s=t.dataset.section;tabs.forEach(x=>x.classList.remove('active'));t.classList.add('active');secs.forEach(x=>{x.classList.remove('active');if(x.id===s)x.classList.add('active');});window.scrollTo({top:document.querySelector('.nav-sticky').offsetTop,behavior:'smooth'});});});
+document.querySelector('.scroll-hint')?.addEventListener('click',()=>{document.querySelector('.nav-sticky').scrollIntoView({behavior:'smooth'});});
+</script>
+</body>
+</html>

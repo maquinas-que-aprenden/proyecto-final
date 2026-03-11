@@ -1,0 +1,13 @@
+{
+  "nombre": "Exp 2: XGBoost + SVD + GS",
+  "model_file": "model/modelo_xgboost.joblib",
+  "tfidf_file": "model/tfidf_vectorizer.joblib",
+  "model_type": "XGBClassifier",
+  "experimento": "2",
+  "needs_manual_features": true,
+  "pipeline_type": "tfidf_svd_manual",
+  "test_f1_macro": 0.8822,
+  "test_accuracy": 0.8778,
+  "test_roc_auc": 0.9668,
+  "criterio": "Mayor F1-macro en test entre los 3 experimentos"
+}

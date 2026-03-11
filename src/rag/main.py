@@ -1,0 +1,175 @@
+"""rag/main.py — Pipeline RAG Normativo (Corrective RAG)
+Flujo Retrieve → Grade desde ChromaDB. La generación la hace el orchestrator.
+"""
+
+from __future__ import annotations
+
+import logging
+
+try:
+    from langchain_ollama import ChatOllama
+except ImportError:
+    ChatOllama = None  # type: ignore[assignment,misc]
+
+from src.observability.langfuse_compat import observe, langfuse_context
+
+from src.retrieval.retriever import search
+
+logger = logging.getLogger(__name__)
+
+MAX_DOC_CHARS_GRADING = 3000
+
+GRADING_PROMPT = (
+    "Dado el siguiente documento y la pregunta, "
+    "¿el documento contiene información parcial o totalmente útil para responder la pregunta?\n\n"
+    "Sé permisivo: responde 'si' si el documento toca el tema aunque no lo responda completamente.\n"
+    "Solo responde 'no' si el documento es completamente irrelevante.\n\n"
+    "Documento: {document}\n"
+    "Pregunta: {query}\n\n"
+    "IMPORTANTE: Responde únicamente con 'si' o 'no'. No añadas explicaciones ni te inventes información.\n"
+    'Responde solo con "si" o "no":'
+)
+
+_grading_llm = None
+
+
+def _get_grading_llm():
+    """Devuelve el LLM local para grading (Qwen 2.5 3B via Ollama)."""
+    if ChatOllama is None:
+        raise ImportError("langchain_ollama no instalado. Ejecuta: pip install langchain-ollama")
+    global _grading_llm
+    if _grading_llm is None:
+        _grading_llm = ChatOllama(
+            model="qwen2.5:3b",
+            temperature=0,
+            num_predict=10,
+            num_ctx=4096,
+        )
+    return _grading_llm
+
+
+@observe(name="rag.retrieve")
+def retrieve(query: str, k: int = 9) -> list[dict]:
+    """Recupera documentos de ChromaDB y los formatea para grade()."""
+    try:
+        results = search(query, k=k, mode="soft")
+    except Exception:
+        logger.exception("Error al buscar en ChromaDB")
+        try:
+            langfuse_context.update_current_observation(
+                level="ERROR",
+                status_message="ChromaDB no disponible — retrieve devuelve vacío",
+                metadata={"error": "ChromaDB unavailable", "k": k},
+            )
+        except Exception:
+            pass
+        return []
+
+    docs = [
+        {
+            "doc": r["text"],
+            "metadata": r.get("metadata", {}),
+            "score": max(0.0, 1.0 - r.get("distance", 1.0)),
+        }
+        for r in results
+    ]
+    try:
+        langfuse_context.update_current_observation(
+            metadata={"k": k, "n_docs_retrieved": len(docs)},
+        )
+    except Exception:
+        pass
+    return docs
+
+
+def _grade_by_score(docs: list[dict], threshold: float = 0.3) -> list[dict]:
+    """Fallback: filtra documentos por score de similitud."""
+    return [d for d in docs if d["score"] >= threshold]
+
+
+@observe(name="rag.grade")
+def grade(query: str, docs: list[dict], threshold: float = 0.3) -> list[dict]:
+    """Evalúa relevancia de cada documento con LLM local (Ollama).
+
+    Fallback a filtro por score si Ollama no está disponible.
+    """
+    if not docs:
+        return []
+
+    try:
+        llm = _get_grading_llm()
+    except Exception:
+        logger.warning("Ollama no disponible, usando fallback por score")
+        relevant = _grade_by_score(docs, threshold)
+        try:
+            langfuse_context.update_current_observation(
+                level="WARNING",
+                status_message="Ollama no disponible — grading por score (degradación)",
+                metadata={"n_docs_in": len(docs), "n_relevant": len(relevant), "method": "score_fallback"},
+            )
+        except Exception:
+            pass
+        return relevant
+
+    relevant = []
+    for doc in docs:
+        doc_text = doc["doc"][:MAX_DOC_CHARS_GRADING]
+        prompt = GRADING_PROMPT.format(document=doc_text, query=query)
+        try:
+            response = llm.invoke(prompt)
+            answer = response.content.strip().lower()
+            if answer.startswith("si") or answer.startswith("sí"):
+                relevant.append(doc)
+        except Exception:
+            logger.warning("Error en grading LLM, incluyendo doc por score")
+            if doc["score"] >= threshold:
+                relevant.append(doc)
+
+    # Garantía mínima: si el grader descartó todo, usar filtro por score
+    # Solo pasa docs que superen el umbral de similitud, evita pasar basura al generador
+    if not relevant:
+        relevant = _grade_by_score(docs, threshold)
+        logger.warning("Grader devolvió 0 relevantes — fallback a filtro por score")
+        try:
+            langfuse_context.update_current_observation(
+                level="WARNING",
+                status_message="Grader devolvió 0 relevantes — fallback a filtro por score",
+                metadata={"n_docs_in": len(docs), "n_relevant": len(relevant), "method": "empty_fallback"},
+            )
+        except Exception:
+            pass
+
+    try:
+        langfuse_context.update_current_observation(
+            metadata={"n_docs_in": len(docs), "n_relevant": len(relevant), "method": "llm"},
+        )
+    except Exception:
+        pass
+    return relevant
+
+
+def format_context(docs: list[dict]) -> str:
+    """Formatea los documentos relevantes como contexto para el orchestrator."""
+    blocks = []
+    for i, d in enumerate(docs, 1):
+        meta = d.get("metadata", {})
+        source = meta.get("source", "")
+        unit = meta.get("unit_title") or meta.get("unit_id", "")
+        header = f"[{i}] {source} — {unit}".strip(" —")
+        blocks.append(f"{header}\n{d['doc']}")
+    return "\n\n".join(blocks)
+
+
+if __name__ == "__main__":
+    query = "¿Qué prácticas de IA están prohibidas?"
+    print(f"Query: {query}\n")
+
+    docs = retrieve(query)
+    print(f"Retrieve:  {len(docs)} docs encontrados")
+
+    relevant = grade(query, docs)
+    print(f"Grade:     {len(relevant)} relevantes")
+
+    print(f"Context:\n{format_context(relevant)}")
+
+    print("\n✓ rag/main.py OK")

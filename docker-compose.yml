@@ -1,0 +1,24 @@
+services:
+  normabot:
+    image: ghcr.io/maquinas-que-aprenden/proyecto-final:latest
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    volumes:
+      - ./data/processed/vectorstore:/app/data/processed/vectorstore
+      - ./eval:/app/eval
+      - ollama_models:/home/appuser/.ollama
+      - normabot_memory:/app/data/memory
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  ollama_models:
+  normabot_memory:

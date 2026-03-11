@@ -1,0 +1,103 @@
+# MLOps + Observabilidad
+
+## Setup
+* Repositorio público en GitHub:
+    * GitFlow asegurado con rulesets.
+    * Templates para crear issues y PRs.
+    * Automatización de avisos de PRs.
+* 1 cuenta free-tier por 6 meses en AWS
+    * Utilizamos la región eu-west-1 (Irlanda) porque tenemos garantizado que hay más servicios que funcionan en el free-tier que, por ejemplo, en eu-south-2 (España). Está dentro de la UE por lo que cumple con la legislación que nos interesa y la latencia es baja.
+* [Langfuse](https://langfuse.com/) Cloud en la región de datos EU.
+    * Es más conveniente y rápido que hacer un despliegue en AWS, permitiéndonos empezar a trabajar con ello de forma inmediata. El free tier cumple con nuestras necesidades y el que sea gestionado nos evita preocuparnos por mantener una base de datos.
+
+## Gestión de accesos a AWS
+* Se crea el usuario y se le asigna un rol con los permisos estrictamente necesarios para hacer su trabajo (_Principio del Mínimo Privilegio_).
+* Se comparte un fichero `usuario_accessKeys.csv` con cada miembro del proyecto que contiene sus credenciales.
+* Cada compañero descarga AWS CLI y lo configura localmente como se explica en la [guía de trabajo](guia-de-trabajo.md).
+
+### Permisos de desarrolladores
+* Se crea un grupo `NormaBot-Devs`.
+* Se le asigna al grupo una política con acceso restringido al bucket de S3 que vamos a utilizar, y permiso de `bedrock:InvokeModel` restringido al inference profile EU `eu.amazon.nova-lite-v1:0`.
+* Se crea un usuario por compañero y se añade al grupo.
+
+### Roles para las instancias EC2
+* Las instancias EC2 acceden a AWS a través de IAM roles asignados como instance profiles, sin necesitar credenciales en el `.env` (_Principio del Mínimo Privilegio_ aplicado también a los servidores).
+* `NormaBot_EC2_S3_Role` — asignado a la instancia MLflow. Permite solo S3 (`GetObject`, `ListBucket`, `PutObject`) sobre el bucket `normabot`.
+* `NormaBot_Agent_EC2_Role` — asignado a la instancia NormaBot. Añade permiso de `bedrock:InvokeModel` y `bedrock:InvokeModelWithResponseStream` restringido al inference profile EU `eu.amazon.nova-lite-v1:0`, que enruta transparentemente a regiones EU sin exponer credenciales de larga duración.
+
+## Datos y versiones
+* En vez de utilizar GitHub, Google Drive o HF Datasets para almacenar el corpus como se propone en los specs originales, para tener un punto que sea la fuente única de verdad y una mayor trazabilidad, vamos a usar el bucket de S3 `normabot` en `eu-west-1` con [DVC](https://dvc.org/).
+
+## Infraestructura en AWS
+
+### IaC
+* Se persiste la infraestructura en Terraform para poder desplegarla y destruirla con rapidez.
+* La configuración del servidor en la instancia EC2 se hace a través de playbooks de Ansible.
+* Tanto Terraform como Ansible se ejecutan en local, no hay planes de automatizar el despliegue de momento.
+
+### Máquinas virtuales (EC2)
+Inicialmente se plantea:
+* Utilizar una sola instancia de EC2 para desplegar, con un Security Group e IP pública.
+* Utilizar Docker Compose para mantener varios servicios aislados en la misma instancia.
+* Para proteger MLflow y no exponer directamente su puerto, usamos un reverse proxy de NGINX y autenticación básica (usuario y contraseña).
+A fecha de 20/02 se decide la separación en dos instancias: una para MLflow y otra para Normabot, cada una con su correspondiente security group.
+Actualmente:
+    * MLflow necesita un t3.small, porque la memoria RAM de t3.micro del free-tier no es suficiente para su ejecución.
+    * NormaBot se desplegó inicialmente en una t3.large (4 vCPU, 8 GB RAM), suficiente para Ollama/Qwen 2.5 3B (~1.9 GB RAM). La t3.large se usó como servidor de desarrollo y pruebas hasta los días finales del proyecto. En la última semana se migró a una **g4dn.xlarge** (4 vCPU, 16 GB RAM, GPU NVIDIA T4 con 16 GB VRAM) para poder ejecutar el grader QLoRA fine-tuneado (`src/finetuning/grader.py`) en GPU. El volumen EBS de 30 GB está adjunto al servidor GPU. La t3.large permanece definida en Terraform pero detenida.
+    * Las tres instancias tienen IMDSv2 forzado (`http_tokens = "required"`) para impedir ataques SSRF que podrían robar credenciales del instance profile.
+    * En el caso del servidor de normabot es necesario añadir manualmente un .env entrando en la instancia que incluya las variables de entorno que usa:
+    ```
+    AWS_REGION=eu-west-1
+    BEDROCK_MODEL_ID=eu.amazon.nova-lite-v1:0
+    LANGFUSE_PUBLIC_KEY=your_public_key
+    LANGFUSE_SECRET_KEY=your_secret_key
+    LANGFUSE_HOST=https://cloud.langfuse.com
+    APP_VERSION=vX.X.X
+    MLFLOW_TRACKING_URI=https://<ip-mlflow>/mlflow/
+    MLFLOW_PASSWORD=your_password
+    MLFLOW_TRACKING_INSECURE_TLS=true
+    GHCR_READ_TOKEN=your_token
+    GHCR_READ_USER=your_user
+    ```
+
+### Bases de datos
+De momento solo hay una para MLflow. Es preferible usar SQLite dentro de la propia instancia de EC2 porque es coste 0€ y evita los gastos y la gestión que supone una RDS (usuarios, redes, copias de seguridad).
+
+### Almacenamiento en bloque (EBS)
+* Enlazadas a las instancias de EC2, tienen `prevent_destroy = true` en Terraform: ni siquiera un `terraform destroy` puede eliminarlas. Hay que borrarlas manualmente desde la consola de AWS si fuera necesario.
+* Se usa gp3, porque es más barato que gp2 y rinde mejor.
+* Se usan dos volúmenes separados: 10GB para MLflow y 30GB para NormaBot. El volumen de NormaBot se amplió de 20GB a 30GB porque la imagen Docker (~12GB comprimida) más los snapshots de containerd superaban el espacio disponible en 20GB. Están desacoplados de las instancias para que los datos persistan aunque se elimine el servidor. La infraestructura actual está fuera del free-tier de AWS.
+* Los volúmenes root de cada instancia tienen `delete_on_termination = true` porque solo contienen el SO y Docker — nada que no se pueda recrear con Ansible. Los datos que importan están en los volúmenes separados.
+
+## Integración y despliegue continuo (CI/CD)
+* Se usa GitHub Actions por estar integrado con el repositorio.
+* Las imágenes Docker se publican en GitHub Container Registry (ghcr.io) porque es gratuito para repositorios públicos, a diferencia de ECR de AWS que tiene coste por almacenamiento.
+* Hay cuatro workflows separados:
+    * `pr_lint.yml`: lint con ruff solo sobre los ficheros `.py`/`.ipynb` modificados, en cada PR a `main` o `develop`.
+    * `ci-develop.yml`: lint completo + smoke tests (pytest) + construye y publica la imagen con tag `:develop` en cada push a `develop`.
+    * `cicd-main.yml`: lint completo + smoke tests (pytest) + construye, publica con tag `:latest` y despliega automáticamente en el servidor en cada push a `main`. Los tests también corren en PRs a `main` como gate antes del merge.
+    * `eval.yml`: ejecuta la evaluación RAGAS en EC2 contra la imagen `:latest` desplegada. Se lanza manualmente (`workflow_dispatch`). La evaluación se divide en dos fases: Phase A (retriever: ContextPrecision + ContextRecall) y Phase B (E2E: Faithfulness). Phase B reutiliza los contextos de Phase A para que ambas fases sean comparables.
+* El despliegue se hace vía SSH a la EC2. El script de deploy hace login en GHCR, `dvc pull` del vectorstore y levanta el contenedor con `docker compose up -d --pull always --force-recreate`. Pendiente: valorar si simplificar a `docker run` directo.
+* Los smoke tests (133 tests, 6 suites: clasificador, checklist, constantes del clasificador, memoria conversacional, orquestador, reentrenamiento) se ejecutan con `pytest tests/ -v`. Los servicios externos (Bedrock, Ollama) están mockeados y el reentrenamiento usa un stub `_FakeXGB`, por lo que no requieren credenciales ni entrenamiento real en CI. El clasificador incluye `TestAnnex3Override` (14 tests) y el orquestador `TestNoDobleClasificacion` (2 tests) para los bugs críticos cerrados en la semana de cierre. La rama `fine-tuning` (no mergeada) añade `test_finetuning.py` con 45 tests adicionales del grader QLoRA.
+
+## Evaluación RAGAS
+
+* **LLM evaluador**: se usa Nova Lite (el mismo LLM de producción) como evaluador RAGAS por no requerir credenciales adicionales. Limitación conocida: Nova Lite no sigue bien los prompts JSON estructurados de RAGAS, lo que produce NaN en la mayoría de los ejemplos de Faithfulness. A futuro habría que usar un LLM evaluador separado (GPT-4o-mini u otro compatible con RAGAS).
+* **Concurrencia `max_workers=2`**: RAGAS lanza todos los jobs en paralelo por defecto (`max_workers=16`). Con Nova Lite en `eu-west-1` esto dispara ThrottlingException masivo. Se reduce a `max_workers=2` para evitarlo, a costa de mayor duración del workflow.
+* **Métricas y umbrales**: ContextPrecision ≥ 0.70 y ContextRecall ≥ 0.70 (Phase A); Faithfulness ≥ 0.80 (Phase B). AnswerRelevancy excluida: Nova Lite no sigue el prompt de RAGAS para esta métrica. Ver análisis completo en [`docs/mlops/analisis-ragas.md`](analisis-ragas.md).
+* **Dataset manual de 14 preguntas**: suficiente para un primer baseline, insuficiente para estadística estable. A futuro: generar automáticamente con `ragas.testset.TestsetGenerator` desde el corpus para obtener 50-100 ejemplos con cobertura proporcional al contenido indexado.
+
+## Observabilidad y trazabilidad
+* Usamos [MLflow](https://mlflow.org/) para los modelos de clasificación: métricas de entrenamiento y registro del modelo.
+* Usamos [Langfuse](https://langfuse.com/) v2 (`>=2.7.3,<3.0.0`) para el orquestador (LangGraph) y sus agentes:
+    * Podemos auditar el flujo paso a paso y entender su respuesta. Si falla el agente podemos ver si fue en el Retrieve, en el Grade de relevancia o en la generación final del LLM provider (Amazon Nova Lite vía Bedrock).
+    * Permite monitorizar usos en tiempo real del consumo de tokens, latencias y alucinaciones mediante métricas.
+    * Gestiona versiones de prompts.
+    * Cobertura de instrumentación por módulo con `@observe` de Langfuse v2:
+        * `rag/main.py` — retrieve, grade: con `level=ERROR` si ChromaDB no está disponible, y `level=WARNING` si Ollama cae al fallback por score.
+        * `classifier/main.py` — predict_risk: registra nivel de riesgo, confianza y distribución de probabilidades; `score_current_trace` guarda la confianza del modelo como métrica numérica.
+        * `retrieval/retriever.py` — search: registra distancias min/max, número de resultados, fuentes únicas y si el contexto fue truncado.
+        * `orchestrator/main.py` — search_legal_docs y classify_risk con `@observe`; save_user_preference y get_user_preferences sin instrumentar.
+    * **Limitación conocida**: la traza raíz del agente LangGraph vía `CallbackHandler` no está disponible. `langfuse.callback` en v2.60.x requiere `langchain.callbacks.base` que fue eliminado en langchain 0.3. Las trazas individuales de cada herramienta sí llegan a Langfuse vía `@observe`.
+    * Feedback de usuario (👍/👎): eliminado — dependía del `trace_id` del `CallbackHandler` raíz, que no está disponible por incompatibilidad entre `langfuse.callback` v2 y `langchain` 0.3.
+    * En tests, Langfuse se desactiva con `LANGFUSE_ENABLED=false` en `tests/conftest.py` para evitar dependencias de credenciales en CI.

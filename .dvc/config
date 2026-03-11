@@ -1,0 +1,10 @@
+[core]
+    remote = dataremote
+['remote "storage"']
+    url = s3://normabot/dvc
+    region = eu-west-1
+    endpointurl = https://s3.eu-west-1.amazonaws.com
+['remote "dataremote"']
+    url = s3://normabot/data
+    region = eu-west-1
+    endpointurl = https://s3.eu-west-1.amazonaws.com

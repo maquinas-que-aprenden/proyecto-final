@@ -1,0 +1,411 @@
+Run appleboy/ssh-action@v1
+Run echo "$GITHUB_ACTION_PATH" >> $GITHUB_PATH
+Run entrypoint.sh
+Downloading drone-ssh-1.8.2-linux-amd64 from https://github.com/appleboy/drone-ssh/releases/download/v1.8.2
+======= CLI Version Information =======
+Drone SSH version 1.8.2
+=======================================
+From https://github.com/maquinas-que-aprenden/proyecto-final
+ * branch            develop    -> FETCH_HEAD
+HEAD is now at b7302ae Merge pull request #130 from maquinas-que-aprenden/fix/ragas-logs
+INFO  === NormaBot — Evaluación RAGAS ===
+INFO  Dataset cargado: 14 ejemplos
+INFO  Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+INFO  Use pytorch device_name: cuda
+INFO  Load pretrained SentenceTransformer: intfloat/multilingual-e5-base
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00,  3.97it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00,  3.96it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  [1/14] 9/9 docs relevantes — ¿Qué prácticas de IA están prohibidas según el EU AI Act?
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 113.22it/s]
+INFO  [2/14] 1/9 docs relevantes — ¿Cuándo se considera que un sistema de IA es de alto riesgo?
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 117.24it/s]
+INFO  [3/14] 3/9 docs relevantes — ¿Qué es el sistema de gestión de riesgos del EU AI Act?
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 111.91it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  [4/14] 9/9 docs relevantes — ¿Qué requisitos de gobernanza de datos exige el EU AI Act?
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 111.15it/s]
+INFO  [5/14] 1/9 docs relevantes — ¿Qué dice el EU AI Act sobre la supervisión humana?
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 112.80it/s]
+INFO  [6/14] 3/9 docs relevantes — ¿Están obligados los sistemas de IA a informar a los usuarios de que están inter
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 112.33it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  [7/14] 9/9 docs relevantes — ¿Qué multas prevé el EU AI Act por incumplimiento de las prácticas prohibidas?
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 113.08it/s]
+INFO  [8/14] 2/9 docs relevantes — ¿Qué obliga la LOPD-GDD respecto a las evaluaciones de impacto?
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 113.45it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  [9/14] 9/9 docs relevantes — ¿Qué sistemas de IA están incluidos en el Anexo III del EU AI Act?
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 107.22it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  [10/14] 9/9 docs relevantes — ¿Qué obligaciones tienen los proveedores de sistemas de IA de alto riesgo respec
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 104.62it/s]
+INFO  [11/14] 1/9 docs relevantes — ¿Qué competencias tiene la Agencia Española de Supervisión de Inteligencia Artif
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 107.74it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  [12/14] 9/9 docs relevantes — ¿Están obligados a designar un Delegado de Protección de Datos los prestadores d
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 102.73it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  [13/14] 9/9 docs relevantes — ¿Qué elementos debe contemplar un plan de vigilancia poscomercialización para si
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 109.47it/s]
+INFO  [14/14] 1/9 docs relevantes — ¿Qué grado de intervención humana debería tener un sistema de IA que decide las 
+INFO  Caché guardada en /app/eval/answers_cache_b7302ae5_retriever.json
+INFO  Found credentials from IAM Role: NormaBot_Agent_EC2_Role
+INFO  Phase A — calculando métricas del retriever (Context Precision, Context Recall)...
+Evaluating:   0%|          | 0/28 [00:00<?, ?it/s]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:   4%|▎         | 1/28 [00:01<00:44,  1.66s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  18%|█▊        | 5/28 [00:02<00:11,  2.03it/s]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  32%|███▏      | 9/28 [00:10<00:24,  1.26s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  39%|███▉      | 11/28 [00:21<00:41,  2.46s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  43%|████▎     | 12/28 [00:24<00:41,  2.57s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+ERROR  Prompt fix_output_format failed to parse output: The output parser failed to parse the output including retries.
+INFO  Using Bedrock Converse API to generate response
+ERROR  Prompt fix_output_format failed to parse output: The output parser failed to parse the output including retries.
+ERROR  Prompt fix_output_format failed to parse output: The output parser failed to parse the output including retries.
+ERROR  Prompt context_precision_prompt failed to parse output: The output parser failed to parse the output including retries.
+ERROR  Exception raised in Job[4]: RagasOutputParserException(The output parser failed to parse the output including retries.)
+Evaluating:  46%|████▋     | 13/28 [00:31<00:50,  3.36s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+ERROR  Exception raised in Job[16]: ThrottlingException(An error occurred (ThrottlingException) when calling the Converse operation (reached max retries: 4): Too many requests, please wait before trying again.)
+ERROR  Exception raised in Job[6]: ThrottlingException(An error occurred (ThrottlingException) when calling the Converse operation (reached max retries: 4): Too many requests, please wait before trying again.)
+Evaluating:  50%|█████     | 14/28 [00:33<00:44,  3.17s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+ERROR  Exception raised in Job[18]: ThrottlingException(An error occurred (ThrottlingException) when calling the Converse operation (reached max retries: 4): Too many requests, please wait before trying again.)
+ERROR  Exception raised in Job[23]: ThrottlingException(An error occurred (ThrottlingException) when calling the Converse operation (reached max retries: 4): Too many requests, please wait before trying again.)
+Evaluating:  57%|█████▋    | 16/28 [00:37<00:32,  2.73s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+ERROR  Exception raised in Job[10]: ThrottlingException(An error occurred (ThrottlingException) when calling the Converse operation (reached max retries: 4): Too many requests, please wait before trying again.)
+Evaluating:  68%|██████▊   | 19/28 [00:38<00:15,  1.69s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  71%|███████▏  | 20/28 [00:41<00:14,  1.80s/it]ERROR  Exception raised in Job[12]: ThrottlingException(An error occurred (ThrottlingException) when calling the Converse operation (reached max retries: 4): Too many requests, please wait before trying again.)
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  79%|███████▊  | 22/28 [00:43<00:09,  1.60s/it]ERROR  Exception raised in Job[22]: ThrottlingException(An error occurred (ThrottlingException) when calling the Converse operation (reached max retries: 4): Too many requests, please wait before trying again.)
+Evaluating:  82%|████████▏ | 23/28 [00:44<00:07,  1.45s/it]
+Evaluating:  86%|████████▌ | 24/28 [00:47<00:06,  1.73s/it]INFO  Using Bedrock Converse API to generate response
+ERROR  Exception raised in Job[20]: ThrottlingException(An error occurred (ThrottlingException) when calling the Converse operation (reached max retries: 4): Too many requests, please wait before trying again.)
+Evaluating:  89%|████████▉ | 25/28 [00:50<00:06,  2.03s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+ERROR  Exception raised in Job[14]: ThrottlingException(An error occurred (ThrottlingException) when calling the Converse operation (reached max retries: 4): Too many requests, please wait before trying again.)
+Evaluating:  93%|█████████▎| 26/28 [00:59<00:07,  3.95s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  96%|█████████▋| 27/28 [01:12<00:06,  6.26s/it]ERROR  Exception raised in Job[24]: OutputParserException(Invalid json output: The provided context discusses the establishment and documentation of a post-market surveillance system for high-risk AI systems, which aligns with the answer's emphasis on the need for a post-market surveillance plan. However, the context does not detail the specific elements and tasks that should be included in the plan, such as continuous surveillance, periodic surveillance, incident reporting, transparent communication, training, and flexibility. These details are provided in the answer, but they are not explicitly mentioned in the context.
+For troubleshooting, visit: https://python.langchain.com/docs/troubleshooting/errors/OUTPUT_PARSING_FAILURE )
+Evaluating: 100%|██████████| 28/28 [01:18<00:00,  6.20s/it]
+Evaluating: 100%|██████████| 28/28 [01:18<00:00,  2.81s/it]
+INFO    [1] prec=1.000  rec=0.750  ¿Qué prácticas de IA están prohibidas según el EU AI Act?
+INFO    [2] prec=1.000  rec=0.500  ¿Cuándo se considera que un sistema de IA es de alto riesgo?
+INFO    [3] prec= NaN   rec=0.750  ¿Qué es el sistema de gestión de riesgos del EU AI Act?
+INFO    [4] prec= NaN   rec=0.750  ¿Qué requisitos de gobernanza de datos exige el EU AI Act?
+INFO    [5] prec=1.000  rec=0.200  ¿Qué dice el EU AI Act sobre la supervisión humana?
+INFO    [6] prec= NaN   rec=1.000  ¿Están obligados los sistemas de IA a informar a los usuarios de que están inter
+INFO    [7] prec= NaN   rec=1.000  ¿Qué multas prevé el EU AI Act por incumplimiento de las prácticas prohibidas?
+INFO    [8] prec= NaN   rec=0.000  ¿Qué obliga la LOPD-GDD respecto a las evaluaciones de impacto?
+INFO    [9] prec= NaN   rec=0.000  ¿Qué sistemas de IA están incluidos en el Anexo III del EU AI Act?
+INFO    [10] prec= NaN   rec=0.750  ¿Qué obligaciones tienen los proveedores de sistemas de IA de alto riesgo respec
+INFO    [11] prec= NaN   rec=0.333  ¿Qué competencias tiene la Agencia Española de Supervisión de Inteligencia Artif
+INFO    [12] prec= NaN   rec= NaN   ¿Están obligados a designar un Delegado de Protección de Datos los prestadores d
+INFO    [13] prec= NaN   rec=0.500  ¿Qué elementos debe contemplar un plan de vigilancia poscomercialización para si
+INFO    [14] prec=1.000  rec=0.200  ¿Qué grado de intervención humana debería tener un sistema de IA que decide las 
+INFO  generated new fontManager
+INFO  Agente ReAct disponible — usando respuestas reales
+INFO  Checkpointer SQLite inicializado: data/memory/conversations.db
+INFO  InMemoryStore inicializado para preferencias de usuario
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00,  4.22it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00,  4.22it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  Using Bedrock Converse API to generate response
+INFO  [1/14] respuesta=2409 chars, contextos=9 (agente) — ¿Qué prácticas de IA están prohibidas según el EU AI Act?
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 106.70it/s]
+INFO  Using Bedrock Converse API to generate response
+INFO  [2/14] respuesta=1104 chars, contextos=1 (agente) — ¿Cuándo se considera que un sistema de IA es de alto riesgo?
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 106.48it/s]
+INFO  Using Bedrock Converse API to generate response
+INFO  [3/14] respuesta=1629 chars, contextos=3 (agente) — ¿Qué es el sistema de gestión de riesgos del EU AI Act?
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 101.13it/s]
+INFO  Using Bedrock Converse API to generate response
+INFO  [4/14] respuesta=2022 chars, contextos=9 (agente) — ¿Qué requisitos de gobernanza de datos exige el EU AI Act?
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 109.33it/s]
+INFO  Using Bedrock Converse API to generate response
+INFO  [5/14] respuesta=685 chars, contextos=1 (agente) — ¿Qué dice el EU AI Act sobre la supervisión humana?
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 107.39it/s]
+INFO  Using Bedrock Converse API to generate response
+INFO  [6/14] respuesta=1017 chars, contextos=3 (agente) — ¿Están obligados los sistemas de IA a informar a los usuarios de que están inter
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 107.68it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  Using Bedrock Converse API to generate response
+INFO  [7/14] respuesta=972 chars, contextos=9 (agente) — ¿Qué multas prevé el EU AI Act por incumplimiento de las prácticas prohibidas?
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 103.64it/s]
+INFO  Using Bedrock Converse API to generate response
+INFO  [8/14] respuesta=2564 chars, contextos=2 (agente) — ¿Qué obliga la LOPD-GDD respecto a las evaluaciones de impacto?
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 109.08it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  Using Bedrock Converse API to generate response
+INFO  [9/14] respuesta=2088 chars, contextos=9 (agente) — ¿Qué sistemas de IA están incluidos en el Anexo III del EU AI Act?
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 111.11it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  Using Bedrock Converse API to generate response
+INFO  [10/14] respuesta=2171 chars, contextos=9 (agente) — ¿Qué obligaciones tienen los proveedores de sistemas de IA de alto riesgo respec
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 86.09it/s]
+INFO  Using Bedrock Converse API to generate response
+INFO  [11/14] respuesta=1346 chars, contextos=1 (agente) — ¿Qué competencias tiene la Agencia Española de Supervisión de Inteligencia Artif
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 87.19it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  Using Bedrock Converse API to generate response
+INFO  [12/14] respuesta=1843 chars, contextos=9 (agente) — ¿Están obligados a designar un Delegado de Protección de Datos los prestadores d
+INFO  Using Bedrock Converse API to generate response
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+Batches: 100%|██████████| 1/1 [00:00<00:00, 86.60it/s]
+WARNING  Grader devolvió 0 relevantes — fallback a filtro por score
+INFO  Using Bedrock Converse API to generate response
+INFO  [13/14] respuesta=2520 chars, contextos=9 (agente) — ¿Qué elementos debe contemplar un plan de vigilancia poscomercialización para si
+INFO  Using Bedrock Converse API to generate response
+INFO  Cargando modelo desde metadata: Exp 2: XGBoost + SVD + GS
+INFO  Clasificador cargado: XGBClassifier (107 features, pipeline=tfidf_svd_manual) desde /app/src/classifier/classifier_dataset_fusionado/model
+INFO  Using Bedrock Converse API to generate response
+INFO  [14/14] respuesta=958 chars, contextos=1 (agente) — ¿Qué grado de intervención humana debería tener un sistema de IA que decide las 
+INFO  Caché guardada en /app/eval/answers_cache_b7302ae5_e2e.json
+INFO  Phase B — calculando métricas E2E (Faithfulness)...
+Evaluating:   0%|          | 0/14 [00:00<?, ?it/s]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+ERROR  Exception raised in Job[1]: ThrottlingException(An error occurred (ThrottlingException) when calling the Converse operation (reached max retries: 4): Too many requests, please wait before trying again.)
+Evaluating:   7%|▋         | 1/14 [00:30<06:35, 30.44s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+ERROR  Exception raised in Job[7]: OutputParserException(Invalid json output: Given a question and an answer, analyze the complexity of each sentence in the answer. Break down each sentence into one or more fully understandable statements. Ensure that no pronouns are used in any statement. Format the outputs in JSON.
+Please return the output in a JSON format that complies with the following schema as specified in JSON Schema:
+{"properties": {"statements": {"description": "The generated statements", "items": {"type": "string"}, "title": "Statements", "type": "array"}}, "required": ["statements"], "title": "StatementGeneratorOutput", "type": "object"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.
+--------EXAMPLES-----------
+Example 1
+Input: {
+    "question": "Who was Albert Einstein and what is he best known for?",
+    "answer": "He was a German-born theoretical physicist, widely acknowledged to be one of the greatest and most influential physicists of all time. He was best known for developing the theory of relativity, he also made important contributions to the development of the theory of quantum mechanics."
+}
+Output: {
+    "statements": [
+        "Albert Einstein was a German-born theoretical physicist.",
+        "Albert Einstein is recognized as one of the greatest and most influential physicists of all time.",
+        "Albert Einstein was best known for developing the theory of relativity.",
+        "Albert Einstein also made important contributions to the development of the theory of quantum mechanics."
+    ]
+}
+-----------------------------
+Now perform the same with the following input
+input: {
+    "question": "¿Qué obliga la LOPD-GDD respecto a las evaluaciones de impacto?",
+    "answer": "La LOPD-GDD (Ley Orgánica de Protección de Datos y Garantía de los Derechos Digitales) establece varias obligaciones con respecto a las evaluaciones de impacto en relación con la protección de datos, especialmente cuando el tratamiento de datos puede implicar un alto riesgo para los derechos y libertades de los interesados. Aquí hay algunas obligaciones clave según la LOPD-GDD:\n\n1. **Obligación de realizar evaluaciones de impacto**:\n   - Se debe realizar una evaluación de impacto relativa a la protección de datos cuando el tratamiento de datos personales entrañe probablemente un alto riesgo para los derechos y libertades de los interesados (Artículo 17, párrafo 90).\n\n2. **Criterios para determinar la necesidad de una evaluación**:\n   - Se debe evaluar el alto riesgo en función de la naturaleza, ámbito, contexto y fines del tratamiento, así como los orígenes del riesgo (Artículo 17, párrafo 90).\n\n3. **Contenido de la evaluación**:\n   - La evaluación debe incluir las medidas, garantías y
+For troubleshooting, visit: https://python.langchain.com/docs/troubleshooting/errors/OUTPUT_PARSING_FAILURE )
+ERROR  Exception raised in Job[12]: OutputParserException(Invalid json output: Para crear un plan de vigilancia poscomercialización para sistemas de IA de alto riesgo, tal como se menciona en la Guía 13 de AESIA (Agencia Española de Seguridad e Inteligencia Artificial), los elementos que debe contemplar incluyen:
+1. **Sistema de Vigilancia Poscomercialización**:
+    - **Establecimiento y Documentación**: Los proveedores deberán establecer un sistema de vigilancia poscomercialización que esté alineado con la naturaleza de las tecnologías de IA y los riesgos asociados con los sistemas de IA de alto riesgo (Referencia: [1] Artículo 72 EU AI Act, [2] Guía AESIA).
+2. **Recopilación de Datos**:
+    - **Datos Pertinentes**: El sistema de vigilancia debe recopilar, documentar y analizar de manera activa y sistemática los datos relevantes sobre el funcionamiento de los sistemas de IA de alto riesgo a lo largo de su vida útil (Referencia: [2] Guía AESIA, [7] Art. 72.2).
+3. **Análisis de Datos**:
+    - **Evaluación del Cumplimiento**: Los datos recopilados deben permitir evaluar el cumplimiento permanente de los requisitos establecidos en el AI Act para dichos sistemas (Referencia: [2] Guía AESIA, [7] Art. 72.2).
+4. **Interacción con Otros Sistemas**:
+    - **Análisis de Interacciones**: Cuando sea pertinente, la vigilancia poscomercialización debe incluir un análisis de la interacción con otros sistemas de IA (Referencia: [2] Guía AESIA, [7] Art. 72.2).
+5. **Plan de Vigilancia Poscomercialización**:
+    - **Parte de la Documentación Técnica**: Este plan deberá formar parte de la documentación técnica del sistema (Referencia: [1] Artículo 72 EU AI Act, [2] Guía AESIA).
+6. **Registros de Información**:
+    - **Recolección de Información**: Los proveedores deben definir los registros necesarios para recolectar la información sobre el sistema de IA una vez comercializado, teniendo especial atención a posibles riesgos para la salud, seguridad o derechos fundamentales de las personas (Referencia: [7] Art. 72.2).
+7. **Evaluación de Riesgos**:
+    - **Identificación y Análisis de Riesgos**: Los proveedores deben evaluar y analizar cualquier riesgo emergente basado en los datos recogidos en el sistema de seguimiento posterior a la comercialización, incluyendo la gestión de estos riesgos (Referencia: [8] Sección 4).
+Estos elementos constituyen la base para un plan de vigilancia poscomercialización efectivo, asegurando la seguridad y el correcto funcionamiento de los sistemas de IA de alto riesgo.
+_Informe preliminar generado por IA. Consulte profesional juridico._
+For troubleshooting, visit: https://python.langchain.com/docs/troubleshooting/errors/OUTPUT_PARSING_FAILURE )
+Evaluating:  14%|█▍        | 2/14 [00:36<03:09, 15.81s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+ERROR  Exception raised in Job[2]: ThrottlingException(An error occurred (ThrottlingException) when calling the Converse operation (reached max retries: 4): Too many requests, please wait before trying again.)
+Evaluating:  36%|███▌      | 5/14 [00:37<00:43,  4.81s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+ERROR  Exception raised in Job[8]: ThrottlingException(An error occurred (ThrottlingException) when calling the Converse operation (reached max retries: 4): Too many requests, please wait before trying again.)
+Evaluating:  43%|████▎     | 6/14 [00:39<00:33,  4.13s/it]ERROR  Exception raised in Job[4]: ThrottlingException(An error occurred (ThrottlingException) when calling the Converse operation (reached max retries: 4): Too many requests, please wait before trying again.)
+Evaluating:  50%|█████     | 7/14 [00:40<00:22,  3.28s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  57%|█████▋    | 8/14 [00:44<00:21,  3.59s/it]ERROR  Exception raised in Job[9]: ThrottlingException(An error occurred (ThrottlingException) when calling the Converse operation (reached max retries: 4): Too many requests, please wait before trying again.)
+Evaluating:  64%|██████▍   | 9/14 [00:45<00:13,  2.79s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+Evaluating:  71%|███████▏  | 10/14 [00:48<00:11,  2.90s/it]ERROR  Exception raised in Job[6]: ThrottlingException(An error occurred (ThrottlingException) when calling the Converse operation (reached max retries: 4): Too many requests, please wait before trying again.)
+Evaluating:  79%|███████▊  | 11/14 [00:51<00:09,  3.00s/it]INFO  Using Bedrock Converse API to generate response
+INFO  Using Bedrock Converse API to generate response
+ERROR  Exception raised in Job[5]: OutputParserException(Failed to parse StringIO from completion null. Got: 1 validation error for StringIO
+  Input should be a valid dictionary or instance of StringIO [type=model_type, input_value=None, input_type=NoneType]
+    For further information visit https://errors.pydantic.dev/2.12/v/model_type
+For troubleshooting, visit: https://python.langchain.com/docs/troubleshooting/errors/OUTPUT_PARSING_FAILURE )
+Evaluating:  86%|████████▌ | 12/14 [00:53<00:05,  2.50s/it]ERROR  Exception raised in Job[3]: ThrottlingException(An error occurred (ThrottlingException) when calling the Converse operation (reached max retries: 4): Too many requests, please wait before trying again.)
+Evaluating:  93%|█████████▎| 13/14 [00:54<00:02,  2.14s/it]ERROR  Exception raised in Job[11]: OutputParserException(Failed to parse StringIO from completion null. Got: 1 validation error for StringIO
+  Input should be a valid dictionary or instance of StringIO [type=model_type, input_value=None, input_type=NoneType]
+    For further information visit https://errors.pydantic.dev/2.12/v/model_type
+For troubleshooting, visit: https://python.langchain.com/docs/troubleshooting/errors/OUTPUT_PARSING_FAILURE )
+Evaluating: 100%|██████████| 14/14 [00:58<00:00,  2.61s/it]
+Evaluating: 100%|██████████| 14/14 [00:58<00:00,  4.16s/it]
+INFO    [1] faith=0.778  ¿Qué prácticas de IA están prohibidas según el EU AI Act?
+INFO    [2] faith= NaN   ¿Cuándo se considera que un sistema de IA es de alto riesgo?
+INFO    [3] faith= NaN   ¿Qué es el sistema de gestión de riesgos del EU AI Act?
+INFO    [4] faith= NaN   ¿Qué requisitos de gobernanza de datos exige el EU AI Act?
+INFO    [5] faith= NaN   ¿Qué dice el EU AI Act sobre la supervisión humana?
+INFO    [6] faith= NaN   ¿Están obligados los sistemas de IA a informar a los usuarios de que están inter
+INFO    [7] faith= NaN   ¿Qué multas prevé el EU AI Act por incumplimiento de las prácticas prohibidas?
+INFO    [8] faith= NaN   ¿Qué obliga la LOPD-GDD respecto a las evaluaciones de impacto?
+INFO    [9] faith= NaN   ¿Qué sistemas de IA están incluidos en el Anexo III del EU AI Act?
+INFO    [10] faith= NaN   ¿Qué obligaciones tienen los proveedores de sistemas de IA de alto riesgo respec
+INFO    [11] faith=0.875  ¿Qué competencias tiene la Agencia Española de Supervisión de Inteligencia Artif
+INFO    [12] faith= NaN   ¿Están obligados a designar un Delegado de Protección de Datos los prestadores d
+INFO    [13] faith= NaN   ¿Qué elementos debe contemplar un plan de vigilancia poscomercialización para si
+INFO    [14] faith=0.000  ¿Qué grado de intervención humana debería tener un sistema de IA que decide las 
+INFO  ────────────────────────────────────────
+INFO  Resultados RAGAS:
+INFO    [Phase A — Retriever]
+INFO      ✓ context_precision         1.0000  (umbral: 0.70)
+INFO      ✗ context_recall            0.5179  (umbral: 0.70)
+INFO    [Phase B — E2E]
+INFO      ✗ faithfulness              0.5509  (umbral: 0.80)
+INFO  ────────────────────────────────────────

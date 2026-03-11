@@ -1,0 +1,53 @@
+# ── Entorno virtual ────────────────────────────
+venv/
+.venv/
+.conda/
+
+# ── Python ─────────────────────────────────────
+__pycache__/
+*.pyc
+.ruff_cache/
+.pytest_cache/
+
+# ── Credenciales y configuración local ─────────
+.env
+.aws/
+aws.pem
+
+# ── Data ───────────────────────────────────────
+*.csv
+!*.dvc
+
+# ── DVC (datos reales ignorados, .dvc metadata trackeada) ─
+/data/raw/
+/data/processed/vectorstore/
+/data/processed/chunks_legal/*.jsonl
+
+# ── Memoria conversacional ───────────────────
+/data/memory/
+
+# ── IaC (Terraform / Ansible) ──────────────────
+infra/ansible/inventory.ini
+infra/terraform/.terraform/
+infra/terraform/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+.terraformrc
+terraform.rc
+
+# ── IDE ────────────────────────────────────────
+.vscode/
+
+# ── Claude Code ───────────────────────────────
+# Permitir .claude/ para compartir skills, agents y hooks con el equipo
+# Solo ignorar configuración local
+.claude/settings.local.json
+
+# ── MLflow ─────────────────────────────────────
+mlruns/
+
+# ── Archivos locales / personales ──────────────
+src/classifier/tareas/
+.venv_rag/
+src\classifier\classifier_ultimo_dataset

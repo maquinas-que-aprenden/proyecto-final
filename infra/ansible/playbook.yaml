@@ -1,0 +1,67 @@
+---
+- name: Configurar Servidores (Ubuntu 24.04)
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Actualizar repositorios y sistema
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Instalar dependencias base
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - python3-pip
+          - git
+          - unzip
+        state: present
+
+    - name: Añadir GPG key de Docker
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Añadir repositorio de Docker
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_facts['distribution_release'] }} stable"
+        state: present
+
+    - name: Instalar Docker y Docker Compose
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+
+    - name: Asegurar que el usuario ubuntu está en el grupo docker
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+
+    - name: Descargar instalador AWS CLI
+      get_url:
+        url: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
+        dest: /tmp/awscliv2.zip
+
+    - name: Descomprimir AWS CLI
+      unarchive:
+        src: /tmp/awscliv2.zip
+        dest: /tmp
+        remote_src: yes
+
+    - name: Ejecutar instalador AWS CLI
+      shell: "/tmp/aws/install --update"
+      args:
+        creates: /usr/local/bin/aws
+
+    - name: Mensaje final
+      debug:
+        msg: "Servidor listo."
