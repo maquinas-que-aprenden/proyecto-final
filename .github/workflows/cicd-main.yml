@@ -108,6 +108,9 @@ jobs:
           script: |
             echo "${{ secrets.GHCR_READ_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_READ_USER }}" --password-stdin
             cd /home/ubuntu/normabot
+            git fetch --depth 1 origin main
+            git checkout FETCH_HEAD -- docker-compose.yml eval/
+            export PATH="/home/ubuntu/.local/bin:$PATH"
             dvc pull data/processed/vectorstore/
             docker compose up -d --pull always --force-recreate
             docker logout ghcr.io
