@@ -1,0 +1,15 @@
+{
+  "fecha": "2026-03-08",
+  "model_type": "BertForSequenceClassification",
+  "base_model": "dccuchile/bert-base-spanish-wwm-cased",
+  "experimento": "bert_pipeline",
+  "nombre": "BERT fine-tuning + data augmentation",
+  "test_f1_macro": 0.7289,
+  "test_accuracy": 0.725,
+  "eval_loss": 0.6999,
+  "epochs": 4,
+  "best_checkpoint": "checkpoint-800",
+  "features": "texto_completo (transformer embeddings)",
+  "dataset": "fusionado + data augmentation (back-translation + paráfrasis LLM)",
+  "criterio": "eval_f1 en checkpoint final (epoch 4)"
+}

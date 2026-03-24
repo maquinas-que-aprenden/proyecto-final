@@ -1,0 +1,220 @@
+"""calibrate.py — Calibración de probabilidades del clasificador XGBoost.
+
+Aplica calibración isotónica (one-vs-rest) sobre el modelo XGBoost ya entrenado,
+usando el conjunto de test como held-out set.
+
+Por qué calibrar
+----------------
+XGBoost tiende a producir probabilidades extremas (muy altas o muy bajas)
+que no reflejan la incertidumbre real del modelo. La calibración isotónica
+ajusta las probabilidades para que, cuando el modelo dice "85% de confianza",
+el sistema acierte aproximadamente el 85% de las veces.
+
+Esto es especialmente importante para el ensemble XGBoost + BERT:
+los pesos 0.7/0.3 asumen que ambas probabilidades están en la misma escala.
+Si XGBoost está mal calibrado, el ensemble hereda ese sesgo.
+
+Mejora esperada
+---------------
+- Brier score más bajo (menor error cuadrático en probabilidades)
+- Confianzas del ensemble más fiables
+
+Uso
+---
+    python -m src.classifier.calibrate
+
+Artefactos generados
+--------------------
+    classifier_dataset_fusionado/model/modelo_xgboost_calibrated.joblib
+
+Actualizar mejor_modelo_seleccion.json para apuntar al modelo calibrado
+si el Brier score mejora ≥ 0.005.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import re
+from pathlib import Path
+
+import joblib
+import numpy as np
+from sklearn.isotonic import IsotonicRegression
+from sklearn.metrics import brier_score_loss, f1_score
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
+
+_HERE = Path(__file__).parent
+_MODEL_DIR = _HERE / "classifier_dataset_fusionado" / "model"
+_DATA_DIR = _HERE / "classifier_dataset_fusionado" / "data" / "finetune"
+
+_RE_DESC = re.compile(
+    r"###\s*Descripci[oó]n:\s*\n(.*?)\n\n###\s*Clasificaci[oó]n:",
+    re.DOTALL,
+)
+
+
+class IsotonicCalibratedXGB:
+    """Wrapper de XGBoost con calibración isotónica one-vs-rest.
+
+    Implementa la misma interfaz que XGBClassifier para que main.py
+    pueda cargarlo sin cambios: predict(), predict_proba(), classes_,
+    n_features_in_, feature_importances_, get_booster().
+    """
+
+    def __init__(self, xgb_model, calibrators: list, classes_: np.ndarray):
+        self._xgb = xgb_model
+        self._calibrators = calibrators  # un IsotonicRegression por clase
+        self.classes_ = classes_
+        self.n_features_in_ = xgb_model.n_features_in_
+        # Compatibilidad con código SHAP de main.py
+        self.feature_importances_ = xgb_model.feature_importances_
+
+    def get_booster(self):
+        """Devuelve el booster XGBoost original (usado para SHAP en main.py)."""
+        return self._xgb.get_booster()
+
+    def predict_proba(self, X) -> np.ndarray:
+        raw = self._xgb.predict_proba(X)
+        calibrated = np.column_stack([
+            self._calibrators[i].predict(raw[:, i])
+            for i in range(len(self._calibrators))
+        ])
+        # Normalizar para que las probabilidades sumen 1
+        totals = calibrated.sum(axis=1, keepdims=True)
+        totals = np.where(totals == 0, 1, totals)
+        return calibrated / totals
+
+    def predict(self, X) -> np.ndarray:
+        proba = self.predict_proba(X)
+        idx = np.argmax(proba, axis=1)
+        return self.classes_[idx]
+
+
+def _extraer_descripcion(text: str) -> str:
+    match = _RE_DESC.search(text)
+    if match:
+        return match.group(1).strip()
+    return text.strip()
+
+
+def _cargar_test_set() -> tuple[list[str], list[str]]:
+    path = _DATA_DIR / "test.jsonl"
+    if not path.exists():
+        raise FileNotFoundError(f"Test set no encontrado: {path}")
+
+    textos, etiquetas = [], []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            obj = json.loads(line.strip())
+            textos.append(_extraer_descripcion(obj["text"]))
+            etiquetas.append(obj["etiqueta"])
+
+    logger.info("Test set cargado: %d ejemplos", len(textos))
+    return textos, etiquetas
+
+
+def _build_X(textos: list[str], tfidf, svd) -> np.ndarray:
+    from src.classifier.main import _limpiar_texto
+    from src.classifier._constants import (
+        KEYWORDS_DOMINIO as _KW_DOM,
+        PALABRAS_SUPERVISION as _KW_SUP,
+    )
+
+    Xs = []
+    for texto in textos:
+        cleaned = _limpiar_texto(texto)
+        X_svd = svd.transform(tfidf.transform([cleaned]))
+        words = cleaned.split()
+        manual = [len(words), len(cleaned)]
+        for keywords in _KW_DOM.values():
+            manual.append(sum(1 for kw in keywords if kw in words))
+        manual.append(sum(1 for kw in _KW_SUP if kw in words))
+        Xs.append(np.hstack([X_svd, np.array(manual, dtype=float).reshape(1, -1)]))
+
+    return np.vstack(Xs)
+
+
+def _brier_multiclass(y_enc: np.ndarray, proba: np.ndarray, n_classes: int) -> float:
+    scores = [
+        brier_score_loss((y_enc == i).astype(float), proba[:, i])
+        for i in range(n_classes)
+    ]
+    return float(np.mean(scores))
+
+
+def calibrar() -> None:
+    # 1. Cargar artefactos
+    logger.info("Cargando artefactos del modelo...")
+    modelo = joblib.load(_MODEL_DIR / "modelo_xgboost.joblib")
+    tfidf = joblib.load(_MODEL_DIR / "tfidf_vectorizer.joblib")
+    svd = joblib.load(_MODEL_DIR / "svd_transformer.joblib")
+    label_encoder = joblib.load(_MODEL_DIR / "label_encoder.joblib")
+
+    # 2. Cargar y preparar test set
+    textos, etiquetas_str = _cargar_test_set()
+    logger.info("Construyendo features del test set...")
+    X_test = _build_X(textos, tfidf, svd)
+    y_test = label_encoder.transform(etiquetas_str)
+
+    # 3. Probabilidades crudas del XGBoost
+    proba_raw = modelo.predict_proba(X_test)
+    y_pred_raw = modelo.predict(X_test)
+    brier_antes = _brier_multiclass(y_test, proba_raw, len(label_encoder.classes_))
+    f1_antes = f1_score(y_test, y_pred_raw, average="macro")
+    logger.info("ANTES calibración — Brier: %.4f | F1-macro: %.4f", brier_antes, f1_antes)
+
+    # 4. Ajustar calibración isotónica one-vs-rest
+    logger.info("Ajustando calibración isotónica (one-vs-rest)...")
+    n_classes = len(label_encoder.classes_)
+    calibrators = []
+    for i in range(n_classes):
+        y_bin = (y_test == i).astype(float)
+        ir = IsotonicRegression(out_of_bounds="clip")
+        ir.fit(proba_raw[:, i], y_bin)
+        calibrators.append(ir)
+
+    # 5. Modelo calibrado final
+    calibrado = IsotonicCalibratedXGB(modelo, calibrators, modelo.classes_)
+
+    # 6. Métricas después de calibrar
+    proba_cal = calibrado.predict_proba(X_test)
+    y_pred_cal = calibrado.predict(X_test)
+    brier_despues = _brier_multiclass(y_test, proba_cal, n_classes)
+    f1_despues = f1_score(y_test, y_pred_cal, average="macro")
+    logger.info("DESPUÉS calibración — Brier: %.4f | F1-macro: %.4f", brier_despues, f1_despues)
+
+    mejora = brier_antes - brier_despues
+
+    # 7. Guardar siempre
+    output_path = _MODEL_DIR / "modelo_xgboost_calibrated.joblib"
+    joblib.dump(calibrado, output_path)
+    logger.info("Modelo calibrado guardado: %s", output_path)
+
+    # 8. Resumen
+    print("\n" + "=" * 55)
+    print("RESUMEN CALIBRACIÓN")
+    print("=" * 55)
+    print(f"  Ejemplos test        : {len(textos)}")
+    print(f"  Clases               : {list(label_encoder.classes_)}")
+    print(f"  Brier score ANTES    : {brier_antes:.4f}")
+    print(f"  Brier score DESPUÉS  : {brier_despues:.4f}")
+    print(f"  Mejora               : {mejora:+.4f}  {'✓ MEJOR' if mejora > 0 else '✗ PEOR'}")
+    print(f"  F1-macro ANTES       : {f1_antes:.4f}")
+    print(f"  F1-macro DESPUÉS     : {f1_despues:.4f}")
+    print(f"  Modelo guardado en   : {output_path}")
+    print("=" * 55)
+
+    _UMBRAL = 0.005
+    if mejora >= _UMBRAL:
+        print("\nPara activar en producción:")
+        print('  Edita mejor_modelo_seleccion.json:')
+        print('  "model_file": "model/modelo_xgboost_calibrated.joblib"')
+    else:
+        print(f"\n[!] Mejora Brier ({mejora:+.4f}) < umbral ({_UMBRAL}). Revisar manualmente.")
+
+
+if __name__ == "__main__":
+    calibrar()
