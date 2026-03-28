@@ -52,6 +52,19 @@ def generate_embeddings(texts: list[str], model: SentenceTransformer) -> np.ndar
     )
 
 
+def _sanitize_meta(rec: dict) -> dict:
+    """Convierte valores no escalares a tipos aceptados por ChromaDB (str/int/float/bool)."""
+    out = {}
+    for k, v in rec.items():
+        if v is None:
+            out[k] = ""
+        elif isinstance(v, list):
+            out[k] = json.dumps(v, ensure_ascii=False)
+        else:
+            out[k] = v
+    return out
+
+
 def populate_chroma(
     texts: list[str],
     embeddings: np.ndarray,
@@ -74,7 +87,7 @@ def populate_chroma(
         ids.append(str(cid))
         m = dict(rec)
         m.pop("text", None)  # no duplicar texto en metadata
-        metas.append(m)
+        metas.append(_sanitize_meta(m))
 
     n = len(ids)
     for start in range(0, n, BATCH_SIZE):

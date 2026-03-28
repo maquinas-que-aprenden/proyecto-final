@@ -216,6 +216,23 @@ def _resplit_if_needed(text: str) -> list[str]:
     return _resplitter.split_text(text)
 
 
+_RISK_PATTERNS = {
+    "inaceptable": r"\binaceptable\b",
+    "alto": r"\balto\s+riesgo\b|\bde\s+alto\s+riesgo\b",
+    "limitado": r"\briesgo\s+limitado\b|\blimitado\b",
+    "mínimo": r"\briesgo\s+m[íi]nimo\b|\bm[íi]nimo\b",
+}
+
+
+def _extract_risk_levels(text: str) -> list[str]:
+    """Detecta niveles de riesgo EU AI Act mencionados en el texto."""
+    return [
+        label
+        for label, pat in _RISK_PATTERNS.items()
+        if re.search(pat, text, flags=re.IGNORECASE)
+    ]
+
+
 # Patrones regex por fuente
 BOE_PATTERNS = [
     r"(?m)^\s*Art[íi]culo\s+\d+.*$",
@@ -243,12 +260,19 @@ def chunk_docs(
     docs: list[dict],
     patterns: list[str],
     unit_meta_fn=None,
-) -> list[dict]:
-    """Genera chunks estructurados a partir de documentos ya leidos."""
+) -> tuple[list[dict], list[dict]]:
+    """Genera chunks estructurados a partir de documentos ya leidos.
+
+    Devuelve (chunks, padres):
+    - chunks: hijos + singles, listos para indexar en ChromaDB
+    - padres: texto completo de unidades que se subdividieron (lookup para RAG)
+    """
     if unit_meta_fn is None:
         unit_meta_fn = _unit_meta
 
     chunks = []
+    padres = []
+
     for doc in docs:
         file = doc["file"]
         text = _norm_spaces(doc["text"])
@@ -263,6 +287,22 @@ def chunk_docs(
             unit_type, unit_id, unit_title = unit_meta_fn(header)
 
             sub_parts = _resplit_if_needed(body)
+            es_subdividido = len(sub_parts) > 1
+
+            if es_subdividido:
+                parent_id = _md5(f"{source}|{file}|{unit_type}|{unit_id}|{u_idx}")
+                padres.append({
+                    "parent_id": parent_id,
+                    "source": source,
+                    "file": file,
+                    "unit_type": unit_type,
+                    "unit_id": unit_id,
+                    "unit_title": unit_title,
+                    "text": body,
+                })
+            else:
+                parent_id = None
+
             for sub_i, sub_text in enumerate(sub_parts):
                 sub_text = sub_text.strip()
                 if len(sub_text) < MIN_CHUNK_CHARS:
@@ -278,6 +318,9 @@ def chunk_docs(
                     "unit_title": unit_title,
                     "unit_index": u_idx,
                     "sub_index": sub_i,
+                    "tipo_nodo": "hijo" if es_subdividido else "single",
+                    "parent_id": parent_id,
+                    "nivel_riesgo_mencionado": _extract_risk_levels(sub_text),
                     "text": sub_text,
                 }
                 # Campos específicos BOE
@@ -290,7 +333,7 @@ def chunk_docs(
                 )
                 chunks.append(chunk)
 
-    return chunks
+    return chunks, padres
 
 
 # ── Pipeline principal ──────────────────────────────────────────────
@@ -314,28 +357,35 @@ def main() -> None:
 
     # 2) Chunking estructurado (todas las fuentes usan chunk_docs)
     print("\n-- Chunking --")
-    boe_chunks = chunk_docs("boe", boe_docs, BOE_PATTERNS)
-    eu_chunks = chunk_docs("eu_ai_act", eu_docs, EU_PATTERNS)
-    aesia_chunks = chunk_docs("aesia", aesia_docs, AESIA_PATTERNS, unit_meta_fn=_unit_meta_aesia)
-    lopd_chunks = chunk_docs("lopd_rgpd", lopd_docs, BOE_PATTERNS)
+    boe_chunks, boe_padres = chunk_docs("boe", boe_docs, BOE_PATTERNS)
+    eu_chunks, eu_padres = chunk_docs("eu_ai_act", eu_docs, EU_PATTERNS)
+    aesia_chunks, aesia_padres = chunk_docs("aesia", aesia_docs, AESIA_PATTERNS, unit_meta_fn=_unit_meta_aesia)
+    lopd_chunks, lopd_padres = chunk_docs("lopd_rgpd", lopd_docs, BOE_PATTERNS)
 
     all_chunks = boe_chunks + eu_chunks + aesia_chunks + lopd_chunks
+    all_padres = boe_padres + eu_padres + aesia_padres + lopd_padres
 
     if not all_chunks:
         print("\n[ERROR] No se generaron chunks. Revisa rutas de data/raw y patrones de chunking.")
         return
 
-    print(f"  BOE: {len(boe_chunks)} chunks")
-    print(f"  EU AI Act: {len(eu_chunks)} chunks")
-    print(f"  AESIA: {len(aesia_chunks)} chunks")
-    print(f"  LOPD/RGPD: {len(lopd_chunks)} chunks")
-    print(f"  TOTAL: {len(all_chunks)} chunks")
+    hijos = [c for c in all_chunks if c["tipo_nodo"] == "hijo"]
+    singles = [c for c in all_chunks if c["tipo_nodo"] == "single"]
+    print(f"  BOE: {len(boe_chunks)} chunks ({len(boe_padres)} padres)")
+    print(f"  EU AI Act: {len(eu_chunks)} chunks ({len(eu_padres)} padres)")
+    print(f"  AESIA: {len(aesia_chunks)} chunks ({len(aesia_padres)} padres)")
+    print(f"  LOPD/RGPD: {len(lopd_chunks)} chunks ({len(lopd_padres)} padres)")
+    print(f"  TOTAL: {len(all_chunks)} chunks ({len(singles)} singles, {len(hijos)} hijos, {len(all_padres)} padres)")
 
     # 3) Escribir output
     print("\n-- Escritura --")
     out_path = OUT_DIR / "chunks_final_all_sources.jsonl"
     _write_jsonl(out_path, all_chunks)
     print(f"  {out_path.name}: {len(all_chunks)} chunks")
+
+    padres_path = OUT_DIR / "chunks_padres.jsonl"
+    _write_jsonl(padres_path, all_padres)
+    print(f"  {padres_path.name}: {len(all_padres)} padres")
 
     # 4) Verificación
     sizes = [len(c["text"]) for c in all_chunks]

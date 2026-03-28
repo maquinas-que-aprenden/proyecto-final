@@ -145,8 +145,24 @@ def search_legal_docs(query: str) -> str:
         return f"Error de validacion: {e}"
 
     from src.rag.main import retrieve, grade, format_context
+    from src.retrieval.retriever import _detect_article_number, _detect_annex_reference
 
-    docs = retrieve(query)
+    # Si la query menciona un artículo o anexo concreto, usar hybrid con filtro
+    # para garantizar que ese artículo aparezca en los resultados.
+    article_num = _detect_article_number(query)
+    annex_ref = _detect_annex_reference(query)
+
+    if article_num:
+        mode = "hybrid"
+        filters = {"unit_id": article_num}
+    elif annex_ref:
+        mode = "hybrid"
+        filters = {"unit_id": annex_ref}
+    else:
+        mode = "soft"
+        filters = None
+
+    docs = retrieve(query, mode=mode, filters=filters)
     if not docs:
         try:
             langfuse_context.update_current_observation(metadata={"n_docs": 0, "n_relevant": 0})
