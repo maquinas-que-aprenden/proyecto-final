@@ -42,6 +42,7 @@ import joblib
 import numpy as np
 from sklearn.isotonic import IsotonicRegression
 from sklearn.metrics import brier_score_loss, f1_score
+from src.classifier._calibrated_model import IsotonicCalibratedXGB  # noqa: F401 (re-export para pickle)
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -55,42 +56,6 @@ _RE_DESC = re.compile(
     re.DOTALL,
 )
 
-
-class IsotonicCalibratedXGB:
-    """Wrapper de XGBoost con calibración isotónica one-vs-rest.
-
-    Implementa la misma interfaz que XGBClassifier para que main.py
-    pueda cargarlo sin cambios: predict(), predict_proba(), classes_,
-    n_features_in_, feature_importances_, get_booster().
-    """
-
-    def __init__(self, xgb_model, calibrators: list, classes_: np.ndarray):
-        self._xgb = xgb_model
-        self._calibrators = calibrators  # un IsotonicRegression por clase
-        self.classes_ = classes_
-        self.n_features_in_ = xgb_model.n_features_in_
-        # Compatibilidad con código SHAP de main.py
-        self.feature_importances_ = xgb_model.feature_importances_
-
-    def get_booster(self):
-        """Devuelve el booster XGBoost original (usado para SHAP en main.py)."""
-        return self._xgb.get_booster()
-
-    def predict_proba(self, X) -> np.ndarray:
-        raw = self._xgb.predict_proba(X)
-        calibrated = np.column_stack([
-            self._calibrators[i].predict(raw[:, i])
-            for i in range(len(self._calibrators))
-        ])
-        # Normalizar para que las probabilidades sumen 1
-        totals = calibrated.sum(axis=1, keepdims=True)
-        totals = np.where(totals == 0, 1, totals)
-        return calibrated / totals
-
-    def predict(self, X) -> np.ndarray:
-        proba = self.predict_proba(X)
-        idx = np.argmax(proba, axis=1)
-        return self.classes_[idx]
 
 
 def _extraer_descripcion(text: str) -> str:
