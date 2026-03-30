@@ -4,7 +4,10 @@ Flujo Retrieve → Grade desde ChromaDB. La generación la hace el orchestrator.
 
 from __future__ import annotations
 
+import json
 import logging
+import threading
+from pathlib import Path
 
 try:
     from langchain_ollama import ChatOllama
@@ -16,6 +19,29 @@ from src.observability.langfuse_compat import observe, langfuse_context
 from src.retrieval.retriever import search
 
 logger = logging.getLogger(__name__)
+
+PARENTS_JSONL = Path(__file__).resolve().parents[2] / "data" / "processed" / "chunks_legal" / "chunks_padres.jsonl"
+
+_parents: dict[str, str] | None = None
+_parents_lock = threading.Lock()
+
+
+def _load_parents() -> dict[str, str]:
+    """Carga chunks_padres.jsonl en dict {parent_id: texto_padre} de forma lazy."""
+    global _parents
+    if _parents is not None:
+        return _parents
+    with _parents_lock:
+        if _parents is not None:
+            return _parents
+        result: dict[str, str] = {}
+        if PARENTS_JSONL.exists():
+            with PARENTS_JSONL.open("r", encoding="utf-8") as f:
+                for line in f:
+                    rec = json.loads(line)
+                    result[rec["parent_id"]] = rec["text"]
+        _parents = result
+    return _parents
 
 MAX_DOC_CHARS_GRADING = 3000
 
@@ -49,10 +75,21 @@ def _get_grading_llm():
 
 
 @observe(name="rag.retrieve")
-def retrieve(query: str, k: int = 9) -> list[dict]:
-    """Recupera documentos de ChromaDB y los formatea para grade()."""
+def retrieve(
+    query: str,
+    k: int = 9,
+    mode: str = "soft",
+    filters: dict | None = None,
+) -> list[dict]:
+    """Recupera documentos de ChromaDB y los formatea para grade().
+
+    Args:
+        mode: "soft" (default), "base" o "hybrid" (BM25 + semántico + RRF).
+        filters: filtros de metadata para pre-filtrar en Chroma, ej. {"unit_id": "5"}.
+                 Solo aplicable en mode="hybrid".
+    """
     try:
-        results = search(query, k=k, mode="soft")
+        results = search(query, k=k, mode=mode, filters=filters)
     except Exception:
         logger.exception("Error al buscar en ChromaDB")
         try:
@@ -69,13 +106,14 @@ def retrieve(query: str, k: int = 9) -> list[dict]:
         {
             "doc": r["text"],
             "metadata": r.get("metadata", {}),
-            "score": max(0.0, 1.0 - r.get("distance", 1.0)),
+            # hybrid no devuelve distancia coseno; score=1.0 para no penalizar
+            "score": max(0.0, 1.0 - r["distance"]) if r.get("distance") is not None else 1.0,
         }
         for r in results
     ]
     try:
         langfuse_context.update_current_observation(
-            metadata={"k": k, "n_docs_retrieved": len(docs)},
+            metadata={"k": k, "mode": mode, "n_docs_retrieved": len(docs)},
         )
     except Exception:
         pass
@@ -149,14 +187,33 @@ def grade(query: str, docs: list[dict], threshold: float = 0.3) -> list[dict]:
 
 
 def format_context(docs: list[dict]) -> str:
-    """Formatea los documentos relevantes como contexto para el orchestrator."""
+    """Formatea los documentos relevantes como contexto para el orchestrator.
+
+    Para chunks hijos, incluye el texto completo del artículo padre como contexto
+    ampliado, seguido del fragmento preciso recuperado.
+    """
+    parents = _load_parents()
     blocks = []
     for i, d in enumerate(docs, 1):
         meta = d.get("metadata", {})
         source = meta.get("source", "")
         unit = meta.get("unit_title") or meta.get("unit_id", "")
         header = f"[{i}] {source} — {unit}".strip(" —")
-        blocks.append(f"{header}\n{d['doc']}")
+
+        tipo_nodo = meta.get("tipo_nodo", "single")
+        parent_id = meta.get("parent_id") or ""
+
+        if tipo_nodo == "hijo" and parent_id and parent_id in parents:
+            parent_text = parents[parent_id]
+            block = (
+                f"{header}\n"
+                f"[Contexto completo del artículo]\n{parent_text}\n\n"
+                f"[Fragmento relevante]\n{d['doc']}"
+            )
+        else:
+            block = f"{header}\n{d['doc']}"
+
+        blocks.append(block)
     return "\n\n".join(blocks)
 
 
