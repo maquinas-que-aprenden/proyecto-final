@@ -49,5 +49,6 @@ mlruns/
 
 # ── Archivos locales / personales ──────────────
 src/classifier/tareas/
+data/tareas/
 .venv_rag/
-src\classifier\classifier_ultimo_dataset
+src\classifier\classifier_ultimo_datasetsrc/classifier/bert_pipeline/
