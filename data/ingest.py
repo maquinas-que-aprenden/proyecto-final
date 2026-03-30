@@ -233,6 +233,149 @@ def _extract_risk_levels(text: str) -> list[str]:
     ]
 
 
+# ── Metadata específica por fuente ─────────────────────────────────
+
+# Mapeo artículo → campo temático (EU AI Act 2024/1689)
+_EU_CAMPO_MAP: list[tuple[range, str]] = [
+    (range(1, 5),    "definiciones_ambito"),        # Art. 1–4
+    (range(5, 6),    "practicas_prohibidas"),        # Art. 5
+    (range(6, 50),   "sistemas_alto_riesgo"),        # Art. 6–49
+    (range(50, 51),  "transparencia"),               # Art. 50
+    (range(51, 57),  "modelos_ia_proposito_general"),# Art. 51–56
+    (range(57, 69),  "gobernanza"),                  # Art. 57–68
+    (range(69, 99),  "responsabilidad_supervision"), # Art. 69–98
+    (range(99, 102), "sanciones"),                   # Art. 99–101
+]
+
+_AESIA_AMBITO_PATTERNS: dict[str, str] = {
+    "alto_riesgo":    r"\balto\s+riesgo\b",
+    "transparencia":  r"\btransparencia\b|\bexplicabilidad\b",
+    "datos":          r"\bdatos\s+de\s+entrenamiento\b|\bdataset\b|\bcalidad\s+de\s+datos\b",
+    "gobernanza":     r"\bgobernanza\b|\bcumplimiento\b|\bauditoria\b",
+    "derechos":       r"\bderechos\s+fundamentales\b|\bno\s+discriminaci[oó]n\b",
+    "ciclo_vida":     r"\bciclo\s+de\s+vida\b|\bpost.mercado\b|\bdespliegue\b",
+}
+
+
+def _extra_meta_eu_ai_act(unit_type: str, unit_id: str | None) -> dict:
+    """Campos adicionales para chunks de EU AI Act."""
+    if unit_type != "article" or not unit_id or not unit_id.isdigit():
+        return {}
+    n = int(unit_id)
+    for art_range, campo in _EU_CAMPO_MAP:
+        if n in art_range:
+            return {"campo": campo}
+    return {"campo": "otros"}
+
+
+def _extra_meta_aesia(file: str, text: str) -> dict:
+    """Campos adicionales para chunks de AESIA."""
+    fname = file.lower()
+    tipo = "sandbox" if "sandbox" in fname else "guia"
+    ambitos = [
+        t for t, pat in _AESIA_AMBITO_PATTERNS.items()
+        if re.search(pat, text, flags=re.IGNORECASE)
+    ]
+    meta: dict = {"tipo_documento": tipo}
+    if ambitos:
+        meta["ambito_tematico"] = ambitos
+    return meta
+
+
+# Patrones BOE
+_BOE_TIPO_NORMA_PATTERNS: list[tuple[str, str]] = [
+    (r"\bLey\s+Org[áa]nica\b",    "Ley Orgánica"),
+    (r"\bReal\s+Decreto-ley\b",   "Real Decreto-ley"),
+    (r"\bReal\s+Decreto\b",       "Real Decreto"),
+    (r"\bOrden\s+Ministerial\b",  "Orden Ministerial"),
+    (r"\bOrden\b",                "Orden"),
+    (r"\bResoluci[oó]n\b",        "Resolución"),
+    (r"\bLey\b",                  "Ley"),
+]
+
+_BOE_ORGANISMO_PATTERNS: list[tuple[str, str]] = [
+    (r"Ministerio\s+de\s+([\wáéíóúüñÁÉÍÓÚÜÑ\s]+?)(?:\.|,|\n)", "Ministerio de {0}"),
+    (r"Agencia\s+Española\s+de\s+([\wáéíóúüñÁÉÍÓÚÜÑ\s]+?)(?:\.|,|\n)", "Agencia Española de {0}"),
+    (r"Consejo\s+de\s+Ministros", "Consejo de Ministros"),
+    (r"Jefatura\s+del\s+Estado",  "Jefatura del Estado"),
+]
+
+_LOPD_DERECHOS_PATTERNS: dict[str, str] = {
+    "acceso":        r"\bderecho\s+de\s+acceso\b",
+    "rectificacion": r"\brectificaci[oó]n\b",
+    "supresion":     r"\bsupresi[oó]n\b|\bderecho\s+al\s+olvido\b",
+    "portabilidad":  r"\bportabilidad\b",
+    "oposicion":     r"\boposici[oó]n\b",
+    "limitacion":    r"\blimitaci[oó]n\s+del\s+tratamiento\b",
+}
+
+_LOPD_CATEGORIA_ESPECIAL_PATTERNS: dict[str, str] = {
+    "salud":      r"\bdatos\s+de\s+salud\b|\bhistorial\s+cl[íi]nico\b",
+    "biometrico": r"\bdatos\s+biom[eé]tricos\b",
+    "ideologia":  r"\bideolog[íi]a\b|\bopini[oó]n\s+pol[íi]tica\b",
+    "religion":   r"\bconvicciones\s+religiosas?\b",
+    "origen":     r"\borigen\s+(racial|[eé]tnico)\b",
+}
+
+
+def _extra_meta_boe(doc_text: str, chunk_text: str) -> dict:
+    """Campos adicionales para chunks de BOE."""
+    meta: dict = {}
+
+    # tipo_norma: busca en el texto completo del documento (cabecera)
+    header = doc_text[:500]
+    for pat, label in _BOE_TIPO_NORMA_PATTERNS:
+        if re.search(pat, header, flags=re.IGNORECASE):
+            meta["tipo_norma"] = label
+            break
+
+    # num_norma: número oficial de la norma (ej: "LO 3/2018", "RD 1112/2018")
+    m = re.search(
+        r"\b(Ley\s+Org[áa]nica|Ley|Real\s+Decreto-ley|Real\s+Decreto|Orden)\s+(\d+/\d{4})\b",
+        header,
+        flags=re.IGNORECASE,
+    )
+    if m:
+        meta["num_norma"] = f"{m.group(1).strip()} {m.group(2)}"
+
+    # organismo_emisor: quién emite la norma
+    for pat, template in _BOE_ORGANISMO_PATTERNS:
+        m2 = re.search(pat, header, flags=re.IGNORECASE)
+        if m2:
+            if "{0}" in template:
+                nombre = m2.group(1).strip().rstrip(".,")
+                meta["organismo_emisor"] = template.format(nombre)
+            else:
+                meta["organismo_emisor"] = template
+            break
+
+    return meta
+
+
+def _extra_meta_lopd_rgpd(file: str, text: str) -> dict:
+    """Campos adicionales para chunks de LOPD/RGPD."""
+    fname = file.lower()
+    meta: dict = {
+        "sub_fuente": "lopd_gdd" if "lopdgdd" in fname or "lopd" in fname else "rgpd",
+    }
+
+    derechos = [
+        d for d, pat in _LOPD_DERECHOS_PATTERNS.items()
+        if re.search(pat, text, flags=re.IGNORECASE)
+    ]
+    if derechos:
+        meta["derechos_arco"] = derechos
+
+    categorias = [
+        c for c, pat in _LOPD_CATEGORIA_ESPECIAL_PATTERNS.items()
+        if re.search(pat, text, flags=re.IGNORECASE)
+    ]
+    if categorias:
+        meta["categoria_dato_especial"] = categorias
+
+    return meta
+
+
 # Patrones regex por fuente
 BOE_PATTERNS = [
     r"(?m)^\s*Art[íi]culo\s+\d+.*$",
@@ -328,6 +471,15 @@ def chunk_docs(
                     chunk["boe_year"] = dmeta["boe_year"]
                 if "boe_id" in dmeta:
                     chunk["boe_id"] = dmeta["boe_id"]
+                # Campos específicos por fuente
+                if source == "eu_ai_act":
+                    chunk.update(_extra_meta_eu_ai_act(unit_type, unit_id))
+                elif source == "aesia":
+                    chunk.update(_extra_meta_aesia(file, sub_text))
+                elif source == "boe":
+                    chunk.update(_extra_meta_boe(text, sub_text))
+                elif source == "lopd_rgpd":
+                    chunk.update(_extra_meta_lopd_rgpd(file, sub_text))
                 chunk["id"] = _md5(
                     f"{source}|{file}|{unit_type}|{unit_id}|{u_idx}|{sub_i}|{sub_text[:200]}"
                 )
