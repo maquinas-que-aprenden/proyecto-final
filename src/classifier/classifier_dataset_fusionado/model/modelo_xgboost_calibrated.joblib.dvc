@@ -1,0 +1,5 @@
+outs:
+- md5: 6c5c1cf3638b7e4db0d9af4aa8097707
+  size: 2396127
+  hash: md5
+  path: modelo_xgboost_calibrated.joblib

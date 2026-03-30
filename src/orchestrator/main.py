@@ -40,7 +40,7 @@ except ImportError:
 
 from src.observability.langfuse_compat import observe, langfuse_context
 from src.observability.main import get_langfuse_handler
-from src.classifier.main import predict_risk
+from src.classifier.ensemble import predict_ensemble as predict_risk
 
 logger = logging.getLogger(__name__)
 
