@@ -14,7 +14,7 @@
 | **Blockers P0** | 0 activos | 0 (todos resueltos) |
 | **Tests ejecutables** | 98+ colectados (deterministas) | → (estable) |
 | **PRs mergeados en develop** | 142+ (acumulado) | → (sin nuevos merges en últimas 24h) |
-| **Mejoras ML implementadas** | XGBoost+BERT ensemble (funcional + en prod) | INTEGRADO |
+| **Mejoras ML implementadas** | XGBoost calibrado en prod (ensemble evaluado y descartado) | CERRADO |
 | **Rama actual** | fix/bert-calibrate-guards | PR #147 |
 | **Confianza E2E** | 99%+ (validada en demo real + post-presentación) | ✓ CONFIRMADA |
 
@@ -134,7 +134,7 @@ Brier score: 0.0463 (pre-calibración) → 0.0305 (post-calibración, -34%).
 
 | Tarea | Status | Responsable | Notas |
 |---|---|---|---|
-| Ensemble XGBoost+BERT | ✓ INTEGRADO | Rubén | Novo módulo ensemble.py, graceful fallback, integrado en orchestrator |
+| Ensemble XGBoost+BERT | ✓ EVALUADO — DESCARTADO | Rubén/Dani | F1=0.7574 vs baseline 0.8780. BERT arrastra F1 (-0.1206). XGBoost calibrado se mantiene en prod. |
 | Calibración isotónica | ✓ INVESTIGATIVO | Rubén | Novo módulo calibrate.py, no en pipeline producción (pausa deliberada) |
 | Embeddings e5 multilingual | ✓ INVESTIGATIVO | Rubén | Novo embed_experiment.py para mejorar embeddings, no integrado |
 | DVC tracking modelos | ✓ HECHO | Nati | Modelos calibrados trackeados en DVC |
@@ -155,8 +155,9 @@ Brier score: 0.0463 (pre-calibración) → 0.0305 (post-calibración, -34%).
 
 ### Clasificador — XGBoost + BERT Ensemble
 
-- ✓ XGBoost F1-macro 0.8822 (baseline, stable)
-- ✓ BERT F1-macro 0.7289 (novo, integrado con pesos asimétricos)
+- ✓ XGBoost calibrado F1-macro 0.8780, Brier 0.0305 — **PRODUCCIÓN**
+- ✓ Ensemble XGBoost+BERT evaluado: F1=0.7574 — **DESCARTADO** (BERT arrastra F1)
+- ✓ E5+XGBoost experimental — pendiente más datos (Nati)
 - ✓ Ensemble: Media ponderada (70% XGBoost, 30% BERT)
 - ✓ predict_ensemble() → compatible con predict_risk() interface
 - ✓ Anexo III override post-ensemble (determinista)
