@@ -47,9 +47,9 @@
 | **src/rag/main.py** | 175 | FUNCIONAL | REAL | 2026-03-07 (sin cambios en main) |
 | **src/classifier/main.py** | 512 | FUNCIONAL | REAL | 2026-03-07 (sin cambios) |
 | **src/classifier/ensemble.py** | 153 | FUNCIONAL | REAL | 2026-03-24 (XGBoost+BERT ensemble) |
-| **src/classifier/calibrate.py** | 207 | INVESTIGATIVO | REAL | 2026-03-30 (actualizado, no en prod) |
+| **src/classifier/calibrate.py** | 207 | HERRAMIENTA | REAL | 2026-03-30 (script calibración, genera artefacto prod) |
 | **src/classifier/embed_experiment.py** | 210 | INVESTIGATIVO | REAL | 2026-03-30 (actualizado) |
-| **src/classifier/_calibrated_model.py** | 43 | SOPORTE | REAL | 2026-03-28 (pickle wrapper) |
+| **src/classifier/_calibrated_model.py** | 43 | FUNCIONAL | REAL | 2026-03-28 (wrapper en producción vía mejor_modelo_seleccion.json) |
 | **src/orchestrator/main.py** | 486 | FUNCIONAL | REAL | 2026-03-24 (import ensemble) |
 | **src/retrieval/retriever.py** | 184 | FUNCIONAL | REAL | 2026-03-07 (sin cambios) |
 | **src/checklist/main.py** | 469 | FUNCIONAL | REAL | 2026-03-07 (sin cambios) |
@@ -91,20 +91,20 @@ El orchestrator llama `predict_ensemble` (aliaseado como `predict_risk` para com
 - `classifier_dataset_fusionado/model/modelo_e5_xgboost.joblib` (novo, con embeddings e5)
 - `bert_pipeline/models/bert_model/model.safetensors` (BERT transformer)
 
-### Calibración Isotónica — INVESTIGATIVA, NO EN PRODUCCIÓN
+### Calibración Isotónica — ARTEFACTO EN PRODUCCIÓN, SCRIPT HERRAMIENTA
 
-**Archivo**: `src/classifier/calibrate.py` (207 líneas, actualizado 2026-03-30)
+**Artefacto activo**: `modelo_xgboost_calibrated.joblib` — cargado en inferencia vía `mejor_modelo_seleccion.json`.
 
-**Estado**: Código funcional pero no integrado en pipeline producción.
+**Script generador**: `src/classifier/calibrate.py` (207 líneas) — herramienta off-line para regenerar el modelo calibrado cuando se amplíe el dataset. No se ejecuta en tiempo de inferencia.
 
-**Propósito**: Mejorar confianza probabilística de XGBoost antes de mezclar con BERT.
-
-**Wrapper para serialización**: `src/classifier/_calibrated_model.py` (43 líneas)
+**Wrapper de serialización**: `src/classifier/_calibrated_model.py` (43 líneas, FUNCIONAL EN PROD)
 - Clase `IsotonicCalibratedXGB` implementa interfaz XGBClassifier
 - Compatible con joblib para persistencia
 - Mantiene acceso a get_booster() para SHAP
+- `main.py` la carga implícitamente al deserializar el `.joblib`
 
-**Razón de no integración**: Necesita validación más exhaustiva antes de producción. El modelo actual (sin calibración) es estable y validado.
+**Alcance en producción**: desplegado en artefactos y activo en inferencia online.
+Brier score: 0.0463 (pre-calibración) → 0.0305 (post-calibración, -34%).
 
 ### Embeddings e5 Multilingual — INVESTIGATIVO, NO EN PRODUCCIÓN
 

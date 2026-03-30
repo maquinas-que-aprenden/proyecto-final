@@ -125,12 +125,28 @@ def calibrar() -> None:
     X_all = _build_X(textos, tfidf, svd)
     y_all = label_encoder.transform(etiquetas_str)
 
+    # Validar que cada clase tenga al menos 2 muestras para el split estratificado
+    from collections import Counter
+    counts_cal = Counter(y_all.tolist())
+    min_count_cal = min(counts_cal.values())
+    _MIN_STRAT = 2
+    if min_count_cal < _MIN_STRAT:
+        clases_escasas = [label_encoder.classes_[i] for i, c in counts_cal.items() if c < _MIN_STRAT]
+        logger.warning(
+            "Clases con pocas muestras en test set (%s). "
+            "Se usará split NO estratificado para el calibrador.",
+            clases_escasas,
+        )
+        stratify_cal = None
+    else:
+        stratify_cal = y_all
+
     # Split calibration/evaluation para evitar data leakage:
     # los calibradores se ajustan en X_cal y las métricas post-calibración
     # se miden en X_eval (datos no vistos durante el ajuste).
     # Con dataset pequeño (60 ej.) usamos 2/3 cal / 1/3 eval estratificado.
     X_cal, X_eval, y_cal, y_eval = train_test_split(
-        X_all, y_all, test_size=0.33, stratify=y_all, random_state=42
+        X_all, y_all, test_size=0.33, stratify=stratify_cal, random_state=42
     )
     logger.info(
         "Split calibración/evaluación — cal: %d, eval: %d", len(y_cal), len(y_eval)
@@ -165,9 +181,19 @@ def calibrar() -> None:
     logger.info("DESPUÉS calibración — Brier: %.4f | F1-macro: %.4f", brier_despues, f1_despues)
 
     mejora = brier_antes - brier_despues
+    _UMBRAL = 0.005
 
-    # 7. Guardar siempre
-    output_path = _MODEL_DIR / "modelo_xgboost_calibrated.joblib"
+    # 7. Guardar: modelo de producción si supera umbral, candidato si no
+    if mejora >= _UMBRAL:
+        output_path = _MODEL_DIR / "modelo_xgboost_calibrated.joblib"
+    else:
+        output_path = _MODEL_DIR / "modelo_xgboost_calibrated_candidate.joblib"
+        logger.warning(
+            "Mejora Brier (%+.4f) < umbral (%.3f). "
+            "Guardado como candidato, NO como modelo de producción: %s",
+            mejora, _UMBRAL, output_path.name,
+        )
+
     joblib.dump(calibrado, output_path)
     logger.info("Modelo calibrado guardado: %s", output_path)
 
@@ -182,16 +208,17 @@ def calibrar() -> None:
     print(f"  Mejora               : {mejora:+.4f}  {'✓ MEJOR' if mejora > 0 else '✗ PEOR'}")
     print(f"  F1-macro ANTES       : {f1_antes:.4f}")
     print(f"  F1-macro DESPUÉS     : {f1_despues:.4f}")
-    print(f"  Modelo guardado en   : {output_path}")
+    print(f"  Modelo guardado en   : {output_path.name}")
     print("=" * 55)
 
-    _UMBRAL = 0.005
     if mejora >= _UMBRAL:
         print("\nPara activar en producción:")
         print('  Edita mejor_modelo_seleccion.json:')
         print('  "model_file": "model/modelo_xgboost_calibrated.joblib"')
     else:
-        print(f"\n[!] Mejora Brier ({mejora:+.4f}) < umbral ({_UMBRAL}). Revisar manualmente.")
+        print(f"\n[!] Mejora Brier ({mejora:+.4f}) < umbral ({_UMBRAL}).")
+        print(f"    Guardado como candidato: {output_path.name}")
+        print("    No sobreescribe el modelo de producción. Revisar manualmente.")
 
 
 if __name__ == "__main__":

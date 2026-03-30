@@ -134,7 +134,16 @@ def train(
     labels_ordered = le.classes_.tolist()
     df["label"] = le.transform(df["etiqueta_normalizada"])
 
-    # Validación: mínimo 2 muestras por clase para que la estratificación no falle
+    # Validación: cobertura completa de las 4 clases en el dataset
+    expected_labels = set(range(len(labels_ordered)))
+    missing_in_df = sorted(expected_labels - set(df["label"].unique()))
+    if missing_in_df:
+        raise ValueError(
+            "Faltan clases en el dataset de entrenamiento: "
+            + ", ".join(labels_ordered[i] for i in missing_in_df)
+        )
+
+    # Validación: mínimo de muestras por clase para que la estratificación no falle
     counts = df["label"].value_counts()
     min_count = counts.min()
     _MIN_SAMPLES = 10  # necesita al menos 5 por clase para dos splits estratificados
@@ -163,6 +172,14 @@ def train(
     logger.info(
         "Split — train: %d, val: %d, test: %d", len(df_train), len(df_val), len(df_test)
     )
+
+    # Validación: el split de train debe contener las 4 clases
+    missing_in_train = sorted(expected_labels - set(df_train["label"].unique()))
+    if missing_in_train:
+        raise ValueError(
+            "El split de entrenamiento quedó sin muestras para: "
+            + ", ".join(labels_ordered[i] for i in missing_in_train)
+        )
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
@@ -199,7 +216,7 @@ def train(
     class_weights_tensor = torch.tensor(class_weights, dtype=torch.float32)
     logger.info("Class weights: %s", dict(zip(labels_ordered, class_weights.round(3))))
 
-    # MLflow — degradación graceful si el servidor no está disponible
+    # MLflow — degradación graceful completa en todos los puntos de fallo
     _mlflow_active = False
     mlflow_uri = os.getenv("MLFLOW_TRACKING_URI")
     if mlflow_uri:
@@ -209,25 +226,39 @@ def train(
         _mlflow_active = True
     except Exception:
         logger.warning(
-            "MLflow no disponible (servidor caído o timeout). "
+            "MLflow set_experiment falló (servidor caído o timeout). "
             "El entrenamiento continuará sin tracking remoto.",
             exc_info=True,
         )
 
-    with (mlflow.start_run(run_name=f"bert_{model_name.split('/')[-1]}") if _mlflow_active else _null_mlflow_run()):
+    _run_ctx: object
+    if _mlflow_active:
+        try:
+            _run_ctx = mlflow.start_run(run_name=f"bert_{model_name.split('/')[-1]}")
+        except Exception:
+            logger.warning("MLflow start_run falló. Continuando sin tracking.", exc_info=True)
+            _mlflow_active = False
+            _run_ctx = _null_mlflow_run()
+    else:
+        _run_ctx = _null_mlflow_run()
+
+    with _run_ctx:
         if _mlflow_active:
-            mlflow.log_params(
-                {
-                    "model_name": model_name,
-                    "epochs": epochs,
-                    "batch_size": batch_size,
-                    "learning_rate": learning_rate,
-                    "train_size": len(df_train),
-                    "val_size": len(df_val),
-                    "test_size": len(df_test),
-                    "dataset_source": "augmented" if DATA_JSONL.exists() else "original_csv",
-                }
-            )
+            try:
+                mlflow.log_params(
+                    {
+                        "model_name": model_name,
+                        "epochs": epochs,
+                        "batch_size": batch_size,
+                        "learning_rate": learning_rate,
+                        "train_size": len(df_train),
+                        "val_size": len(df_val),
+                        "test_size": len(df_test),
+                        "dataset_source": "augmented" if DATA_JSONL.exists() else "original_csv",
+                    }
+                )
+            except Exception:
+                logger.warning("MLflow log_params falló.", exc_info=True)
 
         training_args = TrainingArguments(
             output_dir=str(MODEL_DIR / "checkpoints"),
@@ -262,9 +293,12 @@ def train(
         test_metrics = trainer.evaluate(ds["test"])
         logger.info("Test metrics: %s", test_metrics)
         if _mlflow_active:
-            mlflow.log_metrics(
-                {k.replace("eval_", "test_"): v for k, v in test_metrics.items() if isinstance(v, float)}
-            )
+            try:
+                mlflow.log_metrics(
+                    {k.replace("eval_", "test_"): v for k, v in test_metrics.items() if isinstance(v, float)}
+                )
+            except Exception:
+                logger.warning("MLflow log_metrics falló.", exc_info=True)
 
         # Guardar modelo, tokenizer y artefactos de inferencia
         bert_model_path = MODEL_DIR / "bert_model"
@@ -278,9 +312,12 @@ def train(
         )
 
         if _mlflow_active:
-            # Registrar modelo completo (pesos + config + tokenizer) en MLflow
-            mlflow.log_artifacts(str(bert_model_path), artifact_path="bert_model")
-            mlflow.log_artifact(str(MODEL_DIR / "label_encoder.joblib"))
+            try:
+                # Registrar modelo completo (pesos + config + tokenizer) en MLflow
+                mlflow.log_artifacts(str(bert_model_path), artifact_path="bert_model")
+                mlflow.log_artifact(str(MODEL_DIR / "label_encoder.joblib"))
+            except Exception:
+                logger.warning("MLflow log_artifacts falló.", exc_info=True)
         logger.info("Modelo guardado en %s", bert_model_path)
 
 

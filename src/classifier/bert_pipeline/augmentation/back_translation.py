@@ -36,6 +36,8 @@ def back_translate(text: str, via: str = "en") -> str | None:
     preview = text[:40]
     try:
         en = GoogleTranslator(source="es", target=via).translate(text)
+        if en is None:
+            return None  # traductor retornó None sin excepción — tratar como error
         es = GoogleTranslator(source=via, target="es").translate(en)
         return es if es and es != text else ""  # "" = sin variación léxica
     except Exception:
