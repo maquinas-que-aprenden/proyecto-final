@@ -64,7 +64,11 @@ _RE_DESC = re.compile(
 
 def _extraer_descripcion(text: str) -> str:
     match = _RE_DESC.search(text)
-    return match.group(1).strip() if match else text.strip()
+    if not match:
+        raise ValueError(
+            "Formato inesperado en el JSONL: no se encontró la sección '### Descripción'"
+        )
+    return match.group(1).strip()
 
 
 def _cargar_jsonl(path: Path) -> tuple[list[str], list[str]]:

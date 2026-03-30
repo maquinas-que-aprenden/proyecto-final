@@ -42,6 +42,7 @@ import joblib
 import numpy as np
 from sklearn.isotonic import IsotonicRegression
 from sklearn.metrics import brier_score_loss, f1_score
+from sklearn.model_selection import train_test_split
 from src.classifier._calibrated_model import IsotonicCalibratedXGB  # noqa: F401 (re-export para pickle)
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -121,34 +122,46 @@ def calibrar() -> None:
     # 2. Cargar y preparar test set
     textos, etiquetas_str = _cargar_test_set()
     logger.info("Construyendo features del test set...")
-    X_test = _build_X(textos, tfidf, svd)
-    y_test = label_encoder.transform(etiquetas_str)
+    X_all = _build_X(textos, tfidf, svd)
+    y_all = label_encoder.transform(etiquetas_str)
 
-    # 3. Probabilidades crudas del XGBoost
-    proba_raw = modelo.predict_proba(X_test)
-    y_pred_raw = modelo.predict(X_test)
-    brier_antes = _brier_multiclass(y_test, proba_raw, len(label_encoder.classes_))
-    f1_antes = f1_score(y_test, y_pred_raw, average="macro")
+    # Split calibration/evaluation para evitar data leakage:
+    # los calibradores se ajustan en X_cal y las métricas post-calibración
+    # se miden en X_eval (datos no vistos durante el ajuste).
+    # Con dataset pequeño (60 ej.) usamos 2/3 cal / 1/3 eval estratificado.
+    X_cal, X_eval, y_cal, y_eval = train_test_split(
+        X_all, y_all, test_size=0.33, stratify=y_all, random_state=42
+    )
+    logger.info(
+        "Split calibración/evaluación — cal: %d, eval: %d", len(y_cal), len(y_eval)
+    )
+
+    # 3. Probabilidades crudas del XGBoost (evaluadas en eval set)
+    proba_raw_eval = modelo.predict_proba(X_eval)
+    y_pred_raw = modelo.predict(X_eval)
+    brier_antes = _brier_multiclass(y_eval, proba_raw_eval, len(label_encoder.classes_))
+    f1_antes = f1_score(y_eval, y_pred_raw, average="macro")
     logger.info("ANTES calibración — Brier: %.4f | F1-macro: %.4f", brier_antes, f1_antes)
 
-    # 4. Ajustar calibración isotónica one-vs-rest
-    logger.info("Ajustando calibración isotónica (one-vs-rest)...")
+    # 4. Ajustar calibración isotónica one-vs-rest sobre el split de calibración
+    logger.info("Ajustando calibración isotónica (one-vs-rest) sobre X_cal...")
     n_classes = len(label_encoder.classes_)
+    proba_raw_cal = modelo.predict_proba(X_cal)
     calibrators = []
     for i in range(n_classes):
-        y_bin = (y_test == i).astype(float)
+        y_bin = (y_cal == i).astype(float)
         ir = IsotonicRegression(out_of_bounds="clip")
-        ir.fit(proba_raw[:, i], y_bin)
+        ir.fit(proba_raw_cal[:, i], y_bin)
         calibrators.append(ir)
 
     # 5. Modelo calibrado final
     calibrado = IsotonicCalibratedXGB(modelo, calibrators, modelo.classes_)
 
-    # 6. Métricas después de calibrar
-    proba_cal = calibrado.predict_proba(X_test)
-    y_pred_cal = calibrado.predict(X_test)
-    brier_despues = _brier_multiclass(y_test, proba_cal, n_classes)
-    f1_despues = f1_score(y_test, y_pred_cal, average="macro")
+    # 6. Métricas post-calibración en el eval set (no visto durante ajuste)
+    proba_cal = calibrado.predict_proba(X_eval)
+    y_pred_cal = calibrado.predict(X_eval)
+    brier_despues = _brier_multiclass(y_eval, proba_cal, n_classes)
+    f1_despues = f1_score(y_eval, y_pred_cal, average="macro")
     logger.info("DESPUÉS calibración — Brier: %.4f | F1-macro: %.4f", brier_despues, f1_despues)
 
     mejora = brier_antes - brier_despues
@@ -162,7 +175,7 @@ def calibrar() -> None:
     print("\n" + "=" * 55)
     print("RESUMEN CALIBRACIÓN")
     print("=" * 55)
-    print(f"  Ejemplos test        : {len(textos)}")
+    print(f"  Ejemplos total       : {len(textos)} (cal={len(y_cal)}, eval={len(y_eval)})")
     print(f"  Clases               : {list(label_encoder.classes_)}")
     print(f"  Brier score ANTES    : {brier_antes:.4f}")
     print(f"  Brier score DESPUÉS  : {brier_despues:.4f}")

@@ -30,10 +30,14 @@ def back_translate(text: str, via: str = "en") -> str | None:
         ``""``   → traducción exitosa pero sin variación léxica respecto al original.
         ``None`` → error en la llamada al traductor (distinguible de sin-variación).
     """
+    if not isinstance(text, str):
+        logger.warning("Texto inválido para back-translation: %r", text)
+        return None
+    preview = text[:40]
     try:
         en = GoogleTranslator(source="es", target=via).translate(text)
         es = GoogleTranslator(source=via, target="es").translate(en)
         return es if es and es != text else ""  # "" = sin variación léxica
     except Exception:
-        logger.exception("Error en back-translation para '%s...'", text[:40])
+        logger.exception("Error en back-translation para '%s...'", preview)
         return None  # None = error, distinguible de "" (sin variación)

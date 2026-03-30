@@ -14,6 +14,7 @@ Uso:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -37,8 +38,16 @@ from transformers import (
 )
 from sklearn.metrics import f1_score, accuracy_score
 
+from src.classifier._constants import RISK_LABELS
+
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
+
+
+@contextlib.contextmanager
+def _null_mlflow_run():
+    """Context manager no-op cuando MLflow no está disponible."""
+    yield
 
 
 class WeightedTrainer(Trainer):
@@ -70,7 +79,7 @@ MODEL_DIR = _PIPELINE_DIR / "models"
 
 MODEL_NAME = "dccuchile/bert-base-spanish-wwm-cased"
 MLFLOW_EXPERIMENT = "bert_clasificador_riesgo_ia"
-LABELS = ["inaceptable", "alto_riesgo", "riesgo_limitado", "riesgo_minimo"]
+LABELS = list(RISK_LABELS.values())  # ["inaceptable", "alto_riesgo", "riesgo_limitado", "riesgo_minimo"]
 MAX_SEQ_LEN = 256  # cubre >95% de los textos del corpus (ver notebook 03)
 SEED = 42
 
@@ -125,12 +134,31 @@ def train(
     labels_ordered = le.classes_.tolist()
     df["label"] = le.transform(df["etiqueta_normalizada"])
 
+    # Validación: mínimo 2 muestras por clase para que la estratificación no falle
+    counts = df["label"].value_counts()
+    min_count = counts.min()
+    _MIN_SAMPLES = 10  # necesita al menos 5 por clase para dos splits estratificados
+    if min_count < _MIN_SAMPLES:
+        clases_escasas = counts[counts < _MIN_SAMPLES].index.tolist()
+        logger.warning(
+            "Clases con pocas muestras (%s). "
+            "Se usará split NO estratificado para evitar ValueError.",
+            {labels_ordered[i]: int(counts[i]) for i in clases_escasas},
+        )
+        stratify_main = None
+        stratify_temp = None
+    else:
+        stratify_main = df["label"]
+        stratify_temp = None  # se asigna tras el primer split
+
     # Split estratificado: 80% train, 10% val, 10% test
     df_train, df_temp = train_test_split(
-        df, test_size=0.2, stratify=df["label"], random_state=SEED
+        df, test_size=0.2, stratify=stratify_main, random_state=SEED
     )
+    if stratify_main is not None:
+        stratify_temp = df_temp["label"]
     df_val, df_test = train_test_split(
-        df_temp, test_size=0.5, stratify=df_temp["label"], random_state=SEED
+        df_temp, test_size=0.5, stratify=stratify_temp, random_state=SEED
     )
     logger.info(
         "Split — train: %d, val: %d, test: %d", len(df_train), len(df_val), len(df_test)
@@ -171,25 +199,35 @@ def train(
     class_weights_tensor = torch.tensor(class_weights, dtype=torch.float32)
     logger.info("Class weights: %s", dict(zip(labels_ordered, class_weights.round(3))))
 
-    # MLflow
+    # MLflow — degradación graceful si el servidor no está disponible
+    _mlflow_active = False
     mlflow_uri = os.getenv("MLFLOW_TRACKING_URI")
     if mlflow_uri:
         mlflow.set_tracking_uri(mlflow_uri)
-    mlflow.set_experiment(MLFLOW_EXPERIMENT)
-
-    with mlflow.start_run(run_name=f"bert_{model_name.split('/')[-1]}"):
-        mlflow.log_params(
-            {
-                "model_name": model_name,
-                "epochs": epochs,
-                "batch_size": batch_size,
-                "learning_rate": learning_rate,
-                "train_size": len(df_train),
-                "val_size": len(df_val),
-                "test_size": len(df_test),
-                "dataset_source": "augmented" if DATA_JSONL.exists() else "original_csv",
-            }
+    try:
+        mlflow.set_experiment(MLFLOW_EXPERIMENT)
+        _mlflow_active = True
+    except Exception:
+        logger.warning(
+            "MLflow no disponible (servidor caído o timeout). "
+            "El entrenamiento continuará sin tracking remoto.",
+            exc_info=True,
         )
+
+    with (mlflow.start_run(run_name=f"bert_{model_name.split('/')[-1]}") if _mlflow_active else _null_mlflow_run()):
+        if _mlflow_active:
+            mlflow.log_params(
+                {
+                    "model_name": model_name,
+                    "epochs": epochs,
+                    "batch_size": batch_size,
+                    "learning_rate": learning_rate,
+                    "train_size": len(df_train),
+                    "val_size": len(df_val),
+                    "test_size": len(df_test),
+                    "dataset_source": "augmented" if DATA_JSONL.exists() else "original_csv",
+                }
+            )
 
         training_args = TrainingArguments(
             output_dir=str(MODEL_DIR / "checkpoints"),
@@ -223,9 +261,10 @@ def train(
         # Evaluación final en test
         test_metrics = trainer.evaluate(ds["test"])
         logger.info("Test metrics: %s", test_metrics)
-        mlflow.log_metrics(
-            {k.replace("eval_", "test_"): v for k, v in test_metrics.items() if isinstance(v, float)}
-        )
+        if _mlflow_active:
+            mlflow.log_metrics(
+                {k.replace("eval_", "test_"): v for k, v in test_metrics.items() if isinstance(v, float)}
+            )
 
         # Guardar modelo, tokenizer y artefactos de inferencia
         bert_model_path = MODEL_DIR / "bert_model"
@@ -238,7 +277,10 @@ def train(
             MODEL_DIR / "test_split.joblib",
         )
 
-        mlflow.log_artifact(str(MODEL_DIR / "label_encoder.joblib"))
+        if _mlflow_active:
+            # Registrar modelo completo (pesos + config + tokenizer) en MLflow
+            mlflow.log_artifacts(str(bert_model_path), artifact_path="bert_model")
+            mlflow.log_artifact(str(MODEL_DIR / "label_encoder.joblib"))
         logger.info("Modelo guardado en %s", bert_model_path)
 
 
