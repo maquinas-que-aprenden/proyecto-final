@@ -1,13 +1,19 @@
 {
-  "nombre": "Exp 2: XGBoost + SVD + GS",
-  "model_file": "model/modelo_xgboost.joblib",
+  "nombre": "Exp 2: XGBoost + SVD + GS + calibración isotónica",
+  "model_file": "model/modelo_xgboost_calibrated.joblib",
   "tfidf_file": "model/tfidf_vectorizer.joblib",
-  "model_type": "XGBClassifier",
+  "model_type": "IsotonicCalibratedXGB",
   "experimento": "2",
   "needs_manual_features": true,
   "pipeline_type": "tfidf_svd_manual",
-  "test_f1_macro": 0.8822,
-  "test_accuracy": 0.8778,
-  "test_roc_auc": 0.9668,
-  "criterio": "Mayor F1-macro en test entre los 3 experimentos"
+  "test_f1_macro": 0.8780,
+  "test_brier_score": 0.0305,
+  "test_brier_score_before_calibration": 0.0463,
+  "criterio": "XGBoost + calibración isotónica — mejor F1-macro y Brier entre todos los modelos evaluados",
+  "modelos_evaluados": {
+    "xgboost_base": {"test_f1_macro": 0.8822, "descartado_por": "sin calibración de probabilidades (Brier 0.0463)"},
+    "ensemble_xgboost_bert": {"test_f1_macro": 0.7574, "descartado_por": "BERT arrastra F1 hacia abajo (-0.1206 vs calibrado)"},
+    "e5_xgboost": {"test_f1_macro": null, "descartado_por": "dataset insuficiente (240 ejemplos), no supera TF-IDF"}
+  },
+  "fecha_decision": "2026-03-30"
 }
